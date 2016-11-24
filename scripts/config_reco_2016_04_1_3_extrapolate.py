@@ -30,7 +30,7 @@ class Config(object):
           "p_tot_ds":False,
           "tof_0_sp":True,
           "tof_1_sp":True,
-          "tof_2_sp":False,
+          "tof_2_sp":True,
     }
     extrapolation_cuts = {
           "any_cut":False,

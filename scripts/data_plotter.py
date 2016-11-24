@@ -319,3 +319,14 @@ class DataPlotter(object):
             for format in ["png", "root", "pdf"]:
                 canvas.Print(self.plot_dir+"bunch_"+var_1+"_"+var_2+"."+format)
 
+        canvas, hist = self.bunch_us.root_histogram("r", "mm", "pt", "MeV/c", xmin=0., xmax=200., ymin=0., ymax=100.)
+        canvas.cd()
+        hist.SetTitle(self.config_analysis['name'])
+        hist.Draw("COLZ")
+        canvas.Update()
+
+        canvas.Update()
+        for format in ["png", "root", "pdf"]:
+            canvas.Print(self.plot_dir+"bunch_r_pt."+format)
+
+

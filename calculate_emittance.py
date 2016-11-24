@@ -88,6 +88,7 @@ def do_analysis(config, analysis_index):
     plotter.plot_var_1d("r", "upstream")
     plotter.plot_var_1d("p", "downstream")
     plotter.plot_var_1d("r", "downstream")
+    plotter.plot_var_2d("r", "downstream", "pt", "downstream")
     plotter.plot_p_tot_res()
     plotter.plot_p_tot_vs_tof()
     accepted, accepted_data = plotter.get_cuts_summary()

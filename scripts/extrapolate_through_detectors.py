@@ -171,6 +171,7 @@ class ExtrapolateTrackPoints(object):
             #sys.excepthook(*sys.exc_info())
             return
 
+        return 
         # we have an extrapolated track and a detector hit. How close is the
         # extrapolated track to the measured particle?
         residual = det_rec["hit"][axis]-glob_rec["hit"][axis]
@@ -228,7 +229,8 @@ class ExtrapolateTrackPoints(object):
             print "Weighted Residuals", weighted_residual_list
             print "Det", detector, "axis", axis
         if len(residual_list) == 0:
-            raise RuntimeError("No residuals were found? Something screwy?")
+            print "No residuals were found for "+detector+" "+axis+"? Something screwy?"
+            return
 
         nbins = self.config.residuals_plots_nbins
         name = "residuals - "+detector+" "+axis
@@ -310,7 +312,7 @@ class ExtrapolateTrackPoints(object):
             hist.SetTitle("Misses - "+detector)
             self.get_miss_text_box(bunch, detector)
             self.print_canvas(canvas, "misses_"+detector+"_pt")
-            canvas, hist = bunch.root_histogram("r", "mm", "pt", "MeV/c", nx_bins=10, ny_bins=10, xmin=0., xmax=+300., ymin=0., ymax=+100.)
+            canvas, hist = bunch.root_histogram("r", "mm", "pt", "MeV/c", nx_bins=50, ny_bins=50, xmin=0., xmax=+200., ymin=0., ymax=+100.)
             hist.SetTitle("Misses - "+detector)
             self.get_miss_text_box(bunch, detector)
             self.print_canvas(canvas, "misses_"+detector+"_r-pt")
@@ -362,6 +364,27 @@ class ExtrapolateTrackPoints(object):
         json_conf["verbose_level"] = config.verbose_level
         maus_conf = json.dumps(json_conf)
         maus_cpp.globals.birth(maus_conf)
+
+    aperture = sorted([
+         (-3500., 1000.),
+         (-3248.5, 100.),
+         (-3148.5, 100.), # diffuser
+         (-2918.5, 150.),
+         (-1818.5, 150.),
+         (-1050.0,  200.),
+         (-422.0,  200.),
+         (+225.0, 160.),
+         (+1050.0, 200.),
+         (+1818.5, 150.),
+         (+2918.5, 150.),
+      ]+\
+      [(float(z), 150.) for z in range(-2918, -1817, 100)]+\
+      [(float(z), 150.) for z in range(1818, 2919, 100)]+\
+      [(float(z), 200.) for z in range(-1800, 301, 100)]+\
+      [(float(z), 170.) for z in range(400, 1801, 100)]
+    )
+    aperture = [(z+0., r) for (z, r) in aperture]
+
 
 def is_cut(event, config):
     for cut in config.extrapolation_cuts:
