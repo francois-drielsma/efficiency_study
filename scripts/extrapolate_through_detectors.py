@@ -98,7 +98,7 @@ class ExtrapolateTrackPoints(object):
             tof0_point, tof0_error = self.tracking.propagate_errors(tof1_point, tof1_error, self.config.z_tof0)
             event.append(self.make_rec(tof0_point, tof0_error, "tof0"))
         except RuntimeError:
-            pass #sys.excepthook(*sys.exc_info())
+            sys.excepthook(*sys.exc_info())
 
         # walking downstream
         try:
@@ -107,7 +107,7 @@ class ExtrapolateTrackPoints(object):
             tof2_point, tof2_error = self.tracking.propagate_errors(tkd_point, tkd_error, self.config.z_tof2)
             event.append(self.make_rec(tof2_point, tof2_error, "tof2"))
         except RuntimeError:
-            pass #sys.excepthook(*sys.exc_info())
+            sys.excepthook(*sys.exc_info())
             
         return event
 
@@ -161,6 +161,7 @@ class ExtrapolateTrackPoints(object):
             glob_rec = self.get_point(event, self.global_key(detector))
         except ValueError:
             # we failed to extrapolate a track, nothing more to do
+            sys.excepthook(*sys.exc_info())
             return
 
         try:
@@ -168,14 +169,14 @@ class ExtrapolateTrackPoints(object):
         except ValueError:
             # we successfully extrapolated the track, but it is not observed in
             # the detector... I wonder why?
-            #sys.excepthook(*sys.exc_info())
+            sys.excepthook(*sys.exc_info())
             return
 
-        return 
         # we have an extrapolated track and a detector hit. How close is the
         # extrapolated track to the measured particle?
         residual = det_rec["hit"][axis]-glob_rec["hit"][axis]
         residual_list.append(residual)
+        return 
         if axis in self.cov_key_list:
             key = self.cov_key_list.index(axis)
             sigma = (glob_rec["covariance"][key][key]+det_rec["covariance"][key][key])**0.5 # -ve sqrt exception?

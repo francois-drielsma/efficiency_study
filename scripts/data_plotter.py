@@ -96,8 +96,8 @@ class DataPlotter(object):
         
         cut_dict['data_cut'] = cut_data_dict['data_cut']
         cut_dict['runs'] = sorted([run for run in self.run_numbers])
-        cut_dict['max_p_bin'] = self.max_p_bin
-        cut_dict['max_tof01_bin'] = self.max_tof01_bin
+        cut_dict['max_p_bin'] = round(self.max_p_bin, 2)
+        cut_dict['max_tof01_bin'] = round(self.max_tof01_bin, 2)
         cut_keys = ['tof01', 'tof_2_sp', 'data_cut', 'max_p_bin', 'max_tof01_bin']
         wiki_summary = "| "+self.config_analysis['name']+" | "
         cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(cut_dict['runs'])
@@ -126,7 +126,7 @@ class DataPlotter(object):
         hist.SetTitle(self.config_analysis['name'])
         hist.Draw("SAME")
         tof01_canvas.Update()
-        self.max_tof01_bin = max([hist.GetBinContent(i) for i in range(102)])
+        self.max_tof01_bin = self.get_max(hist)
         for format in ["png", "root", "pdf"]:
             tof01_canvas.Print(self.plot_dir+"tof01."+format)
 
@@ -227,6 +227,12 @@ class DataPlotter(object):
         for format in ["png", "root", "pdf"]:
             canvas.Print(self.plot_dir+name+"."+format)
 
+    def get_max(self, hist):
+        bins = [hist.GetBinContent(i) for i in range(1, 101)]
+        max_index = bins.index(max(bins))
+        bin_width = hist.GetBinWidth(max_index) # regular bins
+        return bins[max_index]/bin_width
+
     def plot_var_1d(self, var_1, us_ds_1):
         name =  us_ds_1+"_"+var_1
         canvas = xboa.common.make_root_canvas(name)
@@ -257,8 +263,8 @@ class DataPlotter(object):
         canvas.Update()
         for format in ["png", "root", "pdf"]:
             canvas.Print(self.plot_dir+name+"."+format)
-        if var_1 == "p" and us_ds_1 == "downstream":
-            self.max_p_bin = max([hist.GetBinContent(i) for i in range(102)])
+        if var_1 == "p" and us_ds_1 == "upstream":
+            self.max_p_bin = self.get_max(hist)
 
     def bunch_plots(self):
         name = self.config_analysis['name']

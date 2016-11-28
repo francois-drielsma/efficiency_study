@@ -46,7 +46,7 @@ class Config(object):
           "p_tot_ds":False,
           "tof_0_sp":True,
           "tof_1_sp":True,
-          "tof_2_sp":False,
+          "tof_2_sp":True,
     }
 
     analyses = [
@@ -56,7 +56,7 @@ class Config(object):
             "tof12_cut_high":39.,
             "tof01_cut_low":28.,
             "tof01_cut_high":33.,
-            "p_bins":[[137.5, 142.5]],
+            "p_bins":[[130.0, 150.0]],
             "p_tot_ds_low":80.,
             "p_tot_ds_high":200.,
             "reco_files":file_names([8593,], "MAUS-v2.6.5"), # 8595, 8596, 8597, 8598, 8599, 8600, 8602
@@ -75,7 +75,7 @@ class Config(object):
     global_max_step_size = 100.
     will_load_tk_space_points = False
     will_load_tk_track_points = True
-    number_of_spills = 100000
+    number_of_spills = 10000
     momentum_from_tracker = True
 
     residuals_plots_nbins = 100
