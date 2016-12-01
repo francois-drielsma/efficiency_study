@@ -169,7 +169,7 @@ class ExtrapolateTrackPoints(object):
         except ValueError:
             # we successfully extrapolated the track, but it is not observed in
             # the detector... I wonder why?
-            sys.excepthook(*sys.exc_info())
+            # sys.excepthook(*sys.exc_info())
             return
 
         # we have an extrapolated track and a detector hit. How close is the
@@ -207,6 +207,7 @@ class ExtrapolateTrackPoints(object):
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
         text_box.SetTextSize(0.03)
+        text_box.AddText("MICE Internal")
         text_box.AddText(self.config_anal["name"])
         text_box.AddText("Recon: "+self.data_loader.maus_version)
         text_box.AddText("Geometry: "+str(self.get_geometry()))
@@ -262,7 +263,7 @@ class ExtrapolateTrackPoints(object):
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
         text_box.SetTextSize(0.03)
-        text_box.AddText("Preliminary")
+        text_box.AddText("MICE Internal")
         text_box.AddText("Recon: "+self.data_loader.maus_version)
         text_box.AddText("Geometry: "+str(self.get_geometry()))
         text_box.AddText("All events (black)")

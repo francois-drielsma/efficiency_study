@@ -22,6 +22,7 @@ class DataLoader(object):
         self.events = []
         self.maus_version = ""
         self.run_numbers = set([])
+        self.this_run = 0
         self.cuts = {}
         self.event_id = 0
 
@@ -50,6 +51,7 @@ class DataLoader(object):
             for i in range(tree.GetEntries()):
                 tree.GetEntry(i)
                 spill = data.GetSpill()
+                self.this_run = spill.GetRunNumber()
                 if i == 0:
                     self.run_numbers.add(spill.GetRunNumber())
                 if spill.GetDaqEventType() == "physics_event":
@@ -323,7 +325,7 @@ class DataLoader(object):
         tof2 = None
         for point in event["data"]:
             point["hit"]["event_number"] = self.event_id
-            self.event_id += 1
+            point["hit"]["spill"]  = self.this_run
             if point["detector"] == "tku_tp":
                 tku = point["hit"]
             elif point["detector"] == "tkd_tp":
@@ -346,6 +348,7 @@ class DataLoader(object):
         event["tkd"] = tkd
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
+        self.event_id += 1
         return event
 
     cuts = None
