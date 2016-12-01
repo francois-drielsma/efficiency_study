@@ -100,11 +100,14 @@ class DataPlotter(object):
         cut_dict['max_tof01_bin'] = round(self.max_tof01_bin, 2)
         cut_keys = ['tof01', 'tof_2_sp', 'data_cut', 'max_p_bin', 'max_tof01_bin']
         wiki_summary = "| "+self.config_analysis['name']+" | "
-        cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(cut_dict['runs'])
-        cdb_dict["time"] = str(cdb_dict["time"][0])+" hrs "+str(cdb_dict["time"][1])+" mins"
-        cdb_keys = ["runs", "lmc1234", "tof1_triggers", "tof2_triggers", "time"]
-        for key in cdb_keys:
-            wiki_summary += " "+str(cdb_dict[key]).ljust(8)+" |"
+        try:
+            cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(cut_dict['runs'])
+            cdb_dict["time"] = str(cdb_dict["time"][0])+" hrs "+str(cdb_dict["time"][1])+" mins"
+            cdb_keys = ["runs", "lmc1234", "tof1_triggers", "tof2_triggers", "time"]
+            for key in cdb_keys:
+                wiki_summary += " "+str(cdb_dict[key]).ljust(8)+" |"
+        except Exception:
+            wiki_summary += "| Failed to contact cdb |"
         for key in cut_keys:
             wiki_summary += " "+str(cut_dict[key]).ljust(8)+" |"
         return wiki_summary
@@ -325,7 +328,7 @@ class DataPlotter(object):
             for format in ["png", "root", "pdf"]:
                 canvas.Print(self.plot_dir+"bunch_"+var_1+"_"+var_2+"."+format)
 
-        canvas, hist = self.bunch_us.root_histogram("r", "mm", "pt", "MeV/c", xmin=0., xmax=200., ymin=0., ymax=100.)
+        canvas, hist = self.bunch_us.root_histogram("r", "mm", "pt", "MeV/c", nx_bins=50, ny_bins=50, xmin=0., xmax=200., ymin=0., ymax=100.)
         canvas.cd()
         hist.SetTitle(self.config_analysis['name'])
         hist.Draw("COLZ")

@@ -5,10 +5,21 @@ import xboa.common as common
 from xboa.hit import Hit
 from xboa.bunch import Bunch
 
-def fractional_amplitude(bunch, amplitude_list):
+def delta_weight(bunch, delta):
+    weight_sum_accepted = 0
+    weight_sum_rejected = 0
+    for hit in bunch:
+        if (hit['spill'], hit['event_number']) in delta:
+            weight_sum_accepted += hit['weight']
+        else:
+            weight_sum_rejected += hit['weight']
+    return weight_sum_accepted, weight_sum_rejected
+
+def fractional_amplitude(bunch, amplitude_list, bunch_delta):
     amplitude_list = sorted(amplitude_list)[::-1]
-    weight_list = []
+    weight_accepted_list, weight_rejected_list = [], []
     bunch = bunch.deepcopy()
+    delta = [(hit['spill'], hit['event_number']) for hit in bunch_delta]
     for amplitude in amplitude_list:
         old_weight = -1.
         new_weight = bunch.bunch_weight()
@@ -21,13 +32,21 @@ def fractional_amplitude(bunch, amplitude_list):
                 sys.excepthook(*sys.exc_info())
                 new_weight = 0.
                 old_weight = 0.
-        weight_list.append(new_weight)
-    weight_list = weight_list[::-1]
-    weight_list = [0.]+weight_list
-    return weight_list
+        weight_sum_accepted, weight_sum_rejected = delta_weight(bunch, delta)
+        weight_accepted_list.append(weight_sum_accepted)
+        weight_rejected_list.append(weight_sum_rejected)
+    weight_accepted_list = weight_accepted_list[::-1]
+    weight_accepted_list = [0.]+weight_accepted_list
+    weight_rejected_list = weight_rejected_list[::-1]
+    weight_rejected_list = [0.]+weight_rejected_list
+    return weight_accepted_list, weight_rejected_list
 
 #Add some histograms for sanity checks...
 def delta_amplitude_plot(bunch_0, bunch_1, plot_dir, p_bin):
+    for hit in bunch_0[0:10]:
+        print (hit['spill'], hit['event_number'], hit['particle_number'])
+    for hit in bunch_1[0:10]:
+        print (hit['spill'], hit['event_number'], hit['particle_number'])
     xmax = 100.
     nbins = 50
     print "Momentum bin", p_bin
@@ -45,29 +64,43 @@ def delta_amplitude_plot(bunch_0, bunch_1, plot_dir, p_bin):
     bin_edge_list = [0.]+[axes.GetBinCenter(bin)+axes.GetBinWidth(bin)/2. for bin in range(1, nbins+2)]
 
     print "Upstream amplitude calculation..."
-    cdf_list_0 = fractional_amplitude(bunch_0, bin_edge_list)
+    cdf_list_0, cdf_list_2 = fractional_amplitude(bunch_0, bin_edge_list, bunch_1)
     print "Downstream amplitude calculation..."
-    cdf_list_1 = fractional_amplitude(bunch_1, bin_edge_list)
+    cdf_list_1, dummy = fractional_amplitude(bunch_1, bin_edge_list, bunch_1)
 
     print "CDF 0", cdf_list_0
     print "CDF 1", cdf_list_1
+    print "CDF 2", cdf_list_2
+    print "DUMMY", dummy
     canvas_pdf = common.make_root_canvas("amplitudes")
+
+
+    hist_0 = common.make_root_histogram("cdf 0", [-1.], "A_{#perp}   [mm]", nbins, xmin = 0., xmax = xmax)
+    for bin, weight in enumerate(cdf_list_0[:-1]):
+        hist_0.SetBinContent(bin+1, cdf_list_0[bin+1]-cdf_list_0[bin])
+    hist_0.SetName("z = "+str(round(bunch_0[0]['z'], 1))+" mm (observed downstream)")
+    hist_0.SetLineColor(8)
+    hist_0.Draw()
 
     hist_1 = common.make_root_histogram("cdf 1", [-1.], "A_{#perp}   [mm]", nbins, xmin = 0., xmax = xmax)
     for bin, weight in enumerate(cdf_list_1[:-1]):
         hist_1.SetBinContent(bin+1, cdf_list_1[bin+1]-cdf_list_1[bin])
     hist_1.SetName("z = "+str(round(bunch_1[0]['z'], 1))+" mm")
     hist_1.SetLineColor(4)
-    hist_1.Draw()
+    hist_1.Draw("SAME")
 
-    hist_0 = common.make_root_histogram("cdf 0", [-1.], "A_{#perp}   [mm]", nbins, xmin = 0., xmax = xmax)
-    for bin, weight in enumerate(cdf_list_0[:-1]):
-        hist_0.SetBinContent(bin+1, cdf_list_0[bin+1]-cdf_list_0[bin])
-    hist_0.SetName("z = "+str(round(bunch_0[0]['z'], 1))+" mm")
-    hist_0.SetLineColor(8)
-    hist_0.Draw("SAME")
+    hist_2 = common.make_root_histogram("cdf 2", [-1.], "A_{#perp}   [mm]", nbins, xmin = 0., xmax = xmax)
+    for bin, weight in enumerate(cdf_list_2[:-1]):
+        hist_2.SetBinContent(bin+1, cdf_list_2[bin+1]-cdf_list_2[bin])
+    hist_2.SetName("z = "+str(round(bunch_0[0]['z'], 1))+" mm (not observed downstream)")
+    hist_2.SetLineColor(2)
 
-    legend = common.make_root_legend(canvas_pdf, [hist_0, hist_1])
+    hist_list = sorted([hist_0, hist_1, hist_2], key = lambda hist: -hist.GetMaximum())
+    hist_list[0].Draw()
+    for hist in hist_list[1:]:
+        hist.Draw("SAME")
+
+    legend = common.make_root_legend(canvas_pdf, [hist_0, hist_1, hist_2])
     legend.SetX1NDC(0.6)
     legend.SetX2NDC(0.89)
     legend.SetY1NDC(0.7)
@@ -109,6 +142,7 @@ def delta_amplitude_plot(bunch_0, bunch_1, plot_dir, p_bin):
 def make_bunches(data_loader, p_min, p_max):
     hit_list_us = []
     hit_list_ds = []
+    hit_list_scraped = []
 
     for event in data_loader.events:
         if event['any_cut'] or event['tku']['p'] < p_min or event['tku']['p'] > p_max:
