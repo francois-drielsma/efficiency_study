@@ -24,13 +24,7 @@ from scripts.tm_calculator import TMCalculator
 from scripts.data_plotter import DataPlotter
 from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
-<<<<<<< HEAD
 import scripts.config_reco_2016_04_1_2 as config_file
-=======
-#import scripts.config_reco_2016_04_1_3_extrapolate as config_file
-import scripts.config_reco_2016_04_1_2 as config_file
-
->>>>>>> 6e81bf8037982b2cc7962c3a2e5e6390e256a2f0
 
 def maus_globals(config):
     try:
