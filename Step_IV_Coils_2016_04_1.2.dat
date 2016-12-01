@@ -7,21 +7,21 @@ Module Stage4Coils
   PropertyString Material Galactic
   PropertyHep3Vector Dimensions 1000.0 1000.0 30000.0 mm 
 
-  Substitution $FieldMapMode Write
+  Substitution $FieldMapMode Read
   Substitution $ZOffset 16955.74
 
-  Substitution $EC2_US_Current 205.5
-  Substitution $CC_US_Current 205.5
-  Substitution $EC1_US_Current 205.5
-  Substitution $MC2_US_Current 208.6
-  Substitution $MC1_US_Current 102.3
-  Substitution $FC_US_Current 41.50
-  Substitution $FC_DS_Current 41.50
+  Substitution $EC2_US_Current 205.86
+  Substitution $CC_US_Current 205.86
+  Substitution $EC1_US_Current 205.86
+  Substitution $MC2_US_Current 171.91
+  Substitution $MC1_US_Current 211.73
+  Substitution $FC_US_Current 57.93
+  Substitution $FC_DS_Current 57.93
   Substitution $MC1_DS_Current 0.
   Substitution $MC2_DS_Current 0.0
-  Substitution $EC1_DS_Current 205.5
-  Substitution $CC_DS_Current 205.5
-  Substitution $EC2_DS_Current 205.5
+  Substitution $EC1_DS_Current 205.86
+  Substitution $CC_DS_Current 205.86
+  Substitution $EC2_DS_Current 205.86
   Substitution $AbsorberMaterial MICE_LITHIUM_HYDRIDE
   Substitution $AbsorberThickness 65.
 

@@ -15,15 +15,23 @@ import maus_cpp.field
 import maus_cpp.polynomial_map
 import libxml2
 
-import scripts.extrapolate_through_detectors
+try:
+    import scripts.extrapolate_through_detectors
+except ImportError:
+    print "Note you are not set up for extrapolation... so this 'do_extrapolation' = True will throw an exception"
 import scripts.amplitude_analysis
 from scripts.tm_calculator import TMCalculator
 from scripts.data_plotter import DataPlotter
 from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
-import scripts.config_reco_2016_04_1_3_extrapolate as config_file
+import scripts.config_reco_2016_04_1_2 as config_file
 
 def maus_globals(config):
+    try:
+        os.makedirs("logs/tmp") # location for magnet cached maps
+    except OSError:
+        pass # probably the directory existed already
+
     str_conf = Configuration.Configuration().\
                                       getConfigJSON(command_line_args=False)
     json_conf = json.loads(str_conf)

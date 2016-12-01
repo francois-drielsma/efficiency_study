@@ -53,7 +53,7 @@ class DataLoader(object):
                 if i == 0:
                     self.run_numbers.add(spill.GetRunNumber())
                 if spill.GetDaqEventType() == "physics_event":
-                    if self.config.number_of_spills == None or self.spill_count > self.config.number_of_spills:
+                    if self.config.number_of_spills != None and self.spill_count > self.config.number_of_spills:
                         file_name_list = []
                         break
                     self.spill_count += 1
