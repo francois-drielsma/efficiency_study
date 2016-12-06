@@ -4,6 +4,8 @@ import os
 import site
 import json
 import datetime
+import bisect
+import libxml2
 
 import numpy
 import ROOT
@@ -16,7 +18,6 @@ import Configuration
 import maus_cpp.global_error_tracking
 import maus_cpp.globals
 import maus_cpp.field
-import libxml2
 import xboa.common
 
 class ExtrapolateTrackPoints(object):
@@ -33,8 +34,18 @@ class ExtrapolateTrackPoints(object):
         self.miss_lists = {}
         self.weighted_residual_dicts = {}
         self.data_loader = data_loader
-        self.vb_out = None
-       
+        self.csv_out = None
+        self.csv_headers = ["spill", "event_number", "t", "x", "y", "z", "px", "py", "pz"]
+        self.apertures = sorted(config.apertures+config.detectors)
+        print "Found apertures like"
+        print "z".rjust(8), "radius".rjust(8), "name"
+        for z, radius, name in self.apertures:
+            print str(z).rjust(10), str(radius).rjust(8), name.rjust(12),
+            if radius != None:
+                print "o"+"|".rjust(int(radius/10))
+            else:
+                print "o"
+
     def setup_maus_config(self):
         self.tracking = maus_cpp.global_error_tracking.GlobalErrorTracking()
         self.tracking.set_min_step_size(self.config.global_min_step_size)
@@ -60,7 +71,7 @@ class ExtrapolateTrackPoints(object):
         return rec_point
 
 
-    def make_rec(self, value, ellipse, detector):
+    def make_rec(self, value, ellipse, detector, reference):
         hit = Hit.new_from_dict( {
             "t":value[0],
             "x":value[1],
@@ -69,8 +80,12 @@ class ExtrapolateTrackPoints(object):
             "px":value[5],
             "py":value[6],
             "pz":value[7],
-            "pid":-13,
+            "pid":reference["hit"]["pid"],
+            "charge":reference["hit"]["charge"],
             "mass":xboa.common.pdg_pid_to_mass[13],
+            "spill":reference["hit"]["spill"],
+            "event_number":reference["hit"]["event_number"],
+            "particle_number":reference["hit"]["particle_number"],
           }, "energy"
         )
         rec_point = {
@@ -84,31 +99,40 @@ class ExtrapolateTrackPoints(object):
         return "global_"+detector
 
     def extrapolate_event(self, event):
-        event = sorted(event, key = lambda tp: tp["hit"]["z"]) # check that it is sorted
-        tku_rec = self.get_point(event, "tku_tp")
+        detector_hits = event["data"]
+        detector_hits = sorted(detector_hits, key = lambda tp: tp["hit"]["z"]) # check that it is sorted
+        tku_rec = self.get_point(detector_hits, "tku_tp")
         energy = (tku_rec["hit"]["px"]**2 + tku_rec["hit"]["py"]**2 + tku_rec["hit"]["pz"]**2 + self.mu_mass**2)**0.5
         seed = [0.,     tku_rec["hit"]["x"],  tku_rec["hit"]["y"],  tku_rec["hit"]["z"],
                 tku_rec["hit"]["energy"], tku_rec["hit"]["px"], tku_rec["hit"]["py"], tku_rec["hit"]["pz"],]
         ellipse = tku_rec["covariance"]
-        # walking upstream
+        first = bisect.bisect_left(self.apertures, (seed[3], None, None))
+        # walking upstream from tku
+        point, error = seed, ellipse
         try:
-            tof1_point, tof1_error = self.tracking.propagate_errors(seed, ellipse, self.config.z_tof1)
-            tof1_point[0] = 0.
-            event.append(self.make_rec(tof1_point, tof1_error, "tof1"))
-            tof0_point, tof0_error = self.tracking.propagate_errors(tof1_point, tof1_error, self.config.z_tof0)
-            event.append(self.make_rec(tof0_point, tof0_error, "tof0"))
+            for z_pos, radius, name in reversed(self.apertures[:first]):
+                point, error = self.tracking.propagate_errors(point, error, z_pos)
+                hit = self.make_rec(point, error, name, tku_rec)
+                if radius != None and hit["hit"]["r"] > radius:
+                    event["apertures_us"].append(name)
+                detector_hits.append(hit)
         except RuntimeError:
             sys.excepthook(*sys.exc_info())
 
-        # walking downstream
+        # walking downstream from tku
+        point, error = seed, ellipse
         try:
-            tkd_point, tkd_error = self.tracking.propagate_errors(seed, ellipse, self.config.z_tkd_1)
-            event.append(self.make_rec(tkd_point, tkd_error, "tkd_tp"))
-            tof2_point, tof2_error = self.tracking.propagate_errors(tkd_point, tkd_error, self.config.z_tof2)
-            event.append(self.make_rec(tof2_point, tof2_error, "tof2"))
+            for z_pos, radius, name in self.apertures[first:]:
+                point, error = self.tracking.propagate_errors(point, error, z_pos)
+                hit = self.make_rec(point, error, name, tku_rec)
+                if radius != None and hit["hit"]["r"] > radius:
+                    event["apertures_ds"].append(name)
+                detector_hits.append(hit)
         except RuntimeError:
             sys.excepthook(*sys.exc_info())
-            
+        event["data"] = detector_hits
+        event["will_cut"]["aperture_us"] = len(event["apertures_us"]) > 0
+        event["will_cut"]["aperture_ds"] = len(event["apertures_ds"]) > 0
         return event
 
     def alt_min_max(self, float_list, n_sigma):
@@ -301,6 +325,7 @@ class ExtrapolateTrackPoints(object):
             self.get_miss_text_box(bunch, detector)
             self.print_canvas(canvas, "misses_"+detector+"_x-y")
         for detector in "tkd_tp",:
+            print self.miss_lists.keys()
             if detector not in self.miss_lists or len(self.miss_lists[detector]) == 0:
                 print "No misses for", detector
                 continue
@@ -327,33 +352,35 @@ class ExtrapolateTrackPoints(object):
     cov_key_list = ["t", "x", "y", "energy", "px", "py"]
     mu_mass = xboa.common.pdg_pid_to_mass[13]
 
-    def print_hits_csv(self, detector_list, headers):
-        if self.vb_out == None:
-            self.vb_out = open("data_for_vb.csv", "w")
-            for head in headers:
+    def print_hits_csv(self):
+        if "csv_output_filename" not in self.config_anal or self.config_anal["csv_output_filename"] == None:
+            return
+        if self.csv_out == None:
+            self.csv_out = open(self.config_anal["csv_output_filename"], "w")
+            for head in self.csv_headers:
                 if head in self.units:
                     units = " ["+self.units[head]+"]"
                 else:
                     units = ""
-                print >> self.vb_out, str(head+units).ljust(15),
-            print >> self.vb_out
+                print >> self.csv_out, str(head+units).ljust(15),
+            print >> self.csv_out
         print "    writing data...",
         sys.stdout.flush()
         for event in self.data_loader.events:
-            for detector in detector_list:
+            for detector in self.config_anal["csv_output_detectors"]:
                 for hit in event["data"]:
-                    if hit["detector"] != detector:
+                    if hit["detector"] != self.global_key(detector):
                         continue
-                    for head in headers:
-                        if head in hit.keys():
-                            print >> self.vb_out, str(hit[head]).ljust(15),
+                    for head in self.csv_headers:
+                        if head in hit["hit"].get_variables():
+                            print >> self.csv_out, str(hit["hit"][head]).ljust(15),
                         elif head in event.keys():
-                            print >> self.vb_out, str(event[head]).ljust(15),
+                            print >> self.csv_out, str(event[head]).ljust(15),
                         else:
-                            raise KeyError("Couldn't find key "+head+" from event keys: "+str(event.keys())+" hit keys: "+str(hit.keys()))
-                    print >> self.vb_out
+                            raise KeyError("Couldn't find key "+head+" from event keys: "+str(event.keys())+" hit keys: "+str(hit["hit"].get_variables()))
+                    print >> self.csv_out
                     break
-        self.vb_out.flush()
+        self.csv_out.flush()
         print "written"
 
     def maus_globals(config):
@@ -367,25 +394,6 @@ class ExtrapolateTrackPoints(object):
         maus_conf = json.dumps(json_conf)
         maus_cpp.globals.birth(maus_conf)
 
-    aperture = sorted([
-         (-3500., 1000.),
-         (-3248.5, 100.),
-         (-3148.5, 100.), # diffuser
-         (-2918.5, 150.),
-         (-1818.5, 150.),
-         (-1050.0,  200.),
-         (-422.0,  200.),
-         (+225.0, 160.),
-         (+1050.0, 200.),
-         (+1818.5, 150.),
-         (+2918.5, 150.),
-      ]+\
-      [(float(z), 150.) for z in range(-2918, -1817, 100)]+\
-      [(float(z), 150.) for z in range(1818, 2919, 100)]+\
-      [(float(z), 200.) for z in range(-1800, 301, 100)]+\
-      [(float(z), 170.) for z in range(400, 1801, 100)]
-    )
-    aperture = [(z+0., r) for (z, r) in aperture]
 
 
 def is_cut(event, config):
@@ -407,8 +415,9 @@ def do_plots(extrapolate):
 def do_extrapolation(config, config_anal, data_loader):
     print "Doing extrapolation"
     index = 0
-    pass_cuts = 0
+    pass_first_cuts = 0
     pass_extrapolate = 0
+    pass_second_cuts = 0
     step = 500
     will_do_plots = False
     extrapolate = ExtrapolateTrackPoints(config, config_anal, data_loader)
@@ -419,12 +428,15 @@ def do_extrapolation(config, config_anal, data_loader):
                 event = data_loader.events[index]
                 if is_cut(event, config):
                     continue
-                pass_cuts += 1
+                pass_first_cuts += 1
                 try:
-                    event["data"] = extrapolate.extrapolate_event(event["data"])  
+                    extrapolate.extrapolate_event(event)  
                     pass_extrapolate += 1
                 except ValueError:
                     pass #sys.excepthook(*sys.exc_info())
+                if is_cut(event, config):
+                    continue
+                pass_second_cuts += 1
                 for detector in "tof1", "tof0", "tof2":
                     extrapolate.append_misses(event, detector)
                     for axis in "x", "y", "t":
@@ -433,11 +445,13 @@ def do_extrapolation(config, config_anal, data_loader):
                     extrapolate.append_misses(event, detector)
                     for axis in "x", "y", "px", "py", "pz":
                         extrapolate.append_residual(event, detector, axis)
-                will_do_plots = pass_cuts % step == 0
+                will_do_plots = pass_second_cuts % step == 0
         except IndexError:
             index = len(data_loader.events) # force to finish
-        print "event", index, "of", len(data_loader.events), "with", pass_cuts, "passing cuts and", pass_extrapolate, "extrapolating okay"
+        print "event", index, "of", len(data_loader.events), "with", pass_first_cuts, \
+              "passing first cuts,", pass_extrapolate, "extrapolating okay and", \
+              pass_second_cuts, "passing second cuts"
         do_plots(extrapolate)
         will_do_plots = False
-        
+    extrapolate.print_hits_csv()
 

@@ -23,6 +23,8 @@ class DataLoader(object):
         self.maus_version = ""
         self.run_numbers = set([])
         self.this_run = 0
+        self.this_spill = 0
+        self.this_event = 0
         self.cuts = {}
         self.event_id = 0
 
@@ -52,6 +54,7 @@ class DataLoader(object):
                 tree.GetEntry(i)
                 spill = data.GetSpill()
                 self.this_run = spill.GetRunNumber()
+                self.this_spill = spill.GetSpillNumber()
                 if i == 0:
                     self.run_numbers.add(spill.GetRunNumber())
                 if spill.GetDaqEventType() == "physics_event":
@@ -61,6 +64,7 @@ class DataLoader(object):
                         break
                     self.spill_count += 1
                     for ev_number, reco_event in enumerate(spill.GetReconEvents()):
+                        self.this_event = reco_event.GetPartEventNumber()
                         self.event_count += 1
                         try:
                             event = self.load_reco_event(reco_event)
@@ -325,8 +329,9 @@ class DataLoader(object):
         tof1 = None
         tof2 = None
         for point in event["data"]:
-            point["hit"]["event_number"] = self.event_id
-            point["hit"]["spill"]  = self.this_run
+            point["hit"]["particle_number"] = self.this_run
+            point["hit"]["event_number"] = self.this_event
+            point["hit"]["spill"]  = self.this_spill
             if point["detector"] == "tku_tp":
                 tku = point["hit"]
             elif point["detector"] == "tkd_tp":
@@ -345,10 +350,14 @@ class DataLoader(object):
             event["tof01"] = tof1 - tof0
         except TypeError:
             event["tof01"] = None
+        event["apertures_us"] = [] # list of apertures that the event hit upstream of tku
+        event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
+        event["will_cut"]["aperture_us"] = False
+        event["will_cut"]["aperture_ds"] = False
         self.event_id += 1
         return event
 

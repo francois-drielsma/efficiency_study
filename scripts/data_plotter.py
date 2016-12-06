@@ -248,7 +248,6 @@ class DataPlotter(object):
         for i in range(3):
             hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
             hist.SetTitle(self.config_analysis['name'])
-            hist.SetTitle(self.config_analysis['name'])
             fit = ROOT.TF1("testfit", "gaus")
             hist.Fit(fit, "QN")
             #print fit.GetParameter(0), fit.GetParameter(1), fit.GetParameter(2)
@@ -257,6 +256,9 @@ class DataPlotter(object):
             hist.Draw()
             del fit
 
+        hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
+        hist.SetTitle(self.config_analysis['name'])
+        hist.Draw()
         data_1 = self.choose_data(us_ds_1, True)
         data_1 = [u_in[var_1] for i, u_in in enumerate(data_1)]
         hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)

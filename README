@@ -1,0 +1,39 @@
+What is it
+==========
+Script that I am gradually hanging my analyses off of. At the moment I have:
+* transfer matrix calculation
+* amplitude analysis
+* detector efficiency
+
+Checkout and download
+=====================
+I pushed it to here:
+
+https://github.com/chrisrogers1234/efficiency_study/tree/v1.0
+
+I am not really the git expert, but you can get a copy using
+
+git clone git@github.com:chrisrogers1234/efficiency_study.git
+
+To change to version 1.0 (as of this morning), do
+
+git checkout v1.0
+
+
+Quick start
+===========
+
+I don't quite know of an elegant way to "clone" version 1.0 directly. To run the script
+
+1. Change the recon filename location; edit
+
+scripts/config_reco_2016_04_1_2.py
+
+There are some "general" settings and then a list of analyses (pertaining to e.g. the data samples that are to be analysed). Each analysis has some finer grained controls, for example the list of root files to look at in the "reco_files" tag. You should change this to point at the file you would like to analyse
+
+2. Run calculate_emittance.py
+
+A "reference" log file is attached so you can see what the output is supposed to look like. Note the blob at the end is line of a wiki table, one for each analysis. The idea is to end up with a table like the one here:
+
+http://micewww.pp.rl.ac.uk/projects/analysis/wiki/2016-11-19_physics-shifter
+
