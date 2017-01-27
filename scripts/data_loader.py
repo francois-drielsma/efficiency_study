@@ -27,6 +27,13 @@ class DataLoader(object):
         self.this_event = 0
         self.cuts = {}
         self.event_id = 0
+        self.det_pos = self.get_det_pos()
+
+    def get_det_pos(self):
+        det_pos = {}
+        for det in self.config.detectors:
+            det_pos[det[2]] = det[0]
+        return det_pos
 
     def load_data(self, min_spill, max_spill):
         if min_spill >= max_spill:
@@ -151,8 +158,7 @@ class DataLoader(object):
               "hit":Hit.new_from_dict(sp_dict),
               "detector":["tku_sp_", "tkd_sp_"][space_point.get_tracker()]
             })
-            space_points_out["detector"] += str(space_point.get_station())
-        space_points_out = sorted(space_points_out, key = lambda sp: sp["z"])
+            space_points_out[-1]["detector"] += str(space_point.get_station())
         return space_points_out
 
     def load_track_points(self, scifi_event):
@@ -160,10 +166,13 @@ class DataLoader(object):
         for track in scifi_event.scifitracks():
             detector = ["tku_tp", "tkd_tp"][track.tracker()]
             for track_point in track.scifitrackpoints():
+                #print track.tracker(), track_point.station(), track_point.pos().z()
                 if track_point.station() != self.config.tk_station:
                     continue
                 position = track_point.pos() # maybe global coordinates?
                 momentum = track_point.mom() # maybe global coordinates?
+                if abs(position.z() - self.det_pos[detector]) > 2.: # detector station is a couple mm thick
+                    raise RuntimeError("Track point z position not consistent with config")
                 index = 0
                 cov = [[0. for i in range(6)] for j in range(6)]
                 index_mapping = [1, 4, 2, 5, 3]
@@ -205,7 +214,7 @@ class DataLoader(object):
         will_cut_on_scifi_track_points = self.will_cut_on_scifi_track_points(scifi_event)
 
         if self.config.will_load_tk_space_points:
-            points += self.load_space_points(scifi_event)
+            points += self.load_scifi_space_points(scifi_event)
         if self.config.will_load_tk_track_points:
             points += self.load_track_points(scifi_event)
         return [
@@ -356,8 +365,8 @@ class DataLoader(object):
         event["tkd"] = tkd
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
-        event["will_cut"]["aperture_us"] = False
-        event["will_cut"]["aperture_ds"] = False
+        event["will_cut"]["aperture_us"] = False # loaded during track extrapolation
+        event["will_cut"]["aperture_ds"] = False # loaded during track extrapolation
         self.event_id += 1
         return event
 

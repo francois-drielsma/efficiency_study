@@ -24,9 +24,8 @@ from scripts.tm_calculator import TMCalculator
 from scripts.data_plotter import DataPlotter
 from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
-#import scripts.config_reco_2016_04_1_2 as config_file
-#import scripts.config_reco_200_muon_data as config_file
 import scripts.config_reco_8681 as config_file
+
 
 def maus_globals(config):
     try:
@@ -62,6 +61,9 @@ def do_analysis(config, analysis_index):
         pass
     os.makedirs(config_anal["plot_dir"])
     print "Using p bins", config_anal["p_bins"]
+    if config_anal["do_extrapolation"]:
+        # nb: also does the "aperture_ds" and "aperture_us" cuts
+        scripts.extrapolate_through_detectors.do_extrapolation(config, config_anal, data_loader)
     for p_low, p_high in config_anal["p_bins"]:
         if not config_anal["do_amplitude"]:
             continue
@@ -69,8 +71,6 @@ def do_analysis(config, analysis_index):
         bunch_us, bunch_ds = scripts.amplitude_analysis.make_bunches(data_loader, p_low, p_high)
         canvas_pdf, canvas_ratio = scripts.amplitude_analysis.delta_amplitude_plot(bunch_us, bunch_ds, config.analyses[analysis_index]["plot_dir"], p_bin)
         bunch_us, bunch_ds = None, None
-    if config_anal["do_extrapolation"]:
-        scripts.extrapolate_through_detectors.do_extrapolation(config, config_anal, data_loader)
 
     xboa.common.clear_root()
     plotter = DataPlotter(config, analysis_index, data_loader.events, lambda event: event["any_cut"], data_loader.run_numbers)
@@ -80,6 +80,10 @@ def do_analysis(config, analysis_index):
     plotter.plot_tof01()
     plotter.plot_tof12()
     plotter.bunch_plots()
+    plotter.plot_sp_residuals("tku", "x")
+    plotter.plot_sp_residuals("tku", "y")
+    plotter.plot_sp_residuals("tkd", "x")
+    plotter.plot_sp_residuals("tkd", "y")
     plotter.plot_var_2d("x", "upstream", "px", "upstream")
     plotter.plot_var_2d("y", "upstream", "py", "upstream")
     plotter.plot_var_2d("x", "upstream", "y", "upstream", True)
@@ -99,6 +103,7 @@ def do_analysis(config, analysis_index):
     plotter.plot_var_1d("p", "downstream")
     plotter.plot_var_1d("r", "downstream")
     plotter.plot_var_2d("r", "downstream", "pt", "downstream")
+    plotter.plot_sp_residuals("tku", "x")
     plotter.plot_p_tot_res()
     plotter.plot_p_tot_vs_tof()
     accepted, accepted_data = plotter.get_cuts_summary()

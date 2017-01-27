@@ -236,6 +236,44 @@ class DataPlotter(object):
         bin_width = hist.GetBinWidth(max_index) # regular bins
         return bins[max_index]/bin_width
 
+    def plot_sp_residuals(self, tracker, axis):
+        residuals_list = []
+        residuals_cut_list = []
+        for event in self.events:
+            tp = event[tracker]
+            sp = None
+            for point in event["data"]:
+                hit = point["hit"]
+                if "_tp" in point["detector"]:
+                    continue
+                if tp != None and abs(hit["z"] - tp["z"]) < 1.:
+                    sp = hit
+            is_cut = event["any_cut"]
+            if sp != None:
+                residuals_list.append(sp[axis] - tp[axis])        
+                if not is_cut:
+                    residuals_cut_list.append(sp[axis] - tp[axis])        
+
+        xmin, xmax = -5., 5.
+        name = "residuals_"+tracker+"_"+axis
+        canvas = xboa.common.make_root_canvas(name)
+        hist = xboa.common.make_root_histogram(name, residuals_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 100, xmin=xmin, xmax=xmax)
+        hist.SetTitle(self.config_analysis['name'])
+        hist.Draw()
+        hist = xboa.common.make_root_histogram(name+"_cut", residuals_cut_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 100, xmin=xmin, xmax=xmax)
+        hist.SetLineColor(4)
+        fit = ROOT.TF1(name+"_fit", "gaus")
+        hist.Fit(fit, "Q")
+        mean = fit.GetParameter(1)
+        sigma = fit.GetParameter(2)
+        hist.SetTitle(self.config_analysis['name']+" mean "+str(round(mean, 4))+" sigma "+str(round(sigma, 4)))
+
+        hist.Draw("SAME")
+
+        canvas.Update()
+        for format in ["png", "root", "pdf"]:
+            canvas.Print(self.plot_dir+name+"."+format)
+
     def plot_var_1d(self, var_1, us_ds_1):
         name =  us_ds_1+"_"+var_1
         canvas = xboa.common.make_root_canvas(name)
@@ -271,16 +309,33 @@ class DataPlotter(object):
         if var_1 == "p" and us_ds_1 == "upstream":
             self.max_p_bin = self.get_max(hist)
 
+    def two_d_projection(self, matrix, i_1, i_2):
+        my_cov = numpy.zeros([2, 2])
+        for this_i, global_i in enumerate([i_1, i_2]):
+          for this_j, global_j in enumerate([i_1, i_2]):
+             my_cov[this_i, this_j] = matrix[global_i, global_j]
+        return my_cov
+
     def bunch_plots(self):
         name = self.config_analysis['name']
         fout = open(self.config.data_dir+"/"+name+".txt", "w")
         json_out = open(self.config.data_dir+"/"+name+".json", "w")
         bz = 3e-3
-        p = 140.
+        p = 240.
         beta = self.bunch_us.get_beta(['x', 'y'])
         alpha = self.bunch_us.get_alpha(['x', 'y'])
         eps = self.bunch_us.get_emittance(['x', 'y'])
-        beam_mean = self.bunch_us.mean(['x', 'px', 'y', 'py', 'p', 'z', 'energy'])
+
+        beta_x = self.bunch_us.get_beta(['x'])
+        alpha_x = self.bunch_us.get_alpha(['x'])
+        eps_x = self.bunch_us.get_emittance(['x'])
+
+        beta_y = self.bunch_us.get_beta(['y'])
+        alpha_y = self.bunch_us.get_alpha(['y'])
+        eps_y = self.bunch_us.get_emittance(['y'])
+
+        mean_keys = ['x', 'y', 'px', 'py', 'p', 'z', 'energy']
+        beam_mean = self.bunch_us.mean(mean_keys)
         beam_cov = self.bunch_us.covariance_matrix(['x', 'px', 'y', 'py'])
         penn_beta = p/bz/0.15*1e-3
         penn_cov = Bunch.build_penn_ellipse(eps, xboa.common.pdg_pid_to_mass[13], penn_beta, 0., p, 0., bz, 1)
@@ -292,10 +347,17 @@ class DataPlotter(object):
             "penn_cov":penn_cov.tolist(),
         }
         print >> json_out, json.dumps(data)
+        print >> fout, "runs", self.run_numbers
         print >> fout, "name", name
         print >> fout, "Found", self.bunch_us.bunch_weight(), "events"
-        print >> fout, "means", beam_mean
-        print >> fout, "beta", beta, "alpha", alpha, "emittance:", eps, "matrix:"
+        print >> fout, "means",
+        for key in mean_keys:
+            print >> fout, key+":", str(round(beam_mean[key], 2)),
+        print >> fout
+        print >> fout, "beta", beta, "alpha", alpha, "emittance:", eps
+        print >> fout, "beta x", beta_x, "alpha x", alpha_x, "emittance x:", eps_x
+        print >> fout, "beta y", beta_y, "alpha y", alpha_y, "emittance y:", eps_y
+        print >> fout, "Matrix (x, px, y, py):"
         print >> fout, beam_cov
         print >> fout, "target beta", penn_beta, "target matrix:"
         print >> fout, penn_cov
@@ -305,21 +367,22 @@ class DataPlotter(object):
         fin = open(self.config.data_dir+"/"+name+".txt")
         print fin.read()
 
-        for i_low, i_high, var_1, var_2 in [(0, 2, "x", "px"), (2, 4, "y", "py")]:
+        for i_1, i_2, var_1, var_2 in [(0, 1, "x", "px"), (2, 3, "y", "py"), (0, 2, "x", "y")]:
             canvas, hist = self.bunch_us.root_histogram(var_1, "mm", var_2, "MeV/c", xmin=-150., xmax=150., ymin=-100., ymax=100.)
             canvas.cd()
             hist.SetTitle(self.config_analysis['name'])
             hist.Draw("COLZ")
             canvas.Update()
-            ellipse = xboa.common.make_root_ellipse_function([beam_mean[var_1], beam_mean[var_2]], beam_cov[i_low:i_high, i_low:i_high],
-                                                            contours=[4])
+            # not tested
+            ellipse = xboa.common.make_root_ellipse_function([beam_mean[var_1], beam_mean[var_2]], self.two_d_projection(beam_cov, i_1, i_2),
+                                                            contours=[2.])
             ellipse.SetNpx(1000)
             ellipse.SetNpy(1000)
             ellipse.SetLineColor(1)
             ellipse.Draw("SAME")
             canvas.Update()
 
-            ellipse = xboa.common.make_root_ellipse_function([0., 0.], penn_cov[i_low:i_high, i_low:i_high], contours=[4.])
+            ellipse = xboa.common.make_root_ellipse_function([0., 0.], self.two_d_projection(penn_cov, i_1, i_2), contours=[4.])
             ellipse.SetNpx(1000)
             ellipse.SetNpy(1000)
             ellipse.SetLineColor(8)

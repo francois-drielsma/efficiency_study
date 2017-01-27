@@ -9,8 +9,6 @@ import libxml2
 
 import numpy
 import ROOT
-analysis_path = os.environ["MAUS_ROOT_DIR"]+"/bin/user/fit_fields/scripts/"
-site.addsitedir(analysis_path)
 import xboa.common
 from xboa.hit import Hit
 from xboa.bunch import Bunch
