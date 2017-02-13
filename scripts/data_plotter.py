@@ -6,6 +6,7 @@ import numpy
 import cdb_tof_triggers_lookup
 import ROOT
 from xboa.bunch import Bunch
+import scripts.utilities
 
 class DataPlotter(object):
     def __init__(self, config, analysis_index, events, will_cut, run_numbers = None):
@@ -84,6 +85,7 @@ class DataPlotter(object):
 
     def print_cuts_summary(self):
         cut_dict, cut_data_dict = self.get_cuts_summary()
+        print "========== cuts summary ============"
         for key in sorted(cut_dict.keys()):
             if key in self.config.cuts_active:
                 is_active = self.config.cuts_active[key]
@@ -112,6 +114,55 @@ class DataPlotter(object):
             wiki_summary += " "+str(cut_dict[key]).ljust(8)+" |"
         return wiki_summary
 
+    def plot_pvalues(self):
+        for tracker in "tku", "tkd":
+            pvalue_canvas = xboa.common.make_root_canvas(tracker+" PValues")
+            pvalues_all = []
+            pvalues_cut = []
+            for event in self.events:
+                if event[tracker] == None:
+                    continue
+                for detector_hit in event["data"]:
+                    if detector_hit["detector"] != tracker+"_tp":
+                        continue
+                    pvalues_all.append(detector_hit["pvalue"])
+                    if not self.will_cut(event):
+                        pvalues_cut.append(detector_hit["pvalue"])
+            hist = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_all, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
+            hist.SetTitle(self.config_analysis['name'])
+            hist.Draw()
+            hist = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
+            hist.SetLineColor(4)
+            hist.SetTitle(self.config_analysis['name'])
+            hist.Draw("SAME")
+            pvalue_canvas.SetLogy()
+            pvalue_canvas.Update()
+            for format in ["png", "root", "pdf"]:
+                pvalue_canvas.Print(self.plot_dir+"pvalue_"+tracker+"."+format)
+
+
+    def plot_delta_tof(self, tofs):
+        dtof01_no_cut = [event["delta_"+tofs] for event in self.events if not self.will_cut(event)]
+        dtof01_no_cut = [dtof01 for dtof01 in dtof01_no_cut if dtof01 != None]
+        dtof01_all = [event["delta_"+tofs] for event in self.events]
+        dtof01_all = [dtof01 for dtof01 in dtof01_all if dtof01 != None]
+        if len(dtof01_all) == 0:
+            print "No delta tof plot - perhaps extrapolation is disabled?"
+            return
+        dtof01_canvas = xboa.common.make_root_canvas("delta_tof01_canvas")
+        dtof01_canvas.SetLogy()
+        xmin = -10.
+        xmax = 10.
+        hist = xboa.common.make_root_histogram("delta "+tofs, dtof01_all, "Reco "+tofs+" - Extrapolated "+tofs+" [ns]", 100, xmin = xmin, xmax = xmax)
+        hist.SetTitle(self.config_analysis['name'])
+        hist.Draw()
+        hist = xboa.common.make_root_histogram("delta "+tofs+" in cut", dtof01_no_cut, "Reco "+tofs+" - Extrapolated "+tofs+" [ns]", 100, xmin = xmin, xmax = xmax)
+        hist.SetLineColor(4)
+        hist.SetTitle(self.config_analysis['name'])
+        hist.Draw("SAME")
+        dtof01_canvas.Update()
+        for format in ["png", "root", "pdf"]:
+            dtof01_canvas.Print(self.plot_dir+"delta_"+tofs+"."+format)
 
     def plot_tof01(self):
         tof01_no_cut = [event["tof01"] for event in self.events if not self.will_cut(event)]
@@ -236,39 +287,44 @@ class DataPlotter(object):
         bin_width = hist.GetBinWidth(max_index) # regular bins
         return bins[max_index]/bin_width
 
+    def plot_kalman_pvalue(self, tracker):
+        pass
+
     def plot_sp_residuals(self, tracker, axis):
         residuals_list = []
         residuals_cut_list = []
+        sp_detector = tracker+"_sp_"+str(self.config.tk_station)
         for event in self.events:
             tp = event[tracker]
+            if tp == None:
+                continue # no track point recorded
             sp = None
             for point in event["data"]:
-                hit = point["hit"]
-                if "_tp" in point["detector"]:
-                    continue
-                if tp != None and abs(hit["z"] - tp["z"]) < 1.:
-                    sp = hit
+                if point["detector"] == sp_detector:
+                    sp = point["hit"]
+                    break
             is_cut = event["any_cut"]
-            if sp != None:
-                residuals_list.append(sp[axis] - tp[axis])        
-                if not is_cut:
-                    residuals_cut_list.append(sp[axis] - tp[axis])        
+            if sp == None:
+                continue # no space point recorded (e.g. due to dead channel)
+            residuals_list.append(sp[axis] - tp[axis])        
+            if not is_cut:
+                residuals_cut_list.append(sp[axis] - tp[axis])        
 
-        xmin, xmax = -5., 5.
-        name = "residuals_"+tracker+"_"+axis
+        xmin, xmax = -20., 20.
+        name = "sp_residuals_"+tracker+"_"+axis
         canvas = xboa.common.make_root_canvas(name)
-        hist = xboa.common.make_root_histogram(name, residuals_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 100, xmin=xmin, xmax=xmax)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw()
-        hist = xboa.common.make_root_histogram(name+"_cut", residuals_cut_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 100, xmin=xmin, xmax=xmax)
-        hist.SetLineColor(4)
-        fit = ROOT.TF1(name+"_fit", "gaus")
-        hist.Fit(fit, "Q")
-        mean = fit.GetParameter(1)
-        sigma = fit.GetParameter(2)
-        hist.SetTitle(self.config_analysis['name']+" mean "+str(round(mean, 4))+" sigma "+str(round(sigma, 4)))
+        for i in range(3):
+            hist_raw = xboa.common.make_root_histogram(name, residuals_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 500, xmin=xmin, xmax=xmax)
+            hist_cut = xboa.common.make_root_histogram(name+"_cut", residuals_cut_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 500, xmin=xmin, xmax=xmax)
+            fit = scripts.utilities.fit_peak(hist_cut)
+            mean = fit.GetParameter(1)
+            sigma = fit.GetParameter(2)
+            xmin, xmax = round(mean-sigma*5, 1), round(mean+sigma*5, 1)
 
-        hist.Draw("SAME")
+        hist_raw.SetTitle(self.config_analysis['name']+" mean "+str(round(mean, 4))+" sigma "+str(round(sigma, 4)))
+        hist_raw.Draw()
+        hist_cut.SetLineColor(4)
+        hist_cut.Draw("SAME")
 
         canvas.Update()
         for format in ["png", "root", "pdf"]:
@@ -288,7 +344,7 @@ class DataPlotter(object):
             hist.SetTitle(self.config_analysis['name'])
             fit = ROOT.TF1("testfit", "gaus")
             hist.Fit(fit, "QN")
-            #print fit.GetParameter(0), fit.GetParameter(1), fit.GetParameter(2)
+            print "Mean", fit.GetParameter(1), "rms", fit.GetParameter(2)
             xmin = round(fit.GetParameter(1)-5*fit.GetParameter(2))
             xmax = round(fit.GetParameter(1)+5*fit.GetParameter(2))
             hist.Draw()
@@ -318,8 +374,10 @@ class DataPlotter(object):
 
     def bunch_plots(self):
         name = self.config_analysis['name']
-        fout = open(self.config.data_dir+"/"+name+".txt", "w")
-        json_out = open(self.config.data_dir+"/"+name+".json", "w")
+        fname = name.replace(' ', '_') 
+        fname = self.config_analysis["plot_dir"]+"/"+name+"_summary"
+        fout = open(fname+".txt", "w")
+        json_out = open(fname+".json", "w")
         bz = 3e-3
         p = 240.
         beta = self.bunch_us.get_beta(['x', 'y'])
@@ -364,11 +422,19 @@ class DataPlotter(object):
         print >> fout, "theory matrix (based on measured beta, alpha, Lcan = 0):"
         print >> fout, Bunch.build_penn_ellipse(eps, xboa.common.pdg_pid_to_mass[13], beta, alpha, p, 0., bz, 1)
         fout.close()
-        fin = open(self.config.data_dir+"/"+name+".txt")
+        fin = open(fname+".txt")
         print fin.read()
 
         for i_1, i_2, var_1, var_2 in [(0, 1, "x", "px"), (2, 3, "y", "py"), (0, 2, "x", "y")]:
-            canvas, hist = self.bunch_us.root_histogram(var_1, "mm", var_2, "MeV/c", xmin=-150., xmax=150., ymin=-100., ymax=100.)
+            units = {"x":"mm", "y":"mm", "px":"MeV/c", "py":"MeV/c", "pz":"MeV/c"}
+            limits = {"x":150., "y":150., "px":100., "py":100., "pz":300.}
+            
+            canvas, hist = self.bunch_us.root_histogram(var_1, units[var_1],
+                                                        var_2, units[var_2],
+                                                        xmin=-limits[var_1], 
+                                                        xmax=+limits[var_1], 
+                                                        ymin=-limits[var_2], 
+                                                        ymax=+limits[var_2])
             canvas.cd()
             hist.SetTitle(self.config_analysis['name'])
             hist.Draw("COLZ")

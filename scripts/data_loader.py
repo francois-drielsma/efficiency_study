@@ -47,6 +47,7 @@ class DataLoader(object):
             raise IOError("Couldn't find files for reco_files "+str(self.config_anal["reco_files"]))
         for file_name in file_name_list:
             print "Loading ROOT file", file_name
+            self.spill_count = 0
             sys.stdout.flush()
             root_file = ROOT.TFile(file_name, "READ") # pylint: disable = E1101
 
@@ -56,8 +57,13 @@ class DataLoader(object):
                 tree.SetBranchAddress("data", data)
             except AttributeError:
                 continue
-
+            print "Spill",
+            events_per_file = [] # worried that list.append is consuming cpu
             for i in range(tree.GetEntries()):
+                events_per_spill = [] # worried that list.append is consuming cpu
+                if i % 100 == 0:
+                    print i,
+                    sys.stdout.flush()
                 tree.GetEntry(i)
                 spill = data.GetSpill()
                 self.this_run = spill.GetRunNumber()
@@ -67,7 +73,7 @@ class DataLoader(object):
                 if spill.GetDaqEventType() == "physics_event":
                     if self.config.number_of_spills != None and \
                        self.spill_count > self.config.number_of_spills:
-                        file_name_list = []
+                        #file_name_list = []
                         break
                     self.spill_count += 1
                     for ev_number, reco_event in enumerate(spill.GetReconEvents()):
@@ -83,10 +89,121 @@ class DataLoader(object):
                         if event == None: # missing TOF1 - not considered further
                             continue 
                         event["spill"] = spill.GetSpillNumber()
-                        self.events.append(event)
+                        events_per_spill.append(event)
                         event["event_number"] = ev_number
-            print "...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
+                        if self.config_anal["do_mc"] and len(spill.GetMCEvents()) > ev_number:
+                            self.load_mc_event(event, spill.GetMCEvents()[ev_number])
+                events_per_file += events_per_spill
+            self.events += events_per_file
+            print "\n  ...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
             sys.stdout.flush()
+
+    def load_mc_event(self, loaded_event, mc_event):
+        # mc load functions return a list of hits
+        primary = mc_event.GetPrimary()
+        primary_loaded = self.load_primary(primary)
+        track_vector = mc_event.GetTracks()
+        track_loaded = self.load_tracks(track_vector)
+        temp_event = sorted(primary_loaded+track_loaded, key = lambda tp: tp['hit']['z'])
+        loaded_event["data"] += temp_event
+        
+    def load_tracks(self, track_vector):
+        loaded_track_vector = []
+        for track in track_vector:
+            if abs(track.GetParticleId()) == 211 and track.GetKillReason() != "":
+                print "Pion killed because", track.GetKillReason()
+            hit = {}
+            hit["x"] = track.GetInitialPosition().x()
+            hit["y"] = track.GetInitialPosition().y()
+            hit["z"] = track.GetInitialPosition().z()
+            hit["px"] = track.GetInitialMomentum().x()
+            hit["py"] = track.GetInitialMomentum().y()
+            hit["pz"] = track.GetInitialMomentum().z()
+            hit["pid"] = track.GetParticleId()
+            try:
+                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
+            except KeyError:
+                hit["mass"] = 0.
+            try:
+                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
+            except KeyError:
+                hit["charge"] = 0.
+
+            hit = {}
+            hit["x"] = track.GetFinalPosition().x()
+            hit["y"] = track.GetFinalPosition().y()
+            hit["z"] = track.GetFinalPosition().z()
+            hit["px"] = track.GetFinalMomentum().x()
+            hit["py"] = track.GetFinalMomentum().y()
+            hit["pz"] = track.GetFinalMomentum().z()
+            hit["pid"] = track.GetParticleId()
+            try:
+                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
+            except KeyError:
+                hit["mass"] = 0.
+            try:
+                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
+            except KeyError:
+                hit["charge"] = 0.
+       
+            loaded_track_initial = {
+                "hit":Hit.new_from_dict(hit, "energy"),
+                "detector":"mc_track_initial"
+            }
+            loaded_track_final = {
+                "hit":Hit.new_from_dict(hit, "energy"),
+                "detector":"mc_track_final",
+            }
+            loaded_track_vector += [loaded_track_initial, loaded_track_final]
+        return loaded_track_vector
+
+    def load_primary(self, primary):
+        hit = {}
+        hit["x"] = primary.GetPosition().x()
+        hit["y"] = primary.GetPosition().y()
+        hit["z"] = primary.GetPosition().z()
+        hit["px"] = primary.GetMomentum().x()
+        hit["py"] = primary.GetMomentum().y()
+        hit["pz"] = primary.GetMomentum().z()
+        hit["pid"] = primary.GetParticleId()
+        hit["energy"] = primary.GetEnergy()
+        hit["t"] = primary.GetTime()
+        try:
+            hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
+        except KeyError:
+            hit["mass"] = 0.
+        try:
+            hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
+        except KeyError:
+            hit["charge"] = 0.
+        loaded_primary = {
+            "hit":Hit.new_from_dict(hit),
+            "detector":"mc_primary"
+        }
+        return [loaded_primary]
+
+    def load_virtuals(self, virtual_vector):
+        loaded_virtual_vector = []
+        for virtual in virtual_vector:
+            if abs(track.GetParticleId()) == 211 and track.GetKillReason() != "":
+                print "Pion killed because", track.GetKillReason()
+            hit = {}
+            hit["x"] = track.GetInitialPosition().x()
+            hit["y"] = track.GetInitialPosition().y()
+            hit["z"] = track.GetInitialPosition().z()
+            hit["px"] = track.GetInitialMomentum().x()
+            hit["py"] = track.GetInitialMomentum().y()
+            hit["pz"] = track.GetInitialMomentum().z()
+            hit["pid"] = track.GetParticleId()
+            try:
+                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
+            except KeyError:
+                hit["mass"] = 0.
+            try:
+                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
+            except KeyError:
+                hit["charge"] = 0.
+        
 
     def load_tof_sp(self, tof_sp, station):
         sp_dict = {
@@ -171,8 +288,9 @@ class DataLoader(object):
                     continue
                 position = track_point.pos() # maybe global coordinates?
                 momentum = track_point.mom() # maybe global coordinates?
-                if abs(position.z() - self.det_pos[detector]) > 2.: # detector station is a couple mm thick
-                    raise RuntimeError("Track point z position not consistent with config")
+                if abs(position.z() - self.det_pos[detector]) > 5.: # detector station is a couple mm thick
+                    det_str = " - detector "+str(detector)+" track pos "+str(position.z())+" det pos "+str(self.det_pos[detector])
+                    raise RuntimeError("Track point z position not consistent with config"+det_str)
                 index = 0
                 cov = [[0. for i in range(6)] for j in range(6)]
                 index_mapping = [1, 4, 2, 5, 3]
@@ -202,6 +320,7 @@ class DataLoader(object):
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
                   "detector":detector,
                   "covariance":cov,
+                  "pvalue":track.P_value(),
                 })
         track_points_out = sorted(track_points_out, key = lambda tp: tp["hit"]["z"])
         return track_points_out
@@ -212,6 +331,7 @@ class DataLoader(object):
         will_cut_on_scifi_space_points = self.will_cut_on_scifi_space_points(scifi_event)
         will_cut_on_scifi_tracks = self.will_cut_on_scifi_tracks(scifi_event)
         will_cut_on_scifi_track_points = self.will_cut_on_scifi_track_points(scifi_event)
+        will_cut_on_pvalue = self.will_cut_on_pvalue(scifi_event)
 
         if self.config.will_load_tk_space_points:
             points += self.load_scifi_space_points(scifi_event)
@@ -225,6 +345,8 @@ class DataLoader(object):
                 "scifi_tracks_ds":will_cut_on_scifi_tracks[1],
                 "scifi_track_points_us":will_cut_on_scifi_track_points[0],
                 "scifi_track_points_ds":will_cut_on_scifi_track_points[1],
+                "pvalue_us":will_cut_on_pvalue[0],
+                "pvalue_ds":will_cut_on_pvalue[1],
             }
         ]
 
@@ -284,6 +406,15 @@ class DataLoader(object):
         n_tracks = [i != 1 for i in n_tracks]
         return n_tracks
 
+    def will_cut_on_pvalue(self, scifi_event):
+        """Require any track in a tracker to have pvalue greater than threshold"""
+        will_cut = [True, True]
+        for track in scifi_event.scifitracks():
+            will_cut[track.tracker()] = will_cut[track.tracker()] and \
+                                track.P_value() < self.config_anal["pvalue_threshold"]
+        return will_cut
+
+
     def load_reco_event(self, reco_event):
         tof_event = reco_event.GetTOFEvent()
         global_event = reco_event.GetGlobalEvent()
@@ -302,14 +433,19 @@ class DataLoader(object):
         cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems())
         cuts = (elem for elem in cuts_chain)
         event["will_cut"] = dict(cuts) # True means cut the thing
-        event["any_cut"] = False
-        event["data_cut"] = False
         event = self.tm_data(event)
-        for key, value in event["will_cut"].iteritems():
-            if value and self.config.cuts_active[key]:
-                event["any_cut"] = True
-                event["data_cut"] = True
+        self.update_cuts()
         return event
+
+    def update_cuts(self):
+        for event in self.events:
+            event["any_cut"] = False
+            event["data_cut"] = False
+            for key, value in event["will_cut"].iteritems():
+                if value and self.config.cuts_active[key]:
+                    event["any_cut"] = True
+                    event["data_cut"] = True
+
 
     def will_do_p_cut_us(self, event):
         p_bins = self.config_anal["p_bins"]
@@ -363,10 +499,14 @@ class DataLoader(object):
         event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
+        event["delta_tof01"] = None # loaded during track extrapolation
+        event["delta_tof12"] = None # loaded during track extrapolation
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
         event["will_cut"]["aperture_us"] = False # loaded during track extrapolation
         event["will_cut"]["aperture_ds"] = False # loaded during track extrapolation
+        event["will_cut"]["delta_tof01"] = False # loaded during track extrapolation
+        event["will_cut"]["delta_tof12"] = False # loaded during track extrapolation
         self.event_id += 1
         return event
 

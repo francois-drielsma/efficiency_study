@@ -3,6 +3,7 @@ import os
 import site
 import json
 import shutil
+import importlib
 
 import numpy
 import ROOT
@@ -24,8 +25,10 @@ from scripts.tm_calculator import TMCalculator
 from scripts.data_plotter import DataPlotter
 from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
-import scripts.config_reco_8681 as config_file
-
+import scripts.mc_plotter
+import scripts.residual_fitter
+import scripts.plot_residual_fitter
+config_file = None
 
 def maus_globals(config):
     try:
@@ -37,7 +40,7 @@ def maus_globals(config):
                                       getConfigJSON(command_line_args=False)
     json_conf = json.loads(str_conf)
     json_conf["simulation_geometry_filename"] = config.geometry
-    json_conf["verbose_level"] = 1
+    json_conf["verbose_level"] = config.maus_verbose_level
     maus_conf = json.dumps(json_conf)
     maus_cpp.globals.birth(maus_conf)
     print maus_cpp.field.str(True)
@@ -61,17 +64,30 @@ def do_analysis(config, analysis_index):
         pass
     os.makedirs(config_anal["plot_dir"])
     print "Using p bins", config_anal["p_bins"]
+    if config_anal["do_magnet_alignment"]:
+        print "Doing magnet alignment"
+        fitter = scripts.residual_fitter.ResidualFitter(config, config_anal, data_loader)
+        fitter.fit()
+        #scripts.plot_residual_fitter.do_plots(config)
     if config_anal["do_extrapolation"]:
-        # nb: also does the "aperture_ds" and "aperture_us" cuts
+        # nb: also does the "aperture_ds", "aperture_us", "delta_tof01" cuts
+        print "Doing track extrapolation"
         scripts.extrapolate_through_detectors.do_extrapolation(config, config_anal, data_loader)
     for p_low, p_high in config_anal["p_bins"]:
+        print "Doing alignment"
         if not config_anal["do_amplitude"]:
             continue
+        amp_anal = scripts.amplitude_analysis.AmplitudeAnalysis(config, config_anal)
         p_bin = round((p_low+p_high)/2., 1)
-        bunch_us, bunch_ds = scripts.amplitude_analysis.make_bunches(data_loader, p_low, p_high)
-        canvas_pdf, canvas_ratio = scripts.amplitude_analysis.delta_amplitude_plot(bunch_us, bunch_ds, config.analyses[analysis_index]["plot_dir"], p_bin)
+        bunch_us, bunch_ds = amp_anal.make_bunches(data_loader, p_low, p_high)
+        canvas_pdf, canvas_ratio = amp_anal.delta_amplitude_plot(bunch_us, bunch_ds, config.analyses[analysis_index]["plot_dir"], p_bin)
         bunch_us, bunch_ds = None, None
+    data_loader.update_cuts()
+    if config_anal["do_mc"]:
+        print "Doing MC"
+        scripts.mc_plotter.MCPlotter.do_mc_plots(config, config_anal, data_loader)
 
+    print "Doing plots"
     xboa.common.clear_root()
     plotter = DataPlotter(config, analysis_index, data_loader.events, lambda event: event["any_cut"], data_loader.run_numbers)
     plotter.print_cuts_summary()
@@ -79,7 +95,10 @@ def do_analysis(config, analysis_index):
     sys.stdout.flush()
     plotter.plot_tof01()
     plotter.plot_tof12()
+    plotter.plot_delta_tof("tof01")
+    plotter.plot_delta_tof("tof12")
     plotter.bunch_plots()
+    plotter.plot_pvalues()
     plotter.plot_sp_residuals("tku", "x")
     plotter.plot_sp_residuals("tku", "y")
     plotter.plot_sp_residuals("tkd", "x")
@@ -123,6 +142,10 @@ def main():
     
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print "Usage: python calculate_emittance.py <configname>"
+        sys.exit(1)
+    config_file = importlib.import_module(sys.argv[1])
     main()
     print "Done - press <CR> to finish"
     #raw_input()
