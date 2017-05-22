@@ -2,6 +2,7 @@ import sys
 import glob
 import itertools
 import math
+import time
 
 import ROOT
 import libMausCpp
@@ -38,6 +39,7 @@ class DataLoader(object):
     def load_data(self, min_spill, max_spill):
         if min_spill >= max_spill:
             return
+        self.spill_count = 0
         file_name_list = []
         for fname in self.config_anal["reco_files"]:
             file_name_list += glob.glob(fname)
@@ -47,7 +49,7 @@ class DataLoader(object):
             raise IOError("Couldn't find files for reco_files "+str(self.config_anal["reco_files"]))
         for file_name in file_name_list:
             print "Loading ROOT file", file_name
-            self.spill_count = 0
+            
             sys.stdout.flush()
             root_file = ROOT.TFile(file_name, "READ") # pylint: disable = E1101
 
@@ -57,12 +59,15 @@ class DataLoader(object):
                 tree.SetBranchAddress("data", data)
             except AttributeError:
                 continue
-            print "Spill",
+            print tree.GetEntries(), "spills..."
             events_per_file = [] # worried that list.append is consuming cpu
+            new_t = time.time()
             for i in range(tree.GetEntries()):
                 events_per_spill = [] # worried that list.append is consuming cpu
                 if i % 100 == 0:
-                    print i,
+                    old_t = new_t
+                    new_t = time.time()
+                    print i, "("+str(round(new_t - old_t, 2))+")", 
                     sys.stdout.flush()
                 tree.GetEntry(i)
                 spill = data.GetSpill()
@@ -78,7 +83,6 @@ class DataLoader(object):
                     self.spill_count += 1
                     for ev_number, reco_event in enumerate(spill.GetReconEvents()):
                         self.this_event = reco_event.GetPartEventNumber()
-                        self.event_count += 1
                         try:
                             event = self.load_reco_event(reco_event)
                         except ValueError:
@@ -88,6 +92,7 @@ class DataLoader(object):
                             pass
                         if event == None: # missing TOF1 - not considered further
                             continue 
+                        self.event_count += 1
                         event["spill"] = spill.GetSpillNumber()
                         events_per_spill.append(event)
                         event["event_number"] = ev_number
@@ -97,6 +102,8 @@ class DataLoader(object):
             self.events += events_per_file
             print "\n  ...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
             sys.stdout.flush()
+        print "Finalising cuts"
+        self.update_cuts()
 
     def load_mc_event(self, loaded_event, mc_event):
         # mc load functions return a list of hits
@@ -104,7 +111,11 @@ class DataLoader(object):
         primary_loaded = self.load_primary(primary)
         track_vector = mc_event.GetTracks()
         track_loaded = self.load_tracks(track_vector)
-        temp_event = sorted(primary_loaded+track_loaded, key = lambda tp: tp['hit']['z'])
+        virtual_vector = mc_event.GetVirtualHits()
+        virtual_loaded = self.load_virtuals(virtual_vector)
+        tof_hit_vector = mc_event.GetTOFHits()
+        tof_hit_loaded = self.load_tof_mc_hits(tof_hit_vector)
+        temp_event = sorted(primary_loaded+track_loaded+virtual_loaded+tof_hit_loaded, key = lambda tp: tp['hit']['z'])
         loaded_event["data"] += temp_event
         
     def load_tracks(self, track_vector):
@@ -183,29 +194,73 @@ class DataLoader(object):
         return [loaded_primary]
 
     def load_virtuals(self, virtual_vector):
-        loaded_virtual_vector = []
-        for virtual in virtual_vector:
-            if abs(track.GetParticleId()) == 211 and track.GetKillReason() != "":
-                print "Pion killed because", track.GetKillReason()
-            hit = {}
-            hit["x"] = track.GetInitialPosition().x()
-            hit["y"] = track.GetInitialPosition().y()
-            hit["z"] = track.GetInitialPosition().z()
-            hit["px"] = track.GetInitialMomentum().x()
-            hit["py"] = track.GetInitialMomentum().y()
-            hit["pz"] = track.GetInitialMomentum().z()
-            hit["pid"] = track.GetParticleId()
+        loaded_virtual_vector = [None]*len(virtual_vector)
+        for i, virtual_hit in enumerate(virtual_vector):
+            hit = xboa.hit.Hit()
+            hit["x"] = virtual_hit.GetPosition().x()
+            hit["y"] = virtual_hit.GetPosition().y()
+            hit["z"] = virtual_hit.GetPosition().z()
+            hit["px"] = virtual_hit.GetMomentum().x()
+            hit["py"] = virtual_hit.GetMomentum().y()
+            hit["pz"] = virtual_hit.GetMomentum().z()
+            hit["bx"] = virtual_hit.GetBField().x()
+            hit["by"] = virtual_hit.GetBField().y()
+            hit["bz"] = virtual_hit.GetBField().z()
+            hit["ex"] = virtual_hit.GetEField().x()
+            hit["ey"] = virtual_hit.GetEField().y()
+            hit["ez"] = virtual_hit.GetEField().z()
+            hit["pid"] = virtual_hit.GetParticleId()
+            hit["station"] = virtual_hit.GetStationId()
+            hit["particle_number"] = virtual_hit.GetTrackId()
+            hit["t"] = virtual_hit.GetTime()
+            hit["mass"] = virtual_hit.GetMass()
+            hit["charge"] = virtual_hit.GetCharge()
+            hit.mass_shell_condition('energy')
+            loaded_virtual = {
+                "hit":hit,
+                "detector":"mc_virtual_"+str(hit["station"])
+            }
+            loaded_virtual_vector[i] = loaded_virtual
+        return loaded_virtual_vector
+
+    def load_tof_mc_hits(self, tof_mc_vector):
+        loaded_tof_mc_vector = [None]*len(tof_mc_vector)
+        for i, tof_mc_hit in enumerate(tof_mc_vector):
+            hit = xboa.hit.Hit()
+            hit["x"] = tof_mc_hit.GetPosition().x()
+            hit["y"] = tof_mc_hit.GetPosition().y()
+            hit["z"] = tof_mc_hit.GetPosition().z()
+            hit["px"] = tof_mc_hit.GetMomentum().x()
+            hit["py"] = tof_mc_hit.GetMomentum().y()
+            hit["pz"] = tof_mc_hit.GetMomentum().z()
+            hit["pid"] = tof_mc_hit.GetParticleId()
+            hit["station"] = tof_mc_hit.GetChannelId().GetStation()
+            hit["particle_number"] = tof_mc_hit.GetTrackId()
+            hit["t"] = tof_mc_hit.GetTime()
+            hit["energy"] = tof_mc_hit.GetEnergy()
+            hit["e_dep"] = tof_mc_hit.GetEnergyDeposited()
             try:
-                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
+                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(tof_mc_hit.GetParticleId())]
             except KeyError:
-                hit["mass"] = 0.
-            try:
-                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
-            except KeyError:
-                hit["charge"] = 0.
-        
+                hit["mass"] = (hit["energy"]**2-hit["p"]**2)**0.5
+            loaded_tof_mc = {
+                "hit":hit,
+                "detector":"mc_tof_"+str(hit["station"]),
+            }
+            loaded_tof_mc_vector[i] = loaded_tof_mc
+        return loaded_tof_mc_vector
 
     def load_tof_sp(self, tof_sp, station):
+        xerr = tof_sp.GetGlobalPosXErr()
+        yerr = tof_sp.GetGlobalPosYErr()
+        cov = [
+            [0.0025, 0.,     0., 0., 0., 0.],
+            [0.,     xerr,   0., 0., 0., 0.],
+            [0.,     0.,   yerr, 0., 0., 0.],
+            [0.,     0., 0., 0., 0., 0.],
+            [0.,     0., 0., 0., 0., 0.],
+            [0.,     0., 0., 0., 0., 0.],
+        ]
         sp_dict = {
             "x":tof_sp.GetGlobalPosX(),
             "y":tof_sp.GetGlobalPosY(),
@@ -215,6 +270,7 @@ class DataLoader(object):
         loaded_sp = {
             "hit":Hit.new_from_dict(sp_dict),
             "detector":station,
+            "covariance":cov,
         }
         return loaded_sp
 
@@ -284,7 +340,7 @@ class DataLoader(object):
             detector = ["tku_tp", "tkd_tp"][track.tracker()]
             for track_point in track.scifitrackpoints():
                 #print track.tracker(), track_point.station(), track_point.pos().z()
-                if track_point.station() != self.config.tk_station:
+                if track_point.station() != self.config.tk_station or track_point.plane() != self.config.tk_plane:
                     continue
                 position = track_point.pos() # maybe global coordinates?
                 momentum = track_point.mom() # maybe global coordinates?
@@ -293,18 +349,19 @@ class DataLoader(object):
                     raise RuntimeError("Track point z position not consistent with config"+det_str)
                 index = 0
                 cov = [[0. for i in range(6)] for j in range(6)]
-                index_mapping = [1, 4, 2, 5, 3]
+                index_mapping = [1, 4, 2, 5, 3] # pz, y, x, py, px
                 if track_point.covariance().size() == 25:
                     try:
                         self.nan_check(track_point.covariance())
                     except Exception:
+                        #print "\nCov nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event
+                        #print "    ", [x for x in track_point.covariance()]
                         break
-                        
                     for i in range(5):
                         k = index_mapping[i]
                         for j in range(5):
                             l = index_mapping[j]
-                            cov[k][l] = track_point.covariance()[index]
+                            cov[k][l] = track_point.covariance()[index] # cov[4][1]
                             index += 1
                 tp_dict = {
                   "x":position.x(),
@@ -316,6 +373,11 @@ class DataLoader(object):
                   "pid":-13,
                   "mass":xboa.common.pdg_pid_to_mass[13],
                 }
+                try:
+                    self.nan_check(tp_dict.values())
+                except:
+                    #print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
+                    break
                 track_points_out.append({
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
                   "detector":detector,
@@ -434,18 +496,19 @@ class DataLoader(object):
         cuts = (elem for elem in cuts_chain)
         event["will_cut"] = dict(cuts) # True means cut the thing
         event = self.tm_data(event)
-        self.update_cuts()
         return event
 
     def update_cuts(self):
         for event in self.events:
             event["any_cut"] = False
+            event["downstream_cut"] = False
             event["data_cut"] = False
             for key, value in event["will_cut"].iteritems():
                 if value and self.config.cuts_active[key]:
                     event["any_cut"] = True
                     event["data_cut"] = True
-
+                if value and self.config.downstream_cuts[key]:
+                    event["downstream_cut"] = True
 
     def will_do_p_cut_us(self, event):
         p_bins = self.config_anal["p_bins"]
@@ -464,8 +527,8 @@ class DataLoader(object):
         for x in float_list:
             if math.isnan(x) or math.isinf(x) or x != x:
                 raise ZeroDivisionError("Nan found in tracker: "+str(float_list))
-            if x > 150.:
-                raise ValueError("Tracker recon out of range: "+str(float_list))
+            #if x > 150.:
+            #    raise ValueError("Tracker recon out of range: "+str(float_list))
 
     def tm_data(self, event):
         tku = None

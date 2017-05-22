@@ -28,6 +28,7 @@ import scripts.data_loader
 import scripts.mc_plotter
 import scripts.residual_fitter
 import scripts.plot_residual_fitter
+import scripts.utilities
 config_file = None
 
 def maus_globals(config):
@@ -45,6 +46,15 @@ def maus_globals(config):
     maus_cpp.globals.birth(maus_conf)
     print maus_cpp.field.str(True)
 
+def file_mangle(config_anal, config_file_name):
+    print "Clearing old data"
+    try:
+        shutil.rmtree(config_anal["plot_dir"])
+    except OSError:
+        pass
+    os.makedirs(config_anal["plot_dir"])
+    shutil.copy(config_file_name, config_anal["plot_dir"])
+
 def do_analysis(config, analysis_index):
     config_anal = config.analyses[analysis_index]
     print config_anal["name"]
@@ -55,14 +65,11 @@ def do_analysis(config, analysis_index):
             continue
         data_loader = scripts.data_loader.DataLoader(config, analysis_index)
         data_loader.load_data(0, 100000)
-
+    config.maus_version = data_loader.maus_version
     tm_p_list = []
-    print "Clearing old data"
-    try:
-        shutil.rmtree(config_anal["plot_dir"])
-    except OSError:
-        pass
-    os.makedirs(config_anal["plot_dir"])
+
+    file_mangle(config_anal, sys.argv[1])
+
     print "Using p bins", config_anal["p_bins"]
     if config_anal["do_magnet_alignment"]:
         print "Doing magnet alignment"
@@ -73,64 +80,21 @@ def do_analysis(config, analysis_index):
         # nb: also does the "aperture_ds", "aperture_us", "delta_tof01" cuts
         print "Doing track extrapolation"
         scripts.extrapolate_through_detectors.do_extrapolation(config, config_anal, data_loader)
-    for p_low, p_high in config_anal["p_bins"]:
-        print "Doing alignment"
-        if not config_anal["do_amplitude"]:
-            continue
-        amp_anal = scripts.amplitude_analysis.AmplitudeAnalysis(config, config_anal)
-        p_bin = round((p_low+p_high)/2., 1)
-        bunch_us, bunch_ds = amp_anal.make_bunches(data_loader, p_low, p_high)
-        canvas_pdf, canvas_ratio = amp_anal.delta_amplitude_plot(bunch_us, bunch_ds, config.analyses[analysis_index]["plot_dir"], p_bin)
-        bunch_us, bunch_ds = None, None
+    data_loader.update_cuts()
+    if config_anal["do_amplitude"]:
+        scripts.amplitude_analysis.do_amplitude_analysis(config, config_anal, data_loader)
     data_loader.update_cuts()
     if config_anal["do_mc"]:
         print "Doing MC"
         scripts.mc_plotter.MCPlotter.do_mc_plots(config, config_anal, data_loader)
-
-    print "Doing plots"
-    xboa.common.clear_root()
-    plotter = DataPlotter(config, analysis_index, data_loader.events, lambda event: event["any_cut"], data_loader.run_numbers)
-    plotter.print_cuts_summary()
-    cov_us, cov_ds = plotter.print_covariance_matrix()
-    sys.stdout.flush()
-    plotter.plot_tof01()
-    plotter.plot_tof12()
-    plotter.plot_delta_tof("tof01")
-    plotter.plot_delta_tof("tof12")
-    plotter.bunch_plots()
-    plotter.plot_pvalues()
-    plotter.plot_sp_residuals("tku", "x")
-    plotter.plot_sp_residuals("tku", "y")
-    plotter.plot_sp_residuals("tkd", "x")
-    plotter.plot_sp_residuals("tkd", "y")
-    plotter.plot_var_2d("x", "upstream", "px", "upstream")
-    plotter.plot_var_2d("y", "upstream", "py", "upstream")
-    plotter.plot_var_2d("x", "upstream", "y", "upstream", True)
-    plotter.plot_var_2d("x", "upstream", "y", "upstream", False)
-    plotter.plot_var_2d("x", "downstream", "px", "downstream")
-    plotter.plot_var_2d("y", "downstream", "py", "downstream")
-    plotter.plot_var_1d("x", "upstream")
-    plotter.plot_var_1d("px", "upstream")
-    plotter.plot_var_1d("y", "upstream")
-    plotter.plot_var_1d("py", "upstream")
-    plotter.plot_var_1d("x", "downstream")
-    plotter.plot_var_1d("px", "downstream")
-    plotter.plot_var_1d("y", "downstream")
-    plotter.plot_var_1d("py", "downstream")
-    plotter.plot_var_1d("p", "upstream")
-    plotter.plot_var_1d("r", "upstream")
-    plotter.plot_var_1d("p", "downstream")
-    plotter.plot_var_1d("r", "downstream")
-    plotter.plot_var_2d("r", "downstream", "pt", "downstream")
-    plotter.plot_sp_residuals("tku", "x")
-    plotter.plot_p_tot_res()
-    plotter.plot_p_tot_vs_tof()
-    accepted, accepted_data = plotter.get_cuts_summary()
-    wiki_summary = plotter.print_wiki_summary()
-    print wiki_summary, "\n\n"
+    wiki_summary = "<plots disabled>"
+    if config_anal["do_plots"]:
+        print "Doing plots"
+        wiki_summary = scripts.data_plotter.do_plots(config, config_anal, data_loader)
     return wiki_summary
 
 def main():
+    scripts.utilities.set_palette()
     config = config_file.Config()
     maus_globals(config)
 
@@ -143,9 +107,12 @@ def main():
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print "Usage: python calculate_emittance.py <configname>"
+        print "Usage: python calculate_emittance.py </path/to/config/script>"
         sys.exit(1)
-    config_file = importlib.import_module(sys.argv[1])
+    config_mod = sys.argv[1].replace(".py", "")
+    config_mod = config_mod.replace("/", ".")
+    print "Using configuration module", config_mod
+    config_file = importlib.import_module(config_mod)
     main()
     print "Done - press <CR> to finish"
     #raw_input()

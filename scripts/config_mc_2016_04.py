@@ -1,5 +1,7 @@
-def mc_file_names(job_name, datasets):
-    file_list = ["/home/cr67/MAUS/work/reco/mc/"+job_name+"/"+datasets+"/*_sim.root"]
+import copy
+
+def mc_file_names(datasets):
+    file_list = ["/home/cr67/MAUS/work/reco/mc/"+datasets+"/*.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus):
@@ -10,15 +12,15 @@ def reco_file_names(run_number_list, maus):
         file_list.append(a_file)
     return file_list
 
-def get_analysis(run_list, name, tof01_max, maus_version, data_dir, extrap, amplitude_source):
+def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
     plot_dir = data_dir+"plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
-            "delta_tof01_lower":-2., # Delta TOF01 cut lower bound 
-            "delta_tof01_upper":1.5, # Delta TOF01 cut upper bound 
+            "delta_tof01_lower":-5., # Delta TOF01 cut lower bound 
+            "delta_tof01_upper":5., # Delta TOF01 cut upper bound 
             "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
             "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_cut_low":28., # TOF01 cut lower bound
@@ -26,28 +28,28 @@ def get_analysis(run_list, name, tof01_max, maus_version, data_dir, extrap, ampl
             "p_bins":[[135, 145]], # set of momentum bins; for now really it is just a lower and upper bound
             "p_tot_ds_low":80., # downstream momentum cut lower bound
             "p_tot_ds_high":200., # downstream momentum cut upper bound
-            "reco_files":reco_file_names(run_list, maus_version), # list of strings to be handed to glob
+            "reco_files":mc_file_names(job_name), # list of strings to be handed to glob
             "name":"2016-04 1.2 "+name, # appears on plots
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "amplitude_source":"output/2016-04_1.2_mc/plots_"+amplitude_source+"/amplitude.json",
+            "amplitude_source":None,
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
-            "do_amplitude":True, #True,
+            "do_amplitude":True,
             "do_extrapolation":False, #name == "3-140+M3-Test2",
-            "do_mc":False,
-            "do_plots":False,
+            "do_mc":True, #True,
+            "do_plots":True,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":None, #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
-            "extrapolation_source":extrap
+            "extrapolation_source":"tku_tp",
         }
 
 
 class Config(object):
     geometry = "geometry_08681/ParentGeometryFile.dat" #"Test.dat" # "geometry_08681/ParentGeometryFile.dat" #
     # location to which data and plots will be dumped following analysis
-    data_dir = "output/2016-04_1.2_reco/"
+    data_dir = "output/2016-04_1.2_mc_ds-cuts/"
     info_file = "geometry_08681/Maus_Information.gdml"
     will_require_tof1 = True # require at least one TOF1 Space point to even load the data
     will_require_tof2 = False # require at least one TOF2 Space point to even load the data
@@ -56,6 +58,7 @@ class Config(object):
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
     cuts_active = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
+          "downstream_cut":None,
           "any_cut":None,
           "scifi_space_clusters":False,
           "scifi_space_points":False,
@@ -69,7 +72,7 @@ class Config(object):
           "pvalue_ds":False,
           "tof01":True,
           "tof12":False,
-          "delta_tof01":False, #extrapolatedtof01 compared to recon tof01
+          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "p_tot_us":True,
           "p_tot_ds":False,
@@ -77,14 +80,37 @@ class Config(object):
           "tof_1_sp":True,
           "tof_2_sp":False,
     }
-    extrapolation_cuts = cuts_active
+    downstream_cuts = copy.deepcopy(cuts_active)
+    downstream_cuts["p_tot_ds"] = True
+    downstream_cuts["pvalue_ds"] = True
+    extrapolation_cuts = { # Set to true to make extrapolate_tracks use the cuts; False to ignore the cut
+          "any_cut":False,
+          "downstream_cut":None,
+          "scifi_space_clusters":False,
+          "scifi_space_points":False,
+          "scifi_tracks_us":True,
+          "scifi_track_points_us":False,
+          "aperture_us":False,
+          "aperture_ds":False,
+          "scifi_tracks_ds":False,
+          "scifi_track_points_ds":False,
+          "tof01":True,
+          "tof12":False,
+          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
+          "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
+          "p_tot_us":True,
+          "p_tot_ds":False,
+          "tof_0_sp":True,
+          "tof_1_sp":True,
+          "tof_2_sp":False,
+    }
 
     analyses = []
-    analyses.append(get_analysis([8681], "3-140", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC"))
-    analyses.append(get_analysis([8699], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
-    analyses.append(get_analysis([8685], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
+    #analyses.append(get_analysis("rogers/data_8685_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br12.87_W8.4_hi-stats/*", "10-140 MC", 30, "MAUS-v2.8.2", data_dir))
+    #analyses.append(get_analysis("rogers/data_8699_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br2.0_W1.6_hi-stats//*", "6-140 MC", 31, "MAUS-v2.8.2", data_dir))
+    #analyses.append(get_analysis("rogers/data_8681_franchini_scale-d1=1.02_d2=1.02_ds=1.0_hi-stats/*", "3-140 MC", 32, "MAUS-v2.8.2", data_dir))
+    analyses.append(get_analysis("000056/000??", "3-140 MC Prod", 32, "MAUS-v2.8.2", data_dir))
     amplitude_bin_width = 5
-    amplitude_max = 25
 
     required_trackers = [0, 1] # for space points
     required_number_of_track_points = 12 # doesnt do anything
@@ -92,13 +118,15 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = None #100 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    number_of_spills = 10000 # if set to an integer, limits the number of spills loaded for each sub-analysis
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
+    maus_version = ""
 
     residuals_plots_nbins = 100 # used for track extrapolation plots
     extrapolation_does_apertures = True # set to True in order to include apertures in track extrapolation
     maus_verbose_level = 5
+    amplitude_max = 25
 
     magnet_alignment = {
         "n_events":10,
@@ -106,9 +134,17 @@ class Config(object):
         "resolution":1.,
     }
 
+    mc_plots = {
+        "mc_stations" : { # one virtual plane for each tracker view
+            "tku":[53, 52, 51, 49, 48, 47, 46, 45, 44, 42, 41, 40, 38, 37, 36],
+            "tkd":[63, 64, 65, 66, 67, 68, 70, 71, 72, 74, 75, 76, 77, 78, 79],
+        }
+    }
+
     # z position of central absorber (used for offsetting
     z_apertures = 0.
     # z position of detectors (used for track extrapolation) (z, name)
+    tkd_offset = 81.#81.
     detectors = [
         (5287.2, None, "tof0"),
         (12929.6, None, "tof1"),
@@ -117,20 +153,14 @@ class Config(object):
         (14618.0, None, "tku_3"),
         (14867.0, None, "tku_2"),
         (15068.0, None, "tku_tp"),
-        (18836.8, None, "tkd_tp"),
-        (18855., None, "tkd_2"),
-        (19205., None, "tkd_3"),
-        (19505., None, "tkd_4"),
-        (19855., None, "tkd_5"),
+        (18756.+tkd_offset, None, "tkd_tp"),
+        (18855.+tkd_offset, None, "tkd_2"),
+        (19205.+tkd_offset, None, "tkd_3"),
+        (19505.+tkd_offset, None, "tkd_4"),
+        (19855.+tkd_offset, None, "tkd_5"),
         (21139.4, None, "tof2"),
     ]
 
-    mc_plots = {
-        "mc_stations" : {
-            "tku":53,
-            "tkd":63,
-        }
-    }
 
     z_afc = 16955.74
     # z position of apertures (z, maximum radius, name)

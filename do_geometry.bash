@@ -1,5 +1,5 @@
 #!/bin/bash
-export geometry_run=08445
+export geometry_run=08685
 export geometry_dir=geometry_${geometry_run}
 rm -r ${geometry_dir}
 mkdir ${geometry_dir}

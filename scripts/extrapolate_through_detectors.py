@@ -135,14 +135,14 @@ class ExtrapolateTrackPoints(object):
                 global_delta_t = hit["hit"]["t"]
         if reco_delta_t == None or global_delta_t == None: # time_from detector was not found; default to None
             for hit in detector_hits:
-                hit["hit"]["t"] = None
+                hit["hit"]["t"] = 1e9 # time must be a float - so this is an error code (urk)!
             return
         delta_t = -global_delta_t + reco_delta_t
         for hit in detector_hits:
             if self.is_global(hit["detector"]):
                 hit["hit"]["t"] += delta_t
 
-    def extrapolate_event(self, event, reference_detector = "tku_tp"):
+    def extrapolate_event(self, event, reference_detector = "tku_tp", direction = "both"):
         detector_hits = event["data"]
         detector_hits = sorted(detector_hits, key = lambda tp: tp["hit"]["z"]) # check that it is sorted
         tku_rec = self.get_point(detector_hits, reference_detector)
@@ -150,30 +150,46 @@ class ExtrapolateTrackPoints(object):
         seed = [0.,     tku_rec["hit"]["x"],  tku_rec["hit"]["y"],  tku_rec["hit"]["z"],
                 tku_rec["hit"]["energy"], tku_rec["hit"]["px"], tku_rec["hit"]["py"], tku_rec["hit"]["pz"],]
         ellipse = tku_rec["covariance"]
+        void = [
+            [0., 0.,  0., 0.,  0., 0.],
+            [0., 0.1, 0., 0.,  0., 0.],
+            [0., 0., 0.1, 0.,  0., 0.],
+            [0., 0.,  0., 16., 0., 0.],
+            [0., 0.,  0., 0.,  4., 0.],
+            [0., 0.,  0., 0.,  0., 4.],
+        ]
         first = bisect.bisect_left(self.apertures, (seed[3], None, None))
         # walking upstream from reference_detector
         point, error = seed, ellipse
-        try:
-            for z_pos, radius, name in reversed(self.apertures[:first]):
-                point, error = self.tracking.propagate_errors(point, error, z_pos)
-                hit = self.make_rec(point, error, name, tku_rec)
-                if radius != None and hit["hit"]["r"] > radius:
-                    event["apertures_us"].append(name)
-                detector_hits.append(hit)
-        except RuntimeError:
-            pass #sys.excepthook(*sys.exc_info())
+        #self.tracking.set_tracking_model("em_forwards_dynamic")
+        self.tracking.set_energy_loss_model("bethe_bloch_forwards")
 
-        # walking downstream from reference_detector
-        point, error = seed, ellipse
-        try:
-            for z_pos, radius, name in self.apertures[first:]:
-                point, error = self.tracking.propagate_errors(point, error, z_pos)
-                hit = self.make_rec(point, error, name, tku_rec)
-                if radius != None and hit["hit"]["r"] > radius:
-                    event["apertures_ds"].append(name)
-                detector_hits.append(hit)
-        except RuntimeError:
-            pass # sys.excepthook(*sys.exc_info())
+        if direction == "both" or direction == "upstream":
+            self.tracking.set_scattering_model("moliere_backwards") 
+            try:
+                for z_pos, radius, name in reversed(self.apertures[:first]):
+                    point, error = self.tracking.propagate_errors(point, error, z_pos)
+                    hit = self.make_rec(point, error, name, tku_rec)
+                    if radius != None and hit["hit"]["r"] > radius:
+                        event["apertures_us"].append(name)
+                    detector_hits.append(hit)
+            except RuntimeError:
+                pass #sys.excepthook(*sys.exc_info())
+
+        if direction == "both" or direction == "downstream":
+            self.tracking.set_scattering_model("moliere_forwards")
+            # walking downstream from reference_detector
+            point, error = seed, ellipse
+            try:
+                for z_pos, radius, name in self.apertures[first:]:
+                    point, error = self.tracking.propagate_errors(point, error, z_pos)
+                    hit = self.make_rec(point, error, name, tku_rec)
+                    if radius != None and hit["hit"]["r"] > radius:
+                        event["apertures_ds"].append(name)
+                    detector_hits.append(hit)
+            except RuntimeError:
+                pass # sys.excepthook(*sys.exc_info())
+
         # use time from detector defined in datacards; move all times relatively
         self.time_offset(detector_hits)
         event["data"] = detector_hits
@@ -233,18 +249,16 @@ class ExtrapolateTrackPoints(object):
     def clear_residuals(self):
         self.residual_dicts = {}
 
-    def append_residual(self, event, detector, axis):
+    def append_residual(self, event, detector, axis_list):
         event = event["data"]
         if detector not in self.residual_dicts:
             self.residual_dicts[detector] = {}
             self.weighted_residual_dicts[detector] = {}
-        if axis not in self.residual_dicts[detector]:
-            self.residual_dicts[detector][axis] = []
-            self.weighted_residual_dicts[detector][axis] = []
+        for axis in axis_list:
+            if axis not in self.residual_dicts[detector]:
+                self.residual_dicts[detector][axis] = []
+                self.weighted_residual_dicts[detector][axis] = []
         
-        residual_list = self.residual_dicts[detector][axis]
-        weighted_residual_list = self.weighted_residual_dicts[detector][axis]
-
         glob_rec, det_rec = None, None
         try:
             glob_rec = self.get_point(event, self.global_key(detector))
@@ -263,16 +277,31 @@ class ExtrapolateTrackPoints(object):
 
         # we have an extrapolated track and a detector hit. How close is the
         # extrapolated track to the measured particle?
-        residual = det_rec["hit"][axis]-glob_rec["hit"][axis]
-        residual_list.append(residual)
-        return 
-        if axis in self.cov_key_list:
-            key = self.cov_key_list.index(axis)
-            sigma = (glob_rec["covariance"][key][key]+det_rec["covariance"][key][key])**0.5 # -ve sqrt exception?
-            if sigma < 1e-12:
-                raise ValueError("Zero RMS")
-            weighted_residual = residual/sigma
-            weighted_residual_list.append(weighted_residual)
+        for axis in axis_list:
+            residual_list = self.residual_dicts[detector][axis]
+            residual = det_rec["hit"][axis]-glob_rec["hit"][axis]
+            residual_list.append(residual)
+
+        # gymnastics to ensure that weighted residuals plots have same number of events
+        # at a given detector
+        weighted_residual_calc = []
+        for axis in axis_list:
+            if axis in self.cov_key_list and "covariance" in det_rec and "covariance"  in glob_rec:
+                key = self.cov_key_list.index(axis)
+                try:
+                    sigma = (glob_rec["covariance"][key][key]+det_rec["covariance"][key][key])**0.5 # -ve sqrt exception?
+                    if sigma < 1e-12:
+                        raise ValueError("Zero RMS")
+                    weighted_residual_calc.append(residual/sigma)
+                except ValueError:
+                    #print axis, "glob:", glob_rec["covariance"][key][key], detector, det_rec["covariance"][key][key]
+                    return
+            else:
+                return
+
+        for i, axis in enumerate(axis_list):
+            weighted_residual_list = self.weighted_residual_dicts[detector][axis]
+            weighted_residual_list.append(weighted_residual_calc[i])
 
     def print_canvas(self, canvas, name):
         canvas.Update()
@@ -315,8 +344,6 @@ class ExtrapolateTrackPoints(object):
         self.text_boxes.append(text_box)
         return text_box
 
-    def fit_peak(self, hist):
-        return scripts.utilities.fit_peak(hist)
 
     def plot_residuals(self, detector, axis):
         if detector not in self.residual_dicts:
@@ -339,21 +366,22 @@ class ExtrapolateTrackPoints(object):
         canvas = xboa.common.make_root_canvas(name)
         hist = xboa.common.make_root_histogram(name, residual_list, label, nbins, xmin = min_max[0], xmax = min_max[1])
         hist.SetTitle(detector+": "+axis)
-        fit = self.fit_peak(hist)
+        fit = scripts.utilities.fit_peak(hist, nsigma=1)
         hist.Draw()
         self.get_text_box(residual_list, fit)
         canvas.Update()
         self.print_canvas(canvas, name)
-        return
+
         name = "normalised "+name
         canvas = xboa.common.make_root_canvas(name)
         min_max = self.alt_min_max(weighted_residual_list, 10)
         if len(weighted_residual_list) > 0:
             hist = xboa.common.make_root_histogram(name, weighted_residual_list, "Res("+axis+")/#sigma("+axis+")", nbins, xmin = min_max[0], xmax = min_max[1])
             hist.SetTitle(detector+": "+axis)
+            fit = scripts.utilities.fit_peak(hist, nsigma=1)
             hist.Draw()
-        self.get_text_box(weighted_residual_list)
-        self.print_canvas(canvas, name)
+            self.get_text_box(weighted_residual_list, fit)
+            self.print_canvas(canvas, name)
 
     def get_miss_text_box(self, bunch, detector):
         text_box = ROOT.TPaveText(0.6, 0.4, 0.9, 0.9, "NDC")
@@ -488,6 +516,7 @@ def do_extrapolation(config, config_anal, data_loader):
     extrapolate = ExtrapolateTrackPoints(config, config_anal, data_loader)
     print "using model:"
     print extrapolate.tracking.geometry_model_string()
+    print "starting extrapolation..."
     sys.stdout.flush()
     while index < len(data_loader.events):
         try:
@@ -496,7 +525,7 @@ def do_extrapolation(config, config_anal, data_loader):
                 event = data_loader.events[index]
                 pass_first_cuts += 1
                 try:
-                    extrapolate.extrapolate_event(event)  
+                    extrapolate.extrapolate_event(event, config_anal["extrapolation_source"]) #, "tkd_tp")  
                     extrapolate.extrapolation_cuts(event)
                     pass_extrapolate += 1
                 except ValueError:
@@ -506,15 +535,14 @@ def do_extrapolation(config, config_anal, data_loader):
                 pass_second_cuts += 1
                 for detector in "tof1", "tof0", "tof2":
                     extrapolate.append_misses(event, detector)
-                    for axis in "x", "y", "t":
-                        extrapolate.append_residual(event, detector, axis)
+                    extrapolate.append_residual(event, detector, ["x", "y", "t"])
                 for detector in "tkd_tp",:
                     extrapolate.append_misses(event, detector)
-                    for axis in "x", "y", "px", "py", "pz":
-                        extrapolate.append_residual(event, detector, axis)
+                    extrapolate.append_residual(event, detector, [ "x", "y", "px", "py", "pz"])
                 will_do_plots = pass_second_cuts % step == 0
         except IndexError:
             index = len(data_loader.events) # force to finish
+            sys.excepthook(*sys.exc_info())
         print "event", index, "of", len(data_loader.events), "with", pass_first_cuts, \
               "passing first cuts,", pass_extrapolate, "extrapolating okay and", \
               pass_second_cuts, "passing second cuts"

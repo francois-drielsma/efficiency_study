@@ -40,6 +40,7 @@ class ResidualFitter(object):
         self._iteration = 0
         self.track_source = ""
         self.residuals_source = ""
+        self.direction = "both"
         self.residuals_variables = []
         self.optimisation_axes = {}
         self.optimisation_currents = {}
@@ -71,6 +72,7 @@ class ResidualFitter(object):
         for fit in self.config.residual_fitter["fits"]:
             self.optimisation_axes = {fit["name"]:{"z_pos":fit["z_pos"]}}
             self.track_source = fit["track_source"]
+            self.direction = fit["direction"]
             self.residuals_source = fit["detector"]
             self.residuals_variables = fit["variables"]
             self.optimisation_currents = {}
@@ -125,6 +127,7 @@ class ResidualFitter(object):
         self.update_from_minuit(True)
 
     def pick_events(self, data_loader):
+        print "Picking events..."
         index = 0
         n_selected = 0
         target_count = self.config.residual_fitter["n_events"]
@@ -139,6 +142,8 @@ class ResidualFitter(object):
             if ExtrapolateTrackPoints.is_cut(event, self.config):
                 continue
             for bin_index, bounds in enumerate(p_bins):
+                if len(self.event_list[bin_index]) == target_count:
+                    continue
                 tku_p = event["tku"]["p"]
                 # check if momentum is in the bin
                 if tku_p < bounds[0] or tku_p > bounds[1]:
@@ -152,9 +157,12 @@ class ResidualFitter(object):
                 # keep the clean copy; we don't want the extrapolation
                 self.event_list[bin_index].append(event_copy)
                 n_selected += 1
+                if n_selected % 1000 == 0:
+                    print n_selected, "of", len(self.event_list)*target_count
                 # if the bin is full, remove it from consideration
-                if len(self.event_list[bin_index]) == target_count:
-                    del p_bins[bin_index]
+        print "Picked events after", index, "of", len(data_loader.events), "events" 
+        for i in range(len(self.event_list)):
+            print "   ", p_bins[i], len(self.event_list[i])
 
     def update_from_minuit(self, print_parameters):
         """
@@ -210,13 +218,14 @@ class ResidualFitter(object):
 
     def do_tracking(self):
         self.extrapolate_list = []
+        print "Doing tracking for", self.track_source, "tracking", self.direction, "to", self.residuals_source
         for event_bin in self.event_list: # momentum bins
             extrapolate = ExtrapolateTrackPoints(self.config, self.config_anal, self.data_loader, False)
             self.extrapolate_list.append(extrapolate)
             for event in event_bin:
                 event = copy.deepcopy(event)
                 try:
-                    extrapolate.extrapolate_event(event)
+                    extrapolate.extrapolate_event(event, self.track_source, self.direction)
                 except ValueError:
                     pass #sys.excepthook(*sys.exc_info())
                 for detector in [self.residuals_source]:

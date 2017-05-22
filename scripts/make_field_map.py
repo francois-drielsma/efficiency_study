@@ -23,17 +23,23 @@ In this example, MAUS will build a geometry specified in the usual way by the
 parallel to the beam axis (bz) in the region z=-8 m to z=8 m.
 """
 
+import os
+import shutil
+import ROOT
+
 import Configuration  # MAUS configuration (datacards) module
 import maus_cpp.globals as maus_globals # MAUS C++ calls
 import maus_cpp.field as field # MAUS field map calls
 import xboa.common  # xboa post-processor library
+
+Z_OFFSET = (15068.0+18756.0)/2.
 
 def initialise_maus():
     configuration = Configuration.Configuration().\
                                           getConfigJSON(command_line_args=True)
     maus_globals.birth(configuration)
 
-def plot_hps(z_list):
+def plot_hps(z_list, different_markers):
     hp_z_positions = {
         "hp_77":14104.,
         "hp_79":14429.,
@@ -51,8 +57,8 @@ def plot_hps(z_list):
         "hp_65":3.0430975,
         "hp_66":3.100803,
         "hp_72":3.011501,
-        "hp_73":3.0571025,
-        "hp_80":3.012287,
+        "hp_73":3.0571025, #3.0571025,
+        "hp_80":3.012287, #3.012287,
     }
     graph_list = []
     hp_color_list = [1, 2, 4, 6, 8]
@@ -62,14 +68,19 @@ def plot_hps(z_list):
         btot = hp_btot[hp]
         name = "Hall probe "+hp[-2:]
         if z_pos > z_list[0] and z_pos < z_list[-1]:
-            hist, graph = xboa.common.make_root_graph(name, [z_pos], "", [btot], "")
+            hist, graph = xboa.common.make_root_graph(name, [z_pos-Z_OFFSET], "", [btot], "")
             graph.SetMarkerStyle(20+len(graph_list))
             hp_color = hp_color_list[len(graph_list)%5]
             graph.SetLineColor(10)
             graph.SetMarkerColor(hp_color)
             graph.Draw("p")
-            graph_list.append(graph)
-    return graph_list
+            if different_markers:
+                graph_list.append(graph)
+    if different_markers:
+        return graph_list
+    else:
+        graph.SetName("Hall Probes")
+        return [graph]
 
 def plot_tracker_stations(z_list, btot_list):
     tracker_z_positions = [
@@ -78,6 +89,7 @@ def plot_tracker_stations(z_list, btot_list):
         (14618.0, "tku_3"),
         (14867.0, "tku_2"),
         (15068.0, "tku_tp"),
+        (15068.0/2.+18756.0/2., "absorber"),
         (18756.0, "tkd_tp"),    
         (18955.0, "tkd_2"),
         (19206.0, "tkd_3"),
@@ -87,8 +99,8 @@ def plot_tracker_stations(z_list, btot_list):
     graph_list = []
     for z_pos, station in tracker_z_positions:
         if z_pos > z_list[0] and z_pos < z_list[-1]:
-            hist, graph = xboa.common.make_root_graph("Tracker stations", [z_pos, z_pos], "", [-1e6, 1e6], "")
-            graph.SetLineColor(1)
+            hist, graph = xboa.common.make_root_graph("Tracker stations", [z_pos-Z_OFFSET, z_pos-Z_OFFSET], "", [-1e6, 1e6], "")
+            graph.SetLineColor(4)
             graph.SetLineStyle(2)
             graph.Draw("l")
             graph_list.append(graph)
@@ -114,11 +126,36 @@ def plot_tracker_stations(z_list, btot_list):
             print str(z_list[i-1]).rjust(col), str(round(mean_b, 4)).rjust(col), str(round(dphi, 4)).rjust(col), str(round(dphi_3, 4)).rjust(col), str(round(dphi/dl, 6)).rjust(col)
     return graph_list
 
+TEXT_BOXES = []
+def text_box(graph_list):
+    legend = ROOT.TLegend(0.65, 0.7, 0.89, 0.89)
+    for graph in graph_list:
+        legend.AddEntry(graph, graph.GetName(), "lp")
+    legend.SetBorderSize(0)
+    legend.Draw()
+    TEXT_BOXES.append(legend)
+    text_box = ROOT.TPaveText(0.65, 0.6, 0.89, 0.7, "NDC")
+    text_box.SetFillColor(0)
+    text_box.SetBorderSize(0)
+    text_box.SetTextSize(0.03)
+    text_box.SetTextAlign(12)
+    text_box.AddText("MICE Preliminary")
+    text_box.Draw()
+    TEXT_BOXES.append(text_box)
+    text_box = ROOT.TPaveText(0.65, 0.5, 0.89, 0.6, "NDC")
+    text_box.SetFillColor(0)
+    text_box.SetBorderSize(0)
+    text_box.SetTextSize(0.024)
+    text_box.SetTextAlign(12)
+    text_box.AddText("ISIS Cycle 2016/04")
+    text_box.AddText("MAUS v2.8.5")
+    text_box.Draw()
+    TEXT_BOXES.append(text_box)
 
-def plot_z_range(z_list, name):
+def plot_z_range(z_list, b_min_max, name):
     canvas = None
     graph_list = []
-    for r_pos, line_color in [(140., 6), (160., 4), (180., 8), (0., 1)]:
+    for r_pos, line_color in [(160., 8), (0., 1)]:
         #z_list = [float(z_pos) for z_pos in range(19000, 20001, 10)]
         btot_list = []
         for z_pos in z_list:
@@ -128,12 +165,12 @@ def plot_z_range(z_list, name):
             btot_list.append(btot*1e3)  # btot in T
             #print 'z:', z_pos, ' ** b:', bx_field, by_field, bz_field, \
             #                       'e:', ex_field, ey_field, ez_field
-
-        [ymin, ymax] = xboa.common.min_max(btot_list+[3.1])
-        [xmin, xmax] = xboa.common.min_max(z_list)
+        gz_list = [z - Z_OFFSET for z in z_list]
+        [ymin, ymax] = [b_min_max[0], b_min_max[1]] # xboa.common.min_max(btot_list+[3.1])
+        [xmin, xmax] = xboa.common.min_max(gz_list)
         xmax += (xmax-xmin)*0.3
         # now make a ROOT graph of bz against z
-        hist, graph = xboa.common.make_root_graph("x="+str(r_pos)+" mm", z_list, "z [m]",
+        hist, graph = xboa.common.make_root_graph("x="+str(r_pos)+" mm", gz_list, "z [m]",
                                                    btot_list, "B_{tot} [T]",
                                                   xmin=xmin, xmax=xmax,
                                                   ymin=ymin, ymax=ymax)
@@ -144,26 +181,27 @@ def plot_z_range(z_list, name):
         graph_list.append(graph)
         graph.Draw('l')
         canvas.Update()
-    graph_list += plot_hps(z_list)
+    graph_list += plot_hps(z_list, False)
     plot_tracker_stations(z_list, btot_list)
-    legend = xboa.common.make_root_legend(canvas, graph_list)
-    print legend.GetX1NDC(), legend.GetX2NDC()
-    legend.SetX1NDC(0.7)
-    legend.SetX2NDC(0.9)
-    legend.SetBorderSize(1)
-    legend.Draw()
-    canvas.Print(name) #'plots/bfield_vs_z_ssd.png'
+    text_box(graph_list)
+    for format in ["root", "eps", "png"]:
+        canvas.Print(name+"."+format)
 
 def main():
     """
     Make a plot of z, bz
     """
     # set up datacards (geometry specified e.g. on command line using --simulation_geometry_filename)
+    my_dir = "plots/field_8699/"
+    if os.path.exists(my_dir):
+        shutil.rmtree(my_dir)
+    os.makedirs(my_dir)
     initialise_maus()
+        
     # make plots
-    plot_z_range(range(13900, 15101, 1), "bfield_vs_z_ssu.png")
-    plot_z_range(range(18600, 20001, 1), "bfield_vs_z_ssd.png")
-    plot_z_range(range(13000, 21001, 1), "bfield_vs_z.png")
+    plot_z_range(range(13900, 15101, 1), [2.95, 3.2], my_dir+"bfield_vs_z_ssu")
+    plot_z_range(range(18600, 20001, 1), [2.95, 3.2], my_dir+"bfield_vs_z_ssd")
+    plot_z_range(range(13000, 21001, 1), [None, None], my_dir+"bfield_vs_z")
     # Clean up
     maus_globals.death()
     # Finished
