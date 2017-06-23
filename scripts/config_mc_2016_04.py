@@ -17,8 +17,8 @@ def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
     plot_dir = plot_dir.replace(" ", "_")
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
-            "tof12_cut_low":32., # TOF12 cut lower bound
-            "tof12_cut_high":39., # TOF12 cut upper bound
+            "tof12_cut_low":33., # TOF12 cut lower bound
+            "tof12_cut_high":45., # TOF12 cut upper bound
             "delta_tof01_lower":-5., # Delta TOF01 cut lower bound 
             "delta_tof01_upper":5., # Delta TOF01 cut upper bound 
             "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
@@ -57,7 +57,7 @@ class Config(object):
     tk_plane = 0
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
-    cuts_active = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
+    upstream_cuts = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
           "downstream_cut":None,
           "any_cut":None,
           "scifi_space_clusters":False,
@@ -65,7 +65,7 @@ class Config(object):
           "scifi_tracks_us":True,
           "scifi_track_points_us":False,
           "aperture_us":False,
-          "pvalue_us":True,
+          "pvalue_us":False,
           "aperture_ds":False,
           "scifi_tracks_ds":False,
           "scifi_track_points_ds":False,
@@ -80,30 +80,11 @@ class Config(object):
           "tof_1_sp":True,
           "tof_2_sp":False,
     }
-    downstream_cuts = copy.deepcopy(cuts_active)
+    downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = True
-    downstream_cuts["pvalue_ds"] = True
-    extrapolation_cuts = { # Set to true to make extrapolate_tracks use the cuts; False to ignore the cut
-          "any_cut":False,
-          "downstream_cut":None,
-          "scifi_space_clusters":False,
-          "scifi_space_points":False,
-          "scifi_tracks_us":True,
-          "scifi_track_points_us":False,
-          "aperture_us":False,
-          "aperture_ds":False,
-          "scifi_tracks_ds":False,
-          "scifi_track_points_ds":False,
-          "tof01":True,
-          "tof12":False,
-          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
-          "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
-          "p_tot_us":True,
-          "p_tot_ds":False,
-          "tof_0_sp":True,
-          "tof_1_sp":True,
-          "tof_2_sp":False,
-    }
+    downstream_cuts["pvalue_ds"] = False
+    downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
+    extrapolation_cuts = upstream_cuts
 
     analyses = []
     #analyses.append(get_analysis("rogers/data_8685_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br12.87_W8.4_hi-stats/*", "10-140 MC", 30, "MAUS-v2.8.2", data_dir))
@@ -118,7 +99,7 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = 10000 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     maus_version = ""

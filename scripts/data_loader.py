@@ -294,8 +294,6 @@ class DataLoader(object):
             if tof01 > self.config_anal["tof01_cut_high"] or \
                tof01 < self.config_anal["tof01_cut_low"]:
                 tof01_cut = True
-        else:
-            tof01_cut = True
 
         tof12_cut = False
         if "tof2" in detectors and "tof1" in detectors:
@@ -303,8 +301,6 @@ class DataLoader(object):
             if tof12 > self.config_anal["tof12_cut_high"] or \
                tof12 < self.config_anal["tof12_cut_low"]:
                 tof12_cut = True
-        else:
-            tof12_cut = True
 
         return (tof_sp_list, {
             "tof_0_sp":space_points.GetTOF0SpacePointArray().size() != 1,
@@ -356,6 +352,10 @@ class DataLoader(object):
                     except Exception:
                         #print "\nCov nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event
                         #print "    ", [x for x in track_point.covariance()]
+                        track_points_out.append({
+                          "detector":detector+"_nan",
+                          "hit":{"z":999},
+                        })
                         break
                     for i in range(5):
                         k = index_mapping[i]
@@ -377,6 +377,10 @@ class DataLoader(object):
                     self.nan_check(tp_dict.values())
                 except:
                     #print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
+                    track_points_out.append({
+                      "detector":detector+"_nan",
+                      "hit":{"z":999},
+                    })
                     break
                 track_points_out.append({
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
@@ -388,7 +392,6 @@ class DataLoader(object):
         return track_points_out
 
     def load_scifi_event(self, scifi_event):
-        points = []
         will_cut_on_scifi_cluster = self.will_cut_on_scifi_clusters(scifi_event)
         will_cut_on_scifi_space_points = self.will_cut_on_scifi_space_points(scifi_event)
         will_cut_on_scifi_tracks = self.will_cut_on_scifi_tracks(scifi_event)
@@ -396,9 +399,15 @@ class DataLoader(object):
         will_cut_on_pvalue = self.will_cut_on_pvalue(scifi_event)
 
         if self.config.will_load_tk_space_points:
-            points += self.load_scifi_space_points(scifi_event)
+            space_points = self.load_scifi_space_points(scifi_event)
         if self.config.will_load_tk_track_points:
-            points += self.load_track_points(scifi_event)
+            track_points = self.load_track_points(scifi_event)
+        # a bit hacky - we flag the nans and exclude from recon
+        nan_cut_upstream = [point for point in track_points if point["detector"] == "tku_tp_nan"]
+        nan_cut_downstream = [point for point in track_points if point["detector"] == "tkd_tp_nan"]
+        track_points = [point for point in track_points if point["detector"] != "tku_tp_nan" and \
+                                                           point["detector"] != "tkd_tp_nan"]
+        points = space_points + track_points
         return [
             points, {
                 "scifi_space_points":will_cut_on_scifi_space_points,
@@ -407,6 +416,8 @@ class DataLoader(object):
                 "scifi_tracks_ds":will_cut_on_scifi_tracks[1],
                 "scifi_track_points_us":will_cut_on_scifi_track_points[0],
                 "scifi_track_points_ds":will_cut_on_scifi_track_points[1],
+                "scifi_nan_us":len(nan_cut_upstream) != 0,
+                "scifi_nan_ds":len(nan_cut_downstream) != 0,
                 "pvalue_us":will_cut_on_pvalue[0],
                 "pvalue_ds":will_cut_on_pvalue[1],
             }
@@ -501,12 +512,14 @@ class DataLoader(object):
     def update_cuts(self):
         for event in self.events:
             event["any_cut"] = False
+            event["upstream_cut"] = False
             event["downstream_cut"] = False
             event["data_cut"] = False
             for key, value in event["will_cut"].iteritems():
-                if value and self.config.cuts_active[key]:
+                if value and self.config.upstream_cuts[key]:
                     event["any_cut"] = True
                     event["data_cut"] = True
+                    event["upstream_cut"] = True
                 if value and self.config.downstream_cuts[key]:
                     event["downstream_cut"] = True
 
@@ -514,11 +527,14 @@ class DataLoader(object):
         p_bins = self.config_anal["p_bins"]
         p_low = min(min(p_bins))
         p_high = max(max(p_bins))
-        return event["tku"] == None or event["tku"]["p"] < p_low or event["tku"]["p"] > p_high
+        if event["tku"] == None:
+            return False
+        return event["tku"]["p"] < p_low or event["tku"]["p"] > p_high
 
     def will_do_p_cut_ds(self, event):
-        return event["tkd"] == None or \
-               event["tkd"]["p"] < self.config_anal["p_tot_ds_low"] or \
+        if event["tkd"] == None:
+            return False
+        return event["tkd"]["p"] < self.config_anal["p_tot_ds_low"] or \
                event["tkd"]["p"] > self.config_anal["p_tot_ds_high"]
 
     def nan_check(self, float_list):
@@ -562,6 +578,11 @@ class DataLoader(object):
         event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
+        if event["will_cut"]["scifi_tracks_us"] == False and tku == None:
+              pass #print 'tku', event['tku']
+              #print 'tku_sp', [item for item in event['data'] if 'tku_sp' in item['detector']]
+              #print 'tku_tp', [item for item in event['data'] if 'tku_tp' in item['detector']]
+              #raw_input()
         event["delta_tof01"] = None # loaded during track extrapolation
         event["delta_tof12"] = None # loaded during track extrapolation
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)

@@ -8,10 +8,10 @@ def initialise_maus():
     maus_cpp.globals.birth(configuration)
 
 def print_materials():
-    for x in [120, 0]:
+    for x in [120, 101, 99, 0]:
         material = None
-        for z in range(130000, 140000, 1):
-            z /= 10.
+        for z in range(1300000, 1400000, 1):
+            z /= 100.
             maus_cpp.material.set_position(x, 0., z)
             material_data = maus_cpp.material.get_material_data()
             new_material = material_data['name']

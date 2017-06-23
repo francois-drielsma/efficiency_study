@@ -1,3 +1,5 @@
+import copy
+
 def mc_file_names(job_name, datasets):
     file_list = ["/home/cr67/MAUS/work/reco/mc/"+job_name+"/"+datasets+"/*_sim.root"]
     return file_list
@@ -31,13 +33,13 @@ def get_analysis(run_list, name, tof01_max, maus_version, data_dir, extrap, ampl
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "amplitude_source":"output/2016-04_1.2_mc/plots_"+amplitude_source+"/amplitude.json",
+            "amplitude_source":"output/2016-04_1.2_mc_ds-cuts/plots_"+amplitude_source+"/amplitude.json",
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
             "do_amplitude":True, #True,
             "do_extrapolation":False, #name == "3-140+M3-Test2",
             "do_mc":False,
-            "do_plots":False,
+            "do_plots":True,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":None, #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
             "extrapolation_source":extrap
@@ -55,16 +57,18 @@ class Config(object):
     tk_plane = 0
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
-    cuts_active = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
+    upstream_cuts = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
           "any_cut":None,
           "scifi_space_clusters":False,
           "scifi_space_points":False,
           "scifi_tracks_us":True,
+          "scifi_nan_us":True,
           "scifi_track_points_us":False,
           "aperture_us":False,
           "pvalue_us":True,
           "aperture_ds":False,
           "scifi_tracks_ds":False,
+          "scifi_nan_ds":False,
           "scifi_track_points_ds":False,
           "pvalue_ds":False,
           "tof01":True,
@@ -77,12 +81,18 @@ class Config(object):
           "tof_1_sp":True,
           "tof_2_sp":False,
     }
-    extrapolation_cuts = cuts_active
+    downstream_cuts = copy.deepcopy(upstream_cuts)
+    downstream_cuts["p_tot_ds"] = True
+    downstream_cuts["pvalue_ds"] = False
+    downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
+    downstream_cuts["scifi_tracks_ds"] = True
+    downstream_cuts["scifi_nan_ds"] = True
+    extrapolation_cuts = upstream_cuts
 
     analyses = []
-    analyses.append(get_analysis([8681], "3-140", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC"))
-    analyses.append(get_analysis([8699], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
-    analyses.append(get_analysis([8685], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
+    analyses.append(get_analysis([8681], "3-140", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC_Prod"))
+    #analyses.append(get_analysis([8699], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
+    #analyses.append(get_analysis([8685], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
     amplitude_bin_width = 5
     amplitude_max = 25
 

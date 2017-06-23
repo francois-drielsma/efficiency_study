@@ -7,12 +7,4 @@ python ${MAUS_ROOT_DIR}/bin/utilities/download_geometry.py --geometry_download_b
 
 exit 0
 
-export geometry_id=736
-export geometry_dir=geometry_preprod${geometry_id}
-rm -r ${geometry_dir}
-mkdir ${geometry_dir}
-
-#python ${MAUS_ROOT_DIR}/bin/utilities/download_geometry.py --geometry_download_by id --geometry_download_directory ${geometry_dir} --geometry_download_id ${geometry_id} --cdb_download_url "http://preprodcdb.mice.rl.ac.uk/cdb/"
-
-echo "**********************\n\n\n"
-echo "YOU MUST CHECK THE CURRENTS FOR PREPROD GEOMETRY"
+#--geometry_download_by "id" --geometry_download_id 184 --cdb_download_url "http://preprodcdb.mice.rl.ac.uk/cdb/" --geometry_download_directory ${geometry_dir}

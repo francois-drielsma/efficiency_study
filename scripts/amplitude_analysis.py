@@ -442,12 +442,31 @@ class AmplitudeAnalysis(object):
                 # Square because we add errors in quadrature
                 error_matrix[j][i] = error**2
         # Add errors in quadrature
+        self.matrix_plot(migration_matrix, "migration matrix")
         downstream_errors = [sum(row)**0.5 for row in error_matrix]
+        error_matrix_sqrt = [[element**0.5 for element in row] for row in error_matrix]
+        self.matrix_plot(error_matrix_sqrt, "stats error")
         print "upstream pdf\n", self.matrix_str(row_sum)
         print "migration matrix\n", self.matrix_str(migration_matrix)
         print "error matrix\n", self.matrix_str(error_matrix)
         print "downstream errors\n", self.matrix_str(downstream_errors)
         return downstream_errors
+
+    def matrix_plot(self, matrix, title):
+        bin_centre_list = self.amplitudes["reco"]["all_upstream"]["bin_centre_list"]
+        xmax = max(self.bin_edge_list)
+        nbins = len(bin_centre_list)
+        matrix_hist = ROOT.TH2D(title, title+";Amplitude Downstream [mm];Amplitude Upstream [mm]", nbins, 0., xmax, nbins, 0., xmax)
+        for i in range(nbins):
+            for j in range(nbins):
+                matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
+        self.root_objects.append(matrix_hist)
+        canvas = common.make_root_canvas(title)
+        matrix_hist.SetStats(False)
+        matrix_hist.Draw("COLZ")
+        title = title.replace(" ", "_")
+        for format in ["eps", "png", "root"]:
+            canvas.Print(self.config_anal["plot_dir"]+title+"."+format)
 
     def get_delta_graphs(self, suffix):
         data = self.amplitudes[suffix]
@@ -643,7 +662,7 @@ class AmplitudeAnalysis(object):
                 print "Didnt find any_cut in", event.keys()
                 continue
 
-            if event['any_cut']:
+            if event['upstream_cut']:
                 continue
             spill = event['tku']['spill']
             ev = event['tku']['event_number']
@@ -652,6 +671,8 @@ class AmplitudeAnalysis(object):
             mc_hit_ds = None
             mc_hit_dict_us = {}
             mc_hit_dict_ds = {}
+            tku_truth = [None]*3
+            tkd_truth = [None]*3
             if self.config_anal["do_mc"]:
                 for detector_hit in event["data"]:
                     if detector_hit["detector"] in station_us:
@@ -671,22 +692,20 @@ class AmplitudeAnalysis(object):
                     mc_hit_ds['spill'] = spill
                     mc_hit_ds['event_number'] = ev
                     hits_all_mc_ds.append(mc_hit_ds)
-            if event['tku'] == None:
-                continue
             hits_reco_us.append(event['tku'])
             if mc_hit_us != None:
                 hits_reco_mc_us.append(mc_hit_us)
-            else:
+            elif tku_truth[0] != None:
                 print "tku impurity", tku_truth
 
-            if event['downstream_cut'] or event['tkd'] == None:
+            if event['downstream_cut']:
                 continue
             hits_reco_ds.append(event['tkd'])
             if mc_hit_ds != None:
                 hits_reco_mc_ds.append(mc_hit_ds)
-            else:
+            elif tkd_truth[0] != None:
                 print "tkd impurity", tkd_truth
-                if tkd_truth[2] != 15:
+                if tkd_truth[2] != 15 and tkd_truth[2] != None:
                     print mc_hit_dict_ds[station_ds[0]]
         print "Loaded upstream:"
         print "    reco:", len(hits_reco_us)

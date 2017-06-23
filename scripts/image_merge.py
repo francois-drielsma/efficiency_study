@@ -52,6 +52,11 @@ def main():
         "output/2016-04_1.2_reco/plots_10-140/",
     ]
 
+    mc_vs_prod_directories = [
+        "iteration_5_ipac/2016-04_1.2_mc/plots_3-140_MC_amplitude/",
+        "output/2016-04_1.2_mc_ds-cuts/plots_3-140_MC_Prod/",
+    ]
+
     mc_directories = [
         "output/2016-04_1.2_mc/plots_3-140_MC/",
         "output/2016-04_1.2_mc/plots_6-140_MC/",
@@ -74,7 +79,7 @@ def main():
         "output/2016-04_1.2_mc/plots_10-140_MC_Scale_D1=1.02_D2=1.02_DS=1.00_Br12.87_W8.4/",
     ]
 
-    merge(image_files, mc_directories, "plots/mc")
+    merge(image_files, mc_vs_prod_directories, "plots/mc_vs_prod")
 
 if __name__ == "__main__":
     main()
