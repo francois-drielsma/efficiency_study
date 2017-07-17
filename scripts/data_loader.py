@@ -13,22 +13,29 @@ from xboa.hit import Hit
 # Fix tracker cuts!
 
 class DataLoader(object):
-    def __init__(self, config, analysis_index):
+    def __init__(self, config, config_anal):
         self.config = config
-        self.config_anal = config.analyses[analysis_index]
-        self.detector_count = {}
+        self.config_anal = config_anal
+        self.det_pos = self.get_det_pos()
+        self.maus_version = ""
+        self.run_numbers = set([])
+        self.file_name_list = []
+
         self.spill_count = 0
         self.event_count = 0
         self.accepted_count = 0
-        self.events = []
-        self.maus_version = ""
-        self.run_numbers = set([])
+        self.start_time = time.time()
+
+        self.this_file_name = "a"
+        self.this_root_file = None
         self.this_run = 0
         self.this_spill = 0
         self.this_event = 0
-        self.cuts = {}
-        self.event_id = 0
-        self.det_pos = self.get_det_pos()
+        self.this_daq_event = 0
+        self.this_tree = None
+        self.all_root_files = [None] # f@@@ing root deletes histograms randomly if I let files go out of scope
+
+        self.events = []
 
     def get_det_pos(self):
         det_pos = {}
@@ -36,74 +43,107 @@ class DataLoader(object):
             det_pos[det[2]] = det[0]
         return det_pos
 
-    def load_data(self, min_spill, max_spill):
-        if min_spill >= max_spill:
-            return
-        self.spill_count = 0
-        file_name_list = []
-        for fname in self.config_anal["reco_files"]:
-            file_name_list += glob.glob(fname)
-        file_name_list = sorted(file_name_list)
-        print "Found", file_name_list, "files"
-        if len(file_name_list) == 0:
-            raise IOError("Couldn't find files for reco_files "+str(self.config_anal["reco_files"]))
-        for file_name in file_name_list:
-            print "Loading ROOT file", file_name
-            
-            sys.stdout.flush()
-            root_file = ROOT.TFile(file_name, "READ") # pylint: disable = E1101
+    def clear_data(self):
+        self.events = []
 
-            data = ROOT.MAUS.Data() # pylint: disable = E1101
-            tree = root_file.Get("Spill")
-            try:
-                tree.SetBranchAddress("data", data)
-            except AttributeError:
-                continue
-            print tree.GetEntries(), "spills..."
-            events_per_file = [] # worried that list.append is consuming cpu
-            new_t = time.time()
-            for i in range(tree.GetEntries()):
-                events_per_spill = [] # worried that list.append is consuming cpu
-                if i % 100 == 0:
-                    old_t = new_t
-                    new_t = time.time()
-                    print i, "("+str(round(new_t - old_t, 2))+")", 
-                    sys.stdout.flush()
-                tree.GetEntry(i)
-                spill = data.GetSpill()
-                self.this_run = spill.GetRunNumber()
-                self.this_spill = spill.GetSpillNumber()
-                if i == 0:
-                    self.run_numbers.add(spill.GetRunNumber())
-                if spill.GetDaqEventType() == "physics_event":
-                    if self.config.number_of_spills != None and \
-                       self.spill_count > self.config.number_of_spills:
-                        #file_name_list = []
-                        break
-                    self.spill_count += 1
-                    for ev_number, reco_event in enumerate(spill.GetReconEvents()):
-                        self.this_event = reco_event.GetPartEventNumber()
-                        try:
-                            event = self.load_reco_event(reco_event)
-                        except ValueError:
-                            #sys.excepthook(*sys.exc_info())
-                            print "spill", spill.GetSpillNumber(), "particle_number", reco_event.GetPartEventNumber()
-                        except ZeroDivisionError:
-                            pass
-                        if event == None: # missing TOF1 - not considered further
-                            continue 
-                        self.event_count += 1
-                        event["spill"] = spill.GetSpillNumber()
-                        events_per_spill.append(event)
-                        event["event_number"] = ev_number
-                        if self.config_anal["do_mc"] and len(spill.GetMCEvents()) > ev_number:
-                            self.load_mc_event(event, spill.GetMCEvents()[ev_number])
-                events_per_file += events_per_spill
-            self.events += events_per_file
-            print "\n  ...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
+    def load_data(self, min_daq_event, max_daq_event):
+        self.get_file_list()
+        self.root_event = min_daq_event
+        self.load_spills(max_daq_event - min_daq_event)
+
+    def get_file_list(self):
+        self.file_name_list = []
+        for fname in self.config_anal["reco_files"]:
+            self.file_name_list += glob.glob(fname)
+        self.file_name_list = sorted(self.file_name_list)
+        if len(self.file_name_list) == 0:
+            raise RuntimeError("No files")
+        print "Found", self.file_name_list, "files"
+        self.next_file()
+        self.this_daq_event = 0
+        self.spill_count = 0
+
+    def next_file(self):
+        try:
+            self.this_file_name = self.file_name_list.pop(0)
+            print "Loading ROOT file", self.this_file_name
+        except IndexError:
+            self.this_file_name = ""
+            print "No more files to load"
+        self.this_tree = None
+        self.this_daq_event = 0
+
+    def load_spills(self, number_of_daq_events):
+        load_spills_daq_event = 0 # number of daq events loaded during this call
+                                  # to load_spills
+        self.load_new_file()
+        while load_spills_daq_event < number_of_daq_events and self.this_file_name != "" and self.this_tree != None:
             sys.stdout.flush()
-        print "Finalising cuts"
+            if self.this_file_name == "" or self.this_tree == None:
+                break # ran out of files
+            old_t = time.time()
+            while self.this_daq_event < self.this_tree.GetEntries() and \
+                  load_spills_daq_event < number_of_daq_events:
+                new_t = time.time()
+                if new_t - old_t > 10.:
+                    print "Spill", self.this_daq_event, "Time", round(new_t - self.start_time, 2)
+                    old_t = new_t
+                    sys.stdout.flush()
+                self.this_tree.GetEntry(self.this_daq_event)
+                spill = self.this_data.GetSpill()
+                self.load_one_spill(spill)
+                load_spills_daq_event += 1
+                self.this_daq_event += 1
+            if self.this_daq_event >= self.this_tree.GetEntries():
+                self.next_file()
+                self.load_new_file()
+            print "  ...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
+            sys.stdout.flush()
+        self.this_root_file.Close()
+        self.this_tree = None
         self.update_cuts()
+
+        # return True if there are more events
+        return self.this_file_name != ""
+
+    def load_new_file(self):
+        while self.this_tree == None and self.this_file_name != "":
+            self.all_root_files[0] = self.this_root_file
+            self.this_root_file = ROOT.TFile(self.this_file_name, "READ") # pylint: disable = E1101
+            self.this_data = ROOT.MAUS.Data() # pylint: disable = E1101
+            self.this_tree = self.this_root_file.Get("Spill")
+            try:
+                self.this_tree.SetBranchAddress("data", self.this_data)
+            except AttributeError:
+                print "Failed to load 'Spill' tree for file", self.this_file_name, "maybe it isnt a MAUS output file?"
+                self.this_tree = None
+                continue
+
+    def load_one_spill(self, spill):
+        self.this_run = spill.GetRunNumber()
+        self.this_spill = spill.GetSpillNumber()
+        if spill.GetDaqEventType() == "physics_event":
+            self.spill_count += 1
+            for ev_number, reco_event in enumerate(spill.GetReconEvents()):
+                self.this_event = reco_event.GetPartEventNumber()
+                try:
+                    event = self.load_reco_event(reco_event)
+                except ValueError:
+                    #sys.excepthook(*sys.exc_info())
+                    print "spill", spill.GetSpillNumber(), "particle_number", reco_event.GetPartEventNumber()
+                except ZeroDivisionError:
+                    pass
+                if event == None: # missing TOF1 - not considered further
+                    continue 
+                self.event_count += 1
+                event["spill"] = spill.GetSpillNumber()
+                self.events.append(event)
+                event["event_number"] = ev_number
+                if self.config_anal["do_mc"] and len(spill.GetMCEvents()) > ev_number:
+                    self.load_mc_event(event, spill.GetMCEvents()[ev_number])
+                for hit in event["data"]:
+                    hit["hit"]["event_number"] = ev_number
+                    hit["hit"]["spill"] = spill.GetSpillNumber()
 
     def load_mc_event(self, loaded_event, mc_event):
         # mc load functions return a list of hits
@@ -195,6 +235,7 @@ class DataLoader(object):
 
     def load_virtuals(self, virtual_vector):
         loaded_virtual_vector = [None]*len(virtual_vector)
+        #print "Virtuals",
         for i, virtual_hit in enumerate(virtual_vector):
             hit = xboa.hit.Hit()
             hit["x"] = virtual_hit.GetPosition().x()
@@ -221,6 +262,8 @@ class DataLoader(object):
                 "detector":"mc_virtual_"+str(hit["station"])
             }
             loaded_virtual_vector[i] = loaded_virtual
+            #print str(hit["station"])+":"+str(hit["z"]),
+        #print
         return loaded_virtual_vector
 
     def load_tof_mc_hits(self, tof_mc_vector):
@@ -387,6 +430,8 @@ class DataLoader(object):
                   "detector":detector,
                   "covariance":cov,
                   "pvalue":track.P_value(),
+                  "chi2":track.chi2(),
+                  "ndf":track.ndf(),
                 })
         track_points_out = sorted(track_points_out, key = lambda tp: tp["hit"]["z"])
         return track_points_out
@@ -397,6 +442,7 @@ class DataLoader(object):
         will_cut_on_scifi_tracks = self.will_cut_on_scifi_tracks(scifi_event)
         will_cut_on_scifi_track_points = self.will_cut_on_scifi_track_points(scifi_event)
         will_cut_on_pvalue = self.will_cut_on_pvalue(scifi_event)
+        will_cut_on_chi2 = self.will_cut_on_chi2(scifi_event)
 
         if self.config.will_load_tk_space_points:
             space_points = self.load_scifi_space_points(scifi_event)
@@ -407,6 +453,11 @@ class DataLoader(object):
         nan_cut_downstream = [point for point in track_points if point["detector"] == "tkd_tp_nan"]
         track_points = [point for point in track_points if point["detector"] != "tku_tp_nan" and \
                                                            point["detector"] != "tkd_tp_nan"]
+        n_tkd = len([point for point in track_points if "tkd" in point["detector"] ])
+        if n_tkd == 0 and will_cut_on_scifi_tracks[1] == False:
+            print "NAN?"
+            print nan_cut_downstream
+            raw_input()
         points = space_points + track_points
         return [
             points, {
@@ -420,6 +471,8 @@ class DataLoader(object):
                 "scifi_nan_ds":len(nan_cut_downstream) != 0,
                 "pvalue_us":will_cut_on_pvalue[0],
                 "pvalue_ds":will_cut_on_pvalue[1],
+                "chi2_us":will_cut_on_chi2[0],
+                "chi2_ds":will_cut_on_chi2[1],
             }
         ]
 
@@ -485,6 +538,14 @@ class DataLoader(object):
         for track in scifi_event.scifitracks():
             will_cut[track.tracker()] = will_cut[track.tracker()] and \
                                 track.P_value() < self.config_anal["pvalue_threshold"]
+        return will_cut
+
+    def will_cut_on_chi2(self, scifi_event):
+        """Require any track in a tracker to have pvalue greater than threshold"""
+        will_cut = [True, True]
+        for track in scifi_event.scifitracks():
+            will_cut[track.tracker()] = will_cut[track.tracker()] and \
+                                track.chi2()/track.ndf() > self.config_anal["chi2_threshold"]
         return will_cut
 
 
@@ -591,7 +652,6 @@ class DataLoader(object):
         event["will_cut"]["aperture_ds"] = False # loaded during track extrapolation
         event["will_cut"]["delta_tof01"] = False # loaded during track extrapolation
         event["will_cut"]["delta_tof12"] = False # loaded during track extrapolation
-        self.event_id += 1
         return event
 
     cuts = None
