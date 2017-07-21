@@ -132,7 +132,7 @@ class DataPlotter(object):
             hist_cut_us = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut_us, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
             hist_cut_us.SetLineColor(2)
             hist_cut_us.SetTitle(self.config_analysis['name'])
-            hist_cut_ds = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut_us, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
+            hist_cut_ds = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut_ds, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
             hist_cut_ds.SetLineColor(8)
             hist_cut_ds.SetTitle(self.config_analysis['name'])
 
@@ -146,6 +146,74 @@ class DataPlotter(object):
             pvalue_canvas.Update()
             for format in ["png", "root", "eps"]:
                 pvalue_canvas.Print(self.plot_dir+"pvalue_"+tracker+"."+format)
+
+    def plot_chi2(self):
+        for tracker in "tku", "tkd":
+            chi2_all = []
+            chi2_cut_us = []
+            chi2_cut_ds = []
+            ndf_all = []
+            ndf_cut_us = []
+            ndf_cut_ds = []
+            for event in self.events:
+                if event[tracker] == None:
+                    continue
+                for detector_hit in event["data"]:
+                    if detector_hit["detector"] != tracker+"_tp":
+                        continue
+                    chi2_all.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
+                    ndf_all.append(detector_hit["ndf"])
+                    if not self.will_cut_us(event):
+                        chi2_cut_us.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
+                        ndf_cut_us.append(detector_hit["ndf"])
+                    if not self.will_cut_ds(event):
+                        chi2_cut_ds.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
+                        ndf_cut_ds.append(detector_hit["ndf"])
+
+            chi2_canvas = xboa.common.make_root_canvas(tracker+" Chi2")
+
+            hist = xboa.common.make_root_histogram("chi2 "+tracker, chi2_all, "#chi^{2} ("+tracker+")", 100, xmax=20.)
+            hist.SetTitle(self.config_analysis['name'])
+            hist_cut_us = xboa.common.make_root_histogram("chi2 "+tracker, chi2_cut_us, "#chi^{2} ("+tracker+")", 100, xmax=20.)
+            hist_cut_us.SetLineColor(2)
+            hist_cut_us.SetTitle(self.config_analysis['name'])
+            hist_cut_ds = xboa.common.make_root_histogram("chi2 "+tracker, chi2_cut_ds, "#chi^{2} ("+tracker+")", 100, xmax=20.)
+            hist_cut_ds.SetLineColor(8)
+            hist_cut_ds.SetTitle(self.config_analysis['name'])
+
+            min_value = max(hist_cut_us.GetMinimum()/2., 0.8)
+            max_value = hist.GetMaximum()*2.
+            hist.GetYaxis().SetRangeUser(min_value, max_value)
+            hist.Draw()
+            hist_cut_us.Draw("SAME")
+            hist_cut_ds.Draw("SAME")
+
+            chi2_canvas.SetLogy()
+            chi2_canvas.Update()
+            for format in ["png", "root", "eps"]:
+                chi2_canvas.Print(self.plot_dir+"chi2_"+tracker+"."+format)
+
+            ndf_canvas = xboa.common.make_root_canvas(tracker+" NDF")
+            hist = xboa.common.make_root_histogram("ndf "+tracker, ndf_all, "NDoF ("+tracker+")", 100)
+            hist.SetTitle(self.config_analysis['name'])
+            hist_cut_us = xboa.common.make_root_histogram("ndf "+tracker, ndf_cut_us, "NDoF ("+tracker+")", 100)
+            hist_cut_us.SetLineColor(2)
+            hist_cut_us.SetTitle(self.config_analysis['name'])
+            hist_cut_ds = xboa.common.make_root_histogram("ndf "+tracker, ndf_cut_ds, "NDoFchi ("+tracker+")", 100)
+            hist_cut_ds.SetLineColor(8)
+            hist_cut_ds.SetTitle(self.config_analysis['name'])
+
+            min_value = max(hist_cut_us.GetMinimum()/2., 0.8)
+            max_value = hist.GetMaximum()*2.
+            hist.GetYaxis().SetRangeUser(min_value, max_value)
+            hist.Draw()
+            hist_cut_us.Draw("SAME")
+            hist_cut_ds.Draw("SAME")
+
+            ndf_canvas.SetLogy()
+            ndf_canvas.Update()
+            for format in ["png", "root", "eps"]:
+                ndf_canvas.Print(self.plot_dir+"ndf_"+tracker+"."+format)
 
 
     def plot_delta_tof(self, tofs):
@@ -584,6 +652,8 @@ def do_plots(config, config_anal, data_loader):
     plotter.plot_delta_tof("tof01")
     plotter.plot_delta_tof("tof12")
     plotter.plot_pvalues()
+    plotter.plot_chi2()
+
     #plotter.plot_sp_residuals("tku", "x")
     #plotter.plot_sp_residuals("tku", "y")
     #plotter.plot_sp_residuals("tkd", "x")

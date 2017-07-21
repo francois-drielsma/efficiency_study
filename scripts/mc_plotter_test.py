@@ -97,7 +97,8 @@ class MCPlotter(AnalysisBase):
         for i, key in enumerate(sorted(track_final.keys())):
             var_list = track_final[key]
             name = slice_variable+" = "+str(key)
-            hist = self.make_root_histogram(canvas_name, name, var_list, plot_variable+" at "+detector, 100, [], '', 0, [], xmin, xmax)
+            label = plot_variable+" at "+detector+" ["+scripts.utilities.default_units(plot_variable)+"]"
+            hist = self.make_root_histogram(canvas_name, name, var_list, label, 100, [], '', 0, [], xmin, xmax)
             hist.SetMarkerStyle(24)
             if key in color_dict:
                 hist.SetMarkerColor(color_dict[key])
@@ -156,8 +157,10 @@ class MCPlotter(AnalysisBase):
             x_list = track_final[pid][0]
             y_list = track_final[pid][1]
             name = slice_variable+" = "+str(pid)
+            label_1 = plot_variable_1+" ["+scripts.utilities.default_units(plot_variable_1)+"]"
+            label_2 = plot_variable_1+" ["+scripts.utilities.default_units(plot_variable_2)+"]"
             hist, graph = self.make_root_graph(canvas_name, name,
-              x_list, plot_variable_1, y_list, plot_variable_2, True,
+              x_list, label_1, y_list, label_2, True,
               xmin, xmax, ymin, ymax)
             if i == 0:
                 hist.Draw()

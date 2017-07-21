@@ -9,12 +9,11 @@ import ROOT
 from xboa.bunch import Bunch
 import scripts.utilities
 
-class MCPlotter(object):
+from analysis_base import AnalysisBase
+
+class MCPlotter(AnalysisBase):
     def __init__(self, config, config_anal, data_loader):
-        self.data_loader = data_loader
-        self.config = config
-        self.config_anal = config_anal
-        self.plot_dir = config_anal["plot_dir"]
+        super(MCPlotter, self).__init__(config, config_anal, data_loader)
 
     def choose_data(self, choice, cuts):
         key_map = {
@@ -30,7 +29,7 @@ class MCPlotter(object):
         data = [event[key] for event in self.events if predicate(event)]
         return data
 
-    def plot_detector_var_one_d(self, detector, slice_variable, plot_variable, color_dict, cuts = False, xmin = None, xmax = None):
+    def process_var_one_d(self, name, *args):
         track_final = {}
         for event in self.data_loader.events:
             if cuts and event["any_cut"]:
@@ -43,13 +42,35 @@ class MCPlotter(object):
                 if slice_var not in track_final:
                     track_final[slice_var] = []
                 track_final[slice_var].append(plot_var)
+        track_final = [track_final[key] for key in sorted(track_final.keys())]
         all_list = []
         for value in track_final.values():
             all_list += value
+        for i, hist in enumerate(self.plots[name]["histograms"]):
+            if i == 0:
+                [hist.Fill(item) for item in all_list]
+            else:
+                [hist.Fill(item) for item in track_final[i-1]]
+
+    def birth_var_one_d(self, detector, slice_variable, plot_variable, color_dict, cuts = False, xmin = None, xmax = None):
+        canvas_name = plot_variable+"_at_"+detector
+        out_list = self.process_var_one_d()
+        self.make_root_histogram(canvas_name, "all", all_list, plot_variable+" at "+detector, 100, xmin=xmin, xmax=xmax)
+        for i, key in enumerate(sorted(track_final.keys())):
+            var_list = track_final[key]
+            name = slice_variable+" = "+str(key)
+            self.make_root_histogram(canvas_name, name, var_list, plot_variable+" at "+detector, 100, xmin=xmin, xmax=xmax)
+            hist.SetMarkerStyle(24)
+            if key in color_dict:
+                hist.SetMarkerColor(color_dict[key])
+            hist.Draw("SAMEP")
+        self.plots[name]["canvas"].BuildLegend()
+        self.process_var_one_d(name, detector, slice_variable, plot_variable, color_dict, cuts, xmin, xmax)
+
+    def death_var_one_d(self):
 
         canvas = xboa.common.make_root_canvas(plot_variable+" at "+detector)
         canvas.SetLogy()
-        hist = xboa.common.make_root_histogram("all", all_list, plot_variable+" at "+detector, 100, xmin=xmin, xmax=xmax)
         hist.SetTitle(self.config_anal['name'])
         hist.SetName("all")
         hist.Draw()

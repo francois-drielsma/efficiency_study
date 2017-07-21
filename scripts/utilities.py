@@ -3,7 +3,17 @@ import math
 import numpy
 import ROOT
 
+import xboa.common
+
 ROOT_OBJECTS = []
+
+def default_units(var):
+    units_dict = {"x":"mm", "y":"mm", "z":"mm", "r":"mm",
+                  "SP Res(x)":"mm", "SP Res(y)":"mm", 
+                  "px":"MeV/c", "py":"MeV/c", "pz":"MeV/c", "pt":"MeV/c", "p":"MeV/c",
+                  "energy":"MeV", "kinetic_energy":"MeV", "e_dep":"MeV",
+                  "time":"ns"}
+    return units_dict[var]
 
 def fractional_axis_range(data, fraction):
     data = sorted(data)
@@ -17,6 +27,13 @@ def fractional_axis_range(data, fraction):
     except IndexError:
         xmax = data[-1]
     return xmin, xmax
+
+def fit_peak_data(data, nsigma=3, frac_guess=0.99):
+    xmin, xmax = fractional_axis_range(data, frac_guess)
+    canvas = xboa.common.make_root_canvas("dummy")
+    hist = xboa.common.make_root_histogram("dummy", data, "", 100, xmin=xmin, xmax=xmax)
+    fit = fit_peak(hist, nsigma)
+    return fit
 
 def fit_peak(hist, nsigma=3):
     mean = hist.GetBinCenter(hist.GetMaximumBin())

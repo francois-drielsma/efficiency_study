@@ -121,6 +121,7 @@ class DataLoader(object):
 
     def load_one_spill(self, spill):
         self.this_run = spill.GetRunNumber()
+        self.run_numbers.add(self.this_run)
         self.this_spill = spill.GetSpillNumber()
         if spill.GetDaqEventType() == "physics_event":
             self.spill_count += 1

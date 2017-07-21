@@ -33,12 +33,13 @@ def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
+            "chi2_threshold":5.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_source":None,
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
-            "do_amplitude":True,
+            "do_amplitude":False,
             "do_extrapolation":False, #name == "3-140+M3-Test2",
-            "do_mc":True, #True,
+            "do_mc":False, #True,
             "do_plots":True,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":None, #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
@@ -47,7 +48,7 @@ def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
 
 
 class Config(object):
-    geometry = "geometry_08681/ParentGeometryFile.dat" #"Test.dat" # "geometry_08681/ParentGeometryFile.dat" #
+    geometry = "Test.dat" #"geometry_08681/ParentGeometryFile.dat" 
     # location to which data and plots will be dumped following analysis
     data_dir = "output/2016-04_1.2_mc_ds-cuts/"
     info_file = "geometry_08681/Maus_Information.gdml"
@@ -63,13 +64,17 @@ class Config(object):
           "scifi_space_clusters":False,
           "scifi_space_points":False,
           "scifi_tracks_us":True,
+          "scifi_nan_us":True,
           "scifi_track_points_us":False,
           "aperture_us":False,
           "pvalue_us":False,
+          "chi2_us":True,
           "aperture_ds":False,
           "scifi_tracks_ds":False,
           "scifi_track_points_ds":False,
+          "scifi_nan_ds":False,
           "pvalue_ds":False,
+          "chi2_ds":False,
           "tof01":True,
           "tof12":False,
           "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
@@ -83,14 +88,18 @@ class Config(object):
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = True
     downstream_cuts["pvalue_ds"] = False
+    downstream_cuts["chi2_ds"] = True
     downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
+    downstream_cuts["scifi_nan_ds"] = True
+    downstream_cuts["scifi_tracks_ds"] = True
     extrapolation_cuts = upstream_cuts
 
     analyses = []
     #analyses.append(get_analysis("rogers/data_8685_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br12.87_W8.4_hi-stats/*", "10-140 MC", 30, "MAUS-v2.8.2", data_dir))
     #analyses.append(get_analysis("rogers/data_8699_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br2.0_W1.6_hi-stats//*", "6-140 MC", 31, "MAUS-v2.8.2", data_dir))
-    #analyses.append(get_analysis("rogers/data_8681_franchini_scale-d1=1.02_d2=1.02_ds=1.0_hi-stats/*", "3-140 MC", 32, "MAUS-v2.8.2", data_dir))
-    analyses.append(get_analysis("000056/000??", "3-140 MC Prod", 32, "MAUS-v2.8.2", data_dir))
+    #analyses.append(get_analysis("franchini/", "3-140 MC Franchini", 32, "MAUS-v2.8.2", data_dir))
+    analyses.append(get_analysis("000056/0000?", "3-140 MC TestAbstraction1", 32, "MAUS-v2.8.2", data_dir)) #
+    #analyses.append(get_analysis("franchini/", "3-140 MC TestAbstraction2", 32, "MAUS-v2.8.2", data_dir)) #
     amplitude_bin_width = 5
 
     required_trackers = [0, 1] # for space points
@@ -99,7 +108,9 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
+    preanalysis_number_of_spills = 3 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 10 # number of spills to analyse during each "analysis" step
+    number_of_spills = None # maximum number of spills to analyse for each sub-analysis
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     maus_version = ""

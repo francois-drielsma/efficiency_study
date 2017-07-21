@@ -33,6 +33,7 @@ def get_analysis(run_list, name, tof01_max, maus_version, data_dir, extrap, ampl
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
+            "chi2_threshold":5.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_source":"output/2016-04_1.2_mc_ds-cuts/plots_"+amplitude_source+"/amplitude.json",
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
@@ -66,11 +67,13 @@ class Config(object):
           "scifi_track_points_us":False,
           "aperture_us":False,
           "pvalue_us":True,
+          "chi2_us":True,
           "aperture_ds":False,
           "scifi_tracks_ds":False,
           "scifi_nan_ds":False,
           "scifi_track_points_ds":False,
           "pvalue_ds":False,
+          "chi2_ds":False,
           "tof01":True,
           "tof12":False,
           "delta_tof01":False, #extrapolatedtof01 compared to recon tof01
@@ -87,10 +90,11 @@ class Config(object):
     downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
     downstream_cuts["scifi_tracks_ds"] = True
     downstream_cuts["scifi_nan_ds"] = True
+    downstream_cuts["chi2_ds"] = True
     extrapolation_cuts = upstream_cuts
 
     analyses = []
-    analyses.append(get_analysis([8681], "3-140", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC_Prod"))
+    analyses.append(get_analysis([8681], "3-140 v2.8.5", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC"))
     #analyses.append(get_analysis([8699], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
     #analyses.append(get_analysis([8685], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
     amplitude_bin_width = 5

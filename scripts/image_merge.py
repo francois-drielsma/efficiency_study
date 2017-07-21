@@ -23,7 +23,7 @@ def target_list(image_files, directories):
     return target_list
 
 
-def merge(image_files, directories, plot_dir):
+def merge(image_files, directories, plot_dir, will_require_complete):
     try:
         shutil.rmtree(plot_dir)
     except OSError:
@@ -35,6 +35,8 @@ def merge(image_files, directories, plot_dir):
     for image, image_list in my_target_list.iteritems():
         image_name = os.path.splitext(image)[0]
         merge_target = plot_dir+"/"+image_name+"_merge.png"
+        if will_require_complete and len(image_list) != len(directories):
+            continue
         print image_list, merge_target
         subprocess.Popen(["convert"]+image_list+["-append", merge_target])
 
@@ -52,10 +54,18 @@ def main():
         "output/2016-04_1.2_reco/plots_10-140/",
     ]
 
-    mc_vs_prod_directories = [
-        "iteration_5_ipac/2016-04_1.2_mc/plots_3-140_MC_amplitude/",
+    reco_285_vs_291_directories = [
+        "output/2016-04_1.2_reco/plots_3-140_v2.8.5/",
+        "output/2016-04_1.2_reco/plots_3-140_test/",
+    ]
+
+
+    mc_vs_paolo_directories = [
+        "output/2016-04_1.2_reco/plots_3-140/",
+        "output/2016-04_1.2_mc_ds-cuts/plots_3-140_MC_Franchini/",
         "output/2016-04_1.2_mc_ds-cuts/plots_3-140_MC_Prod/",
     ]
+
 
     mc_directories = [
         "output/2016-04_1.2_mc/plots_3-140_MC/",
@@ -79,7 +89,7 @@ def main():
         "output/2016-04_1.2_mc/plots_10-140_MC_Scale_D1=1.02_D2=1.02_DS=1.00_Br12.87_W8.4/",
     ]
 
-    merge(image_files, mc_vs_prod_directories, "plots/mc_vs_prod")
+    merge(image_files, reco_285_vs_291_directories, "plots/MAUS_285_vs_291", True)
 
 if __name__ == "__main__":
     main()

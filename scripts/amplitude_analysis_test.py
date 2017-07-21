@@ -50,17 +50,13 @@ class AmplitudeAnalysis(object):
         for bin_upper_edge in amplitude_bin_edges[:-1]:
             new_weight = -1
             old_weight = 1
-            #print "Calc bin", bin_upper_edge,
             while old_weight != new_weight:
                 old_weight = new_weight
                 try:
                     amplitude_list = bunch.list_get_hit_variable(['amplitude x y'])[0]
                     for i, amplitude in enumerate(amplitude_list):
-                        #print amplitude,
                         hit = bunch[i]
                         if amplitude > bin_upper_edge:
-                            #if hit['local_weight'] > 0.5:
-                            #    print amplitude, bin_upper_edge, hit['spill'], hit['event_number']
                             hit['local_weight'] = 0
                         else:
                             amplitude_dict[(hit['spill'], hit['event_number'])] = amplitude
@@ -68,10 +64,6 @@ class AmplitudeAnalysis(object):
                 except Exception:
                     sys.excepthook(*sys.exc_info())
                     break
-            #print new_weight, len(amplitude_dict)
-        #for key, value in amplitude_dict.iteritems():
-        #    print key, value
-        #print amplitude_dict
         return amplitude_dict
 
     def delta_amplitude_calc(self, bunch_0, bunch_1, suffix):

@@ -32,6 +32,8 @@ import maus_cpp.globals as maus_globals # MAUS C++ calls
 import maus_cpp.field as field # MAUS field map calls
 import xboa.common  # xboa post-processor library
 
+import trim_coils
+
 Z_OFFSET = (15068.0+18756.0)/2.
 
 def initialise_maus():
