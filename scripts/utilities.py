@@ -20,11 +20,12 @@ def fractional_axis_range(data, fraction):
     data_len = len(data)
     half_fraction = (1.-fraction)/2.
     min_index = math.floor(half_fraction*data_len)
-    xmin = data[int(min_index)]
     max_index = math.ceil((1.-half_fraction)*data_len)
     try:
+        xmin = data[int(min_index)]
         xmax = data[int(max_index)]
     except IndexError:
+        xmin = data[0]
         xmax = data[-1]
     return xmin, xmax
 

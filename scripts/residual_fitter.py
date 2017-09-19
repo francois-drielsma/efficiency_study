@@ -11,7 +11,7 @@ import Configuration
 import maus_cpp.field
 import maus_cpp.globals
 
-from scripts.extrapolate_through_detectors import ExtrapolateTrackPoints
+from scripts.extrapolate_track_points import ExtrapolateTrackPoints
 import scripts.field_murgler
 
 class ResidualFitter(object):

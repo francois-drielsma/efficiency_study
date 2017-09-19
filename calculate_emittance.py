@@ -4,10 +4,10 @@ import site
 import json
 import shutil
 import importlib
+import time
 
 import numpy
 import ROOT
-ROOT.gROOT.SetBatch(True)
 
 import xboa.common
 import Configuration
@@ -16,104 +16,116 @@ import maus_cpp.field
 import maus_cpp.polynomial_map
 import libxml2
 
-try:
-    import scripts.extrapolate_through_detectors
-except ImportError:
-    print "Note you are not set up for extrapolation... so this 'do_extrapolation' = True will throw an exception"
 import scripts.amplitude_analysis
 from scripts.tm_calculator import TMCalculator
 from scripts.data_plotter import DataPlotter
 from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
 import scripts.mc_plotter
+import scripts.data_plotter
+import scripts.amplitude_analysis
 import scripts.residual_fitter
 import scripts.plot_residual_fitter
 import scripts.utilities
+import scripts.extrapolate_track_points
 config_file = None
 
-def maus_globals(config):
-    try:
-        os.makedirs("logs/tmp") # location for magnet cached maps
-    except OSError:
-        pass # probably the directory existed already
+class Analyser(object):
+    def __init__(self):
+        config_mod = sys.argv[1].replace(".py", "")
+        config_mod = config_mod.replace("/", ".")
+        print "Using configuration module", config_mod
+        config_file = importlib.import_module(config_mod)
+        scripts.utilities.set_palette()
+        scripts.utilities.set_root_verbosity(5)
+        ROOT.gROOT.SetBatch(True)
+        self.config = config_file.Config()
+        self.config_anal = None
+        self.maus_globals(self.config)
+        self.analysis_list = []
 
-    str_conf = Configuration.Configuration().\
-                                      getConfigJSON(command_line_args=False)
-    json_conf = json.loads(str_conf)
-    json_conf["simulation_geometry_filename"] = config.geometry
-    json_conf["verbose_level"] = config.maus_verbose_level
-    maus_conf = json.dumps(json_conf)
-    maus_cpp.globals.birth(maus_conf)
-    print maus_cpp.field.str(True)
+    def do_analysis(self):
+        for i, self.config_anal in enumerate(self.config.analyses):
+            self.init_phase()
+            self.birth_phase()
+            self.process_phase()
+            self.print_phase()
+            self.finalise_phase()
 
-def file_mangle(config_anal, config_file_name):
-    print "Clearing old data"
-    try:
-        shutil.rmtree(config_anal["plot_dir"])
-    except OSError:
-        pass
-    os.makedirs(config_anal["plot_dir"])
-    shutil.copy(config_file_name, config_anal["plot_dir"])
+    def maus_globals(self, config):
+        try:
+            os.makedirs("logs/tmp") # location for magnet cached maps
+        except OSError:
+            pass # probably the directory existed already
 
-def do_analysis(config, analysis_index):
-    config_anal = config.analyses[analysis_index]
-    print config_anal["name"]
-    all_event_count = 0
+        str_conf = Configuration.Configuration().\
+                                          getConfigJSON(command_line_args=False)
+        json_conf = json.loads(str_conf)
+        json_conf["simulation_geometry_filename"] = config.geometry
+        json_conf["verbose_level"] = config.maus_verbose_level
+        maus_conf = json.dumps(json_conf)
+        maus_cpp.globals.birth(maus_conf)
+        print maus_cpp.field.str(True)
 
-    for max_spill in [config.number_of_spills]:
-        if max_spill == 0:
-            continue
-        data_loader = scripts.data_loader.DataLoader(config, analysis_index)
-        data_loader.load_data(0, 100000)
-    config.maus_version = data_loader.maus_version
-    tm_p_list = []
+    def file_mangle(self, config_file_name):
+        print "Clearing old data"
+        try:
+            shutil.rmtree(self.config_anal["plot_dir"])
+        except OSError:
+            pass
+        os.makedirs(self.config_anal["plot_dir"])
+        shutil.copy(config_file_name, self.config_anal["plot_dir"])
 
-    file_mangle(config_anal, sys.argv[1])
+    def init_phase(self):
+        self.data_loader = scripts.data_loader.DataLoader(self.config, self.config_anal)
+        self.data_loader.get_file_list()
+        if self.config_anal["do_extrapolation"]:
+            print "Doing Extrapolation"
+            self.analysis_list.append(scripts.extrapolate_track_points.ExtrapolateTrackPoints(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_mc"]:
+            print "Doing MC"
+            self.analysis_list.append(scripts.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_plots"]:
+            print "Doing plots"
+            self.analysis_list.append(scripts.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_amplitude"]:
+            print "Doing amplitude"
+            self.analysis_list.append(scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
 
-    print "Using p bins", config_anal["p_bins"]
-    if config_anal["do_magnet_alignment"]:
-        print "Doing magnet alignment"
-        fitter = scripts.residual_fitter.ResidualFitter(config, config_anal, data_loader)
-        fitter.fit()
-        #scripts.plot_residual_fitter.do_plots(config)
-    if config_anal["do_extrapolation"]:
-        # nb: also does the "aperture_ds", "aperture_us", "delta_tof01" cuts
-        print "Doing track extrapolation"
-        scripts.extrapolate_through_detectors.do_extrapolation(config, config_anal, data_loader)
-    data_loader.update_cuts()
-    if config_anal["do_amplitude"]:
-        scripts.amplitude_analysis.do_amplitude_analysis(config, config_anal, data_loader)
-    data_loader.update_cuts()
-    if config_anal["do_mc"]:
-        print "Doing MC"
-        scripts.mc_plotter.MCPlotter.do_mc_plots(config, config_anal, data_loader)
-    wiki_summary = "<plots disabled>"
-    if config_anal["do_plots"]:
-        print "Doing plots"
-        wiki_summary = scripts.data_plotter.do_plots(config, config_anal, data_loader)
-    return wiki_summary
+    def birth_phase(self):
+        all_event_count = 0
+        self.data_loader.load_spills(self.config.preanalysis_number_of_spills)
+        self.config.maus_version = self.data_loader.maus_version
 
-def main():
-    scripts.utilities.set_palette()
-    config = config_file.Config()
-    maus_globals(config)
+        self.file_mangle(sys.argv[1])
 
-    wiki_summary_list = []
-    for i, anal in enumerate(config.analyses):
-        wiki_summary_list.append(do_analysis(config, i))
-    for summary in wiki_summary_list:
-        print summary
-    
+        for analysis in self.analysis_list:
+            analysis.birth()
+        self.data_loader.clear_data()
+
+    def process_phase(self):
+        now = time.time()
+        while self.data_loader.load_spills(self.config.analysis_number_of_spills) and \
+              self.data_loader.check_spill_count():
+            for analysis in self.analysis_list:
+                analysis.process()
+            self.data_loader.clear_data()
+            if now - time.time() > 1800: # 30 mins
+                self.print_phase()
+
+    def print_phase(self):
+        for analysis in self.analysis_list:
+            analysis.death()
+
+    def finalise_phase(self):
+        self.analysis_list = []
+        self.data_loader = None
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print "Usage: python calculate_emittance.py </path/to/config/script>"
         sys.exit(1)
-    config_mod = sys.argv[1].replace(".py", "")
-    config_mod = config_mod.replace("/", ".")
-    print "Using configuration module", config_mod
-    config_file = importlib.import_module(config_mod)
-    main()
+    analyser = Analyser()
+    analyser.do_analysis()
     print "Done - press <CR> to finish"
-    #raw_input()
 

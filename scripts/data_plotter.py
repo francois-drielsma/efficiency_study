@@ -11,414 +11,238 @@ import ROOT
 from xboa.bunch import Bunch
 import scripts.utilities
 
-class DataPlotter(object):
-    def __init__(self, config, config_anal, events, will_cut_us, will_cut_ds, run_numbers = None):
-        self.events = events
-        self.will_cut_us = will_cut_us
-        self.will_cut_ds = will_cut_ds
-        self.config = config
-        self.config_analysis = config_anal
-        self.plot_dir = config_anal["plot_dir"]
-        self.max_tof12_bin = None
-        self.max_p_bin = None
-        self.run_numbers = run_numbers
-        for event in events:
-            if self.will_cut_us(event) and event["tku"] != None:
-                event["tku"]["local_weight"] = 0.
-            if self.will_cut_ds(event) and event["tkd"] != None:
-                event["tkd"]["local_weight"] = 0.
+from analysis_base import AnalysisBase
 
-    def choose_data(self, key, cuts):
-        if cuts == None:
-            predicate = lambda event: event[key] != None
-        else:
-            predicate = lambda event: not cuts(event) and event[key] != None
-        data = [event[key] for event in self.events if predicate(event)]
-        return data
+class DataPlotter(AnalysisBase):
+    def __init__(self, config, config_anal, data_loader):
+        super(DataPlotter, self).__init__(config, config_anal, data_loader)
+        self.data_loader = data_loader
+        self.max_tof01_bin = 0.
+        self.max_tof12_bin = 0.
+        self.max_p_bin = 0.
+        self.run_numbers = set()
+        self.will_cut_us = lambda event: event["upstream_cut"]
+        self.will_cut_ds = lambda event: event["downstream_cut"]
+        self.upstream_cut = {}
+        self.downstream_cut = {}
+        self.ellipse = {}
 
-    def get_cuts_summary(self):
-        # there are a set of cuts that are to do with basic "data quality" e.g.
-        # exactly one hit in TOF, etc and there are a set of cuts that are to do
-        # with "bias correction"/etc.
-        # I report the number of events that pass each data quality cut;
-        # and the number of events that pass each "bias correction" cut AND the data quality cuts
-        accepted_dict = {"upstream_cut":0, "data_cut":None, "downstream_cut":0, "all_events":0}
-        accepted_upstream_dict = {"upstream_cut":0, "data_cut":0, "downstream_cut":0, "all_events":0}
-        for key in self.events[0]["will_cut"]:
-            accepted_dict[key] = 0
-            accepted_upstream_dict[key] = 0
-        for event in self.events:
-            accepted_dict["all_events"]  += 1 # total number of events considered
-            accepted_upstream_dict["all_events"]  += 1 # total number of events considered
-            will_cut = event["will_cut"]
-            for key in will_cut:
-                if not will_cut[key]:
-                    accepted_dict[key] += 1
-                    if event["upstream_cut"]:
-                        continue
-                    accepted_upstream_dict[key] += 1
-            if not event["upstream_cut"]:
-                accepted_dict["upstream_cut"]  += 1 # total number accepted by all cuts
-            if not event["upstream_cut"]:
-                accepted_upstream_dict["upstream_cut"]  += 1 # total number accepted by data cuts
-                if not event["upstream_cut"]:
-                    accepted_upstream_dict["upstream_cut"]  += 1 # total number accepted by data cuts
-                if not event["downstream_cut"]:
-                    accepted_upstream_dict["downstream_cut"]  += 1 # total number accepted by data cuts
-            if not event["downstream_cut"]:
-                accepted_dict["downstream_cut"]  += 1 # total number accepted by all cuts
-        return accepted_dict, accepted_upstream_dict
+    def birth(self):
+        self.run_numbers.update(self.data_loader.run_numbers)
+        self.birth_tof("tof01")
+        self.birth_tof("tof12")
+        self.birth_pvalues("tku")
+        self.birth_pvalues("tkd")
+        self.birth_chi2("tku")
+        self.birth_chi2("tkd")
+        self.birth_ndf("tku")
+        self.birth_ndf("tkd")
+        self.birth_p_tot_vs_tof("tof01", "tku", "all")
+        self.birth_p_tot_vs_tof("tof01", "tku", "us cut")
+        self.birth_p_tot_vs_tof("tof12", "tkd", "all")
+        self.birth_p_tot_vs_tof("tof12", "tkd", "ds cut")
+        self.birth_p_tot_res()
 
-    def print_cuts_summary(self):
-        cut_dict, cut_data_dict = self.get_cuts_summary()
-        print "========== cuts summary ============"
-        print "   ", "cut name".ljust(25), "us?".ljust(5), "ds?".ljust(5), "pass".ljust(8), "pass and pass data cut".ljust(8)
-        for key in sorted(cut_dict.keys()):
-            if key in self.config.upstream_cuts:
-                is_active_us = self.config.upstream_cuts[key]
-            else:
-                is_active_us = None
-            if key in self.config.downstream_cuts:
-                is_active_ds = self.config.downstream_cuts[key]
-            else:
-                is_active_ds = None
-            print "   ", key.ljust(25), str(is_active_us).ljust(5), str(is_active_ds).ljust(5), str(cut_dict[key]).ljust(8), str(cut_data_dict[key]).ljust(8)
+        self.birth_var_2d("x", "tku", "px", "tku", [-150, 150], [-100, 100], "us cut")
+        self.birth_var_2d("y", "tku", "py", "tku", [-150, 150], [-100, 100], "us cut")
+        self.birth_var_2d("px", "tku", "py", "tku", [-100, 100], [-100, 100], "us cut")
+        self.birth_var_2d("x", "tku", "y", "tku", [-150, 150], [-150, 150], "us cut")
+        self.birth_var_2d("x", "tku", "y", "tku", [-150, 150], [-150, 150], "all")
+        self.birth_var_2d("r", "tku", "pt", "tku", [0, 150*1.5], [0, 100*1.5], "all")
 
-    def print_wiki_summary(self):
-        cut_dict, cut_data_dict = self.get_cuts_summary()
-        
-        cut_dict['data_cut'] = cut_data_dict['data_cut']
-        cut_dict['runs'] = sorted([run for run in self.run_numbers])
-        cut_dict['max_p_bin'] = 0.
-        cut_dict['max_tof01_bin'] = 0.
-        try:
-            cut_dict['max_p_bin'] = round(self.max_p_bin, 2)
-            cut_dict['max_tof01_bin'] = round(self.max_tof01_bin, 2)
-        except TypeError:
-            pass
-        cut_keys = ['tof01', 'tof_2_sp', 'data_cut', 'max_p_bin', 'max_tof01_bin']
-        wiki_summary = "| "+self.config_analysis['name']+" | "
-        try:
-            cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(cut_dict['runs'])
-            cdb_dict["time"] = str(cdb_dict["time"][0])+" hrs "+str(cdb_dict["time"][1])+" mins"
-            cdb_keys = ["runs", "lmc1234", "tof1_triggers", "tof2_triggers", "time"]
-            for key in cdb_keys:
-                wiki_summary += " "+str(cdb_dict[key]).ljust(8)+" |"
-        except Exception:
-            wiki_summary += "| Failed to contact cdb |"
-        for key in cut_keys:
-            wiki_summary += " "+str(cut_dict[key]).ljust(8)+" |"
-        return wiki_summary
+        self.birth_var_2d("x", "tkd", "px", "tkd", [-150, 150], [-100, 100], "ds cut")
+        self.birth_var_2d("y", "tkd", "py", "tkd", [-150, 150], [-100, 100], "ds cut")
+        self.birth_var_2d("px", "tkd", "py", "tkd", [-100, 100], [-100, 100], "ds cut")
+        self.birth_var_2d("x", "tkd", "y", "tkd", [-150, 150], [-150, 150], "ds cut")
+        self.birth_var_2d("x", "tkd", "y", "tkd", [-150, 150], [-150, 150], "all")
+        self.birth_var_2d("r", "tkd", "pt", "tkd", [0, 150*1.5], [0, 100*1.5], "all")
 
-    def plot_pvalues(self):
-        for tracker in "tku", "tkd":
-            pvalue_canvas = xboa.common.make_root_canvas(tracker+" PValues")
-            pvalues_all = []
-            pvalues_cut_us = []
-            pvalues_cut_ds = []
-            for event in self.events:
-                if event[tracker] == None:
+        self.birth_var_1d("x", "tku")
+        self.birth_var_1d("px", "tku")
+        self.birth_var_1d("y", "tku")
+        self.birth_var_1d("py", "tku")
+        self.birth_var_1d("p", "tku") #, min_max=[80., 180.])
+        self.birth_var_1d("r", "tku")
+        self.birth_var_1d("SP Res(x)", "tku")
+        self.birth_var_1d("SP Res(y)", "tku")
+
+        self.birth_var_1d("r", "tku")
+        self.birth_var_1d("x", "tkd")
+        self.birth_var_1d("px", "tkd")
+        self.birth_var_1d("y", "tkd")
+        self.birth_var_1d("py", "tkd")
+        self.birth_var_1d("p", "tkd") #, min_max=[80., 180.])
+        self.birth_var_1d("r", "tkd")
+        self.birth_var_1d("SP Res(x)", "tkd")
+        self.birth_var_1d("SP Res(y)", "tkd")
+
+        self.birth_ellipse("tku", "us cut")
+        self.birth_ellipse("tku", "all")
+        self.birth_ellipse("tkd", "ds cut")
+        self.birth_ellipse("tkd", "all")
+        self.birth_delta_tof("tof01")
+        self.birth_delta_tof("tof12")
+
+        self.birth_cuts_summary()
+
+    def process(self):
+        self.run_numbers.update(self.data_loader.run_numbers)
+        self.process_tof("tof01")
+        self.process_tof("tof12")
+        self.process_tracker("tku", "pvalue")
+        self.process_tracker("tkd", "pvalue")
+        self.process_tracker("tku", "chi2")
+        self.process_tracker("tkd", "chi2")
+        self.process_tracker("tku", "ndf")
+        self.process_tracker("tkd", "ndf")
+        self.process_p_tot_vs_tof("tof01", "tku", "all")
+        self.process_p_tot_vs_tof("tof01", "tku", "us cut")
+        self.process_p_tot_vs_tof("tof12", "tkd", "all")
+        self.process_p_tot_vs_tof("tof12", "tkd", "ds cut")
+        self.process_p_tot_res()
+
+        self.process_var_2d("x", "tku", "px", "tku", "us cut")
+        self.process_var_2d("y", "tku", "py", "tku", "us cut")
+        self.process_var_2d("px", "tku", "py", "tku", "us cut")
+        self.process_var_2d("x", "tku", "y", "tku", "us cut")
+        self.process_var_2d("x", "tku", "y", "tku", "all")
+        self.process_var_2d("r", "tku", "pt", "tku", "all")
+
+        self.process_var_2d("x", "tkd", "px", "tkd", "ds cut")
+        self.process_var_2d("y", "tkd", "py", "tkd", "ds cut")
+        self.process_var_2d("px", "tkd", "py", "tkd", "ds cut")
+        self.process_var_2d("x", "tkd", "y", "tkd", "ds cut")
+        self.process_var_2d("x", "tkd", "y", "tkd", "all")
+        self.process_var_2d("r", "tkd", "pt", "tkd", "all")
+
+        self.process_var_1d("x", "tku")
+        self.process_var_1d("px", "tku")
+        self.process_var_1d("y", "tku")
+        self.process_var_1d("py", "tku")
+        self.process_var_1d("p", "tku") #, min_max=[80., 180.])
+        self.process_var_1d("r", "tku")
+        self.process_var_1d("SP Res(x)", "tku")
+        self.process_var_1d("SP Res(y)", "tku")
+
+        self.process_var_1d("r", "tku")
+        self.process_var_1d("x", "tkd")
+        self.process_var_1d("px", "tkd")
+        self.process_var_1d("y", "tkd")
+        self.process_var_1d("py", "tkd")
+        self.process_var_1d("p", "tkd") #, min_max=[80., 180.])
+        self.process_var_1d("r", "tkd")
+        self.process_var_1d("SP Res(x)", "tkd")
+        self.process_var_1d("SP Res(y)", "tkd")
+
+        self.process_ellipse("tku", "us cut")
+        self.process_ellipse("tku", "all")
+        self.process_ellipse("tkd", "ds cut")
+        self.process_ellipse("tkd", "all")
+
+        self.process_delta_tof("tof01")
+        self.process_delta_tof("tof12")
+
+        self.process_cuts_summary()
+
+    def death(self):
+        for plot_name in self.plots:
+            min_value, max_value = None, None
+            self.plots[plot_name]["canvas"].cd()
+            for hist_name, hist in self.plots[plot_name]["histograms"].iteritems():
+                if min_value == None:
+                    min_value = hist.GetMinimum()/2.
+                    max_value = hist.GetMaximum()*2.
+                else:
+                    min_value = min(hist.GetMinimum()/2., min_value)
+                    max_value = max(hist.GetMaximum()*2., max_value)
+            if min_value < 1.:
+                min_value = 0.8
+            hist_dict = self.get_plot(plot_name)["histograms"]
+            for hist_name in sorted(hist_dict.keys()):
+                hist.SetTitle(self.config_anal['name'])
+                if len(hist_dict) != 3:
                     continue
-                for detector_hit in event["data"]:
-                    if detector_hit["detector"] != tracker+"_tp":
-                        continue
-                    pvalues_all.append(detector_hit["pvalue"])
-                    if not self.will_cut_us(event):
-                        pvalues_cut_us.append(detector_hit["pvalue"])
-                    if not self.will_cut_ds(event):
-                        pvalues_cut_ds.append(detector_hit["pvalue"])
-            hist = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_all, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
-            hist.SetTitle(self.config_analysis['name'])
-            hist_cut_us = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut_us, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
-            hist_cut_us.SetLineColor(2)
-            hist_cut_us.SetTitle(self.config_analysis['name'])
-            hist_cut_ds = xboa.common.make_root_histogram("pvalues "+tracker, pvalues_cut_ds, "P Value ("+tracker+")", 120, xmin = -0.1, xmax = 1.1)
-            hist_cut_ds.SetLineColor(8)
-            hist_cut_ds.SetTitle(self.config_analysis['name'])
+                hist = hist_dict[hist_name]
+                hist.GetYaxis().SetRangeUser(min_value, max_value)
+                if "us cut" in hist_name:
+                    hist.SetLineColor(2)
+                    hist.Draw("SAME")
+                elif "ds cut" in hist_name:
+                    hist.SetLineColor(8)
+                    hist.Draw("SAME")
+                else:
+                    hist.Draw()
 
-            min_value = max(hist_cut_us.GetMinimum()/2., 0.8)
-            max_value = hist.GetMaximum()*2.
-            hist.GetYaxis().SetRangeUser(min_value, max_value)
-            hist.Draw()
-            hist_cut_us.Draw("SAME")
-            hist_cut_ds.Draw("SAME")
-            pvalue_canvas.SetLogy()
-            pvalue_canvas.Update()
-            for format in ["png", "root", "eps"]:
-                pvalue_canvas.Print(self.plot_dir+"pvalue_"+tracker+"."+format)
+        self.death_var_2d("x", "tku", "px", "tku", "us cut", True)
+        self.death_var_2d("y", "tku", "py", "tku", "us cut", True)
+        self.death_var_2d("px", "tku", "py", "tku", "us cut", True)
+        self.death_var_2d("x", "tku", "y", "tku", "us cut", True)
+        self.death_var_2d("x", "tku", "y", "tku", "all", True)
 
-    def plot_chi2(self):
-        for tracker in "tku", "tkd":
-            chi2_all = []
-            chi2_cut_us = []
-            chi2_cut_ds = []
-            ndf_all = []
-            ndf_cut_us = []
-            ndf_cut_ds = []
-            for event in self.events:
-                if event[tracker] == None:
+        self.death_var_2d("x", "tkd", "px", "tkd", "ds cut", True)
+        self.death_var_2d("y", "tkd", "py", "tkd", "ds cut", True)
+        self.death_var_2d("px", "tkd", "py", "tkd", "ds cut", True)
+        self.death_var_2d("x", "tkd", "y", "tkd", "ds cut", True)
+        self.death_var_2d("x", "tkd", "y", "tkd", "all", True)
+
+        self.print_plots()
+        self.death_wiki_summary()
+        self.death_cuts_summary()
+
+
+    def get_data_tof(self, tof):
+        events = self.data_loader.events
+        tof_us_cut = [event[tof] for event in events if not self.will_cut_us(event) and event[tof] != None]
+        tof_ds_cut = [event[tof] for event in events if not self.will_cut_ds(event) and event[tof] != None]
+        tof_all = [event[tof] for event in events if event[tof] != None]
+        return tof_us_cut, tof_ds_cut, tof_all
+
+    def birth_tof(self, tof):
+        axis = {"tof01":"tof1 - tof0 [ns]", "tof12":"tof2 - tof1 [ns]"}[tof]
+        tof_us_cut, tof_ds_cut, tof_all = self.get_data_tof(tof)
+        xmin = min(25., self.config_anal[tof+"_cut_low"])
+        xmax = max(45., self.config_anal[tof+"_cut_high"])
+        hist = self.make_root_histogram(tof, tof+" all", tof_all, axis, 100, [], '', 0, [], xmin, xmax)
+        hist = self.make_root_histogram(tof, tof+" us cut", tof_us_cut, axis, 100, [], '', 0, [], xmin, xmax)
+        hist = self.make_root_histogram(tof, tof+" ds cut", tof_ds_cut, axis, 100, [], '', 0, [], xmin, xmax)
+        self.get_plot(tof)["canvas"].SetLogy()
+
+    def process_tof(self, tof):
+        tof_us_cut, tof_ds_cut, tof_all = self.get_data_tof(tof)
+        tof_hists = self.get_plot(tof)["histograms"]
+        for data, hist_key in (tof_us_cut, "us cut"), (tof_ds_cut, "ds cut"), (tof_all, "all"):
+            hist = tof_hists[tof+" "+hist_key]
+            for item in data:
+                hist.Fill(item)
+
+    def get_tracker_data(self, tracker, var):
+        data_all = []
+        data_cut_us = []
+        data_cut_ds = []
+        for event in self.data_loader.events:
+            if event[tracker] == None:
+                continue
+            for detector_hit in event["data"]:
+                if detector_hit["detector"] != tracker+"_tp":
                     continue
-                for detector_hit in event["data"]:
-                    if detector_hit["detector"] != tracker+"_tp":
-                        continue
-                    chi2_all.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
-                    ndf_all.append(detector_hit["ndf"])
-                    if not self.will_cut_us(event):
-                        chi2_cut_us.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
-                        ndf_cut_us.append(detector_hit["ndf"])
-                    if not self.will_cut_ds(event):
-                        chi2_cut_ds.append(detector_hit["chi2"]/float(detector_hit["ndf"]))
-                        ndf_cut_ds.append(detector_hit["ndf"])
+                data = detector_hit[var]
+                if var == "chi2":
+                    data /= float(detector_hit["ndf"])
+                data_all.append(data)
+                if not self.will_cut_us(event):
+                    data_cut_us.append(data)
+                if not self.will_cut_ds(event):
+                    data_cut_ds.append(data)
+        return data_cut_us, data_cut_ds, data_all
 
-            chi2_canvas = xboa.common.make_root_canvas(tracker+" Chi2")
-
-            hist = xboa.common.make_root_histogram("chi2 "+tracker, chi2_all, "#chi^{2} ("+tracker+")", 100, xmax=20.)
-            hist.SetTitle(self.config_analysis['name'])
-            hist_cut_us = xboa.common.make_root_histogram("chi2 "+tracker, chi2_cut_us, "#chi^{2} ("+tracker+")", 100, xmax=20.)
-            hist_cut_us.SetLineColor(2)
-            hist_cut_us.SetTitle(self.config_analysis['name'])
-            hist_cut_ds = xboa.common.make_root_histogram("chi2 "+tracker, chi2_cut_ds, "#chi^{2} ("+tracker+")", 100, xmax=20.)
-            hist_cut_ds.SetLineColor(8)
-            hist_cut_ds.SetTitle(self.config_analysis['name'])
-
-            min_value = max(hist_cut_us.GetMinimum()/2., 0.8)
-            max_value = hist.GetMaximum()*2.
-            hist.GetYaxis().SetRangeUser(min_value, max_value)
-            hist.Draw()
-            hist_cut_us.Draw("SAME")
-            hist_cut_ds.Draw("SAME")
-
-            chi2_canvas.SetLogy()
-            chi2_canvas.Update()
-            for format in ["png", "root", "eps"]:
-                chi2_canvas.Print(self.plot_dir+"chi2_"+tracker+"."+format)
-
-            ndf_canvas = xboa.common.make_root_canvas(tracker+" NDF")
-            hist = xboa.common.make_root_histogram("ndf "+tracker, ndf_all, "NDoF ("+tracker+")", 100)
-            hist.SetTitle(self.config_analysis['name'])
-            hist_cut_us = xboa.common.make_root_histogram("ndf "+tracker, ndf_cut_us, "NDoF ("+tracker+")", 100)
-            hist_cut_us.SetLineColor(2)
-            hist_cut_us.SetTitle(self.config_analysis['name'])
-            hist_cut_ds = xboa.common.make_root_histogram("ndf "+tracker, ndf_cut_ds, "NDoFchi ("+tracker+")", 100)
-            hist_cut_ds.SetLineColor(8)
-            hist_cut_ds.SetTitle(self.config_analysis['name'])
-
-            min_value = max(hist_cut_us.GetMinimum()/2., 0.8)
-            max_value = hist.GetMaximum()*2.
-            hist.GetYaxis().SetRangeUser(min_value, max_value)
-            hist.Draw()
-            hist_cut_us.Draw("SAME")
-            hist_cut_ds.Draw("SAME")
-
-            ndf_canvas.SetLogy()
-            ndf_canvas.Update()
-            for format in ["png", "root", "eps"]:
-                ndf_canvas.Print(self.plot_dir+"ndf_"+tracker+"."+format)
-
-
-    def plot_delta_tof(self, tofs):
-        dtof01_us_cut = [event["delta_"+tofs] for event in self.events if not self.will_cut_us(event)]
-        dtof01_us_cut = [dtof01 for dtof01 in dtof01_us_cut if dtof01 != None]
-        dtof01_ds_cut = [event["delta_"+tofs] for event in self.events if not self.will_cut_ds(event)]
-        dtof01_ds_cut = [dtof01 for dtof01 in dtof01_ds_cut if dtof01 != None]
-        dtof01_all = [event["delta_"+tofs] for event in self.events]
-        dtof01_all = [dtof01 for dtof01 in dtof01_all if dtof01 != None]
-        if len(dtof01_all) == 0:
-            print "No delta tof plot - perhaps extrapolation is disabled?"
-            return
-        dtof01_canvas = xboa.common.make_root_canvas("delta_tof01_canvas")
-        dtof01_canvas.SetLogy()
-        xmin = -15.
-        xmax = 10.
-        hist = xboa.common.make_root_histogram("delta "+tofs, dtof01_all, "Reco "+tofs+" - Extrapolated "+tofs+" [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw()
-        hist = xboa.common.make_root_histogram("delta "+tofs+" in cut", dtof01_us_cut, "Reco "+tofs+" - Extrapolated "+tofs+" [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(2)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        hist = xboa.common.make_root_histogram("delta "+tofs+" in cut", dtof01_ds_cut, "Reco "+tofs+" - Extrapolated "+tofs+" [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(8)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        dtof01_canvas.Update()
-        for format in ["png", "root", "eps"]:
-            dtof01_canvas.Print(self.plot_dir+"delta_"+tofs+"."+format)
-
-    def plot_tof01(self):
-        tof01_us_cut = [event["tof01"] for event in self.events if not self.will_cut_us(event)]
-        tof01_ds_cut = [event["tof01"] for event in self.events if not self.will_cut_ds(event)]
-        tof01_all = [event["tof01"] for event in self.events]
-        tof01_all = [tof01 for tof01 in tof01_all if tof01 != None]
-        tof01_canvas = xboa.common.make_root_canvas("tof01_canvas")
-        tof01_canvas.SetLogy()
-        xmin = min(25., self.config_analysis["tof01_cut_low"])
-        xmax = max(45., self.config_analysis["tof01_cut_high"])
-        hist = xboa.common.make_root_histogram("tof01", tof01_all, "tof1 - tof0 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw()
-        hist = xboa.common.make_root_histogram("tof01 in cut", tof01_us_cut, "tof1 - tof0 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(2)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        hist = xboa.common.make_root_histogram("tof01 in cut", tof01_ds_cut, "tof1 - tof0 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(8)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        tof01_canvas.Update()
-        self.max_tof01_bin = self.get_max(hist)
-        for format in ["png", "root", "eps"]:
-            tof01_canvas.Print(self.plot_dir+"tof01."+format)
-
-    def plot_tof_position(self):
-        for event in self.events:
-            for hit in event:
-                pass
-
-    def plot_tof12(self):
-        tof12_us_cut = [event["tof12"] for event in self.events if not self.will_cut_us(event) and event["tof12"] != None and event["tof12"] < 100.]
-        tof12_ds_cut = [event["tof12"] for event in self.events if not self.will_cut_ds(event) and event["tof12"] != None and event["tof12"] < 100.]
-        tof12_all = [event["tof12"] for event in self.events if event["tof12"] != None and event["tof12"] < 100.]
-        tof12_canvas = xboa.common.make_root_canvas("tof12_canvas")
-        tof12_canvas.SetLogy()
-        xmin = min(25., self.config_analysis["tof12_cut_low"])
-        xmax = max(45., self.config_analysis["tof12_cut_high"])
-        hist = xboa.common.make_root_histogram("tof12", tof12_all, "tof2 - tof1 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw()
-        hist = xboa.common.make_root_histogram("tof12 in cut", tof12_us_cut, "tof2 - tof1 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(2)
-        hist.Draw("SAME")
-        tof12_canvas.Update()
-        hist = xboa.common.make_root_histogram("tof12 in cut", tof12_ds_cut, "tof2 - tof1 [ns]", 100, xmin = xmin, xmax = xmax)
-        hist.SetLineColor(8)
-        hist.Draw("SAME")
-        tof12_canvas.Update()
-        self.max_tof12_bin = max([hist.GetBinContent(i) for i in range(102)])
-        for format in ["png", "root", "eps"]:
-            tof12_canvas.Print(self.plot_dir+"tof12."+format)
-
-    def plot_p_tot_vs_tof(self, tof, tk):
-        canvas = xboa.common.make_root_canvas("p_tot vs tof no cuts")
-        tof_no_cut = [event[tof] for event in self.events if event[tof] != None and event[tk] != None and event["tof12"] < 100.]
-        p_tot_no_cut = [event[tk]["p"] for event in self.events if event[tof] != None and event[tk] != None and event["tof12"] < 100.]
-
-        hist = xboa.common.make_root_histogram("Events in cut", tof_no_cut, tof+" [ns]", 100, p_tot_no_cut, "p_{"+tk+"} [MeV/c]", 100, ymin=0., ymax=300., xmin=25., xmax=45.)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("COLZ")
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+tk+"_p_tot_vs_"+tof+"_all."+format)
-
-        canvas = xboa.common.make_root_canvas("p_tot vs tof us cuts")
-        tof_no_cut = [event[tof] for event in self.events if event[tof] != None and event[tk] != None and not self.will_cut_us(event) and event["tof12"] < 100.]
-        p_tot_no_cut = [event[tk]["p"] for event in self.events if event[tof] != None and event[tk] != None and not self.will_cut_us(event) and event["tof12"] < 100.]
-
-        hist = xboa.common.make_root_histogram("Events in cut", tof_no_cut, tof+" [ns]", 100, p_tot_no_cut, "p_{"+tk+"} [MeV/c]", 100)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("COLZ")
-        canvas.Update()
-
-
-        canvas = xboa.common.make_root_canvas("p_tot vs tof ds cuts")
-        tof_no_cut = [event[tof] for event in self.events if event[tof] != None and event[tk] != None and not self.will_cut_ds(event) and event["tof12"] < 100.]
-        p_tot_no_cut = [event[tk]["p"] for event in self.events if event[tof] != None and event[tk] != None and not self.will_cut_ds(event) and event["tof12"] < 100.]
-
-        hist = xboa.common.make_root_histogram("Events in cut", tof_no_cut, tof+" [ns]", 100, p_tot_no_cut, "p_{"+tk+"} [MeV/c]", 100)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("COLZ")
-        canvas.Update()
-
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+tk+"_p_tot_vs_"+tof+"_cuts."+format)
-
-    def plot_p_tot_res(self):
-        canvas = xboa.common.make_root_canvas("p_tot us vs ds")
-        cut_pred = lambda event: event["tku"] != None and event["tkd"] != None
-        p_tot_us_no_cut = [event["tku"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_ds_no_cut = [event["tkd"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_res_no_cut = [p_tot - p_tot_ds_no_cut[i] for i, p_tot in enumerate(p_tot_us_no_cut)]
-
-        cut_pred = lambda event: event["tku"] != None and event["tkd"] != None and not self.will_cut_us(event)
-        p_tot_us_cut_us = [event["tku"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_ds_cut_us = [event["tkd"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_res_cut_us = [p_tot - p_tot_ds_cut_us[i] for i, p_tot in enumerate(p_tot_us_cut_us)]
-        #mean = numpy.mean(p_tot_res_cut)
-        #std = numpy.std(p_tot_res_cut)
-
-        cut_pred = lambda event: event["tku"] != None and event["tkd"] != None and not self.will_cut_ds(event)
-        p_tot_us_cut_ds = [event["tku"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_ds_cut_ds = [event["tkd"]["p"] for event in self.events if cut_pred(event)]
-        p_tot_res_cut_ds = [p_tot - p_tot_ds_cut_ds[i] for i, p_tot in enumerate(p_tot_us_cut_ds)]
-
-        hist = xboa.common.make_root_histogram("All events", p_tot_res_no_cut, "p_{tku} - p_{tkd} [MeV/c]", 100, xmin=-50, xmax=50)
-        hist.SetTitle(self.config_analysis['name'])
-        #hist.SetTitle("mean: "+str(mean)+" std: "+str(std))
-        hist.Draw()
-        hist = xboa.common.make_root_histogram("Events in cut", p_tot_res_cut_us, "p_{tku} - p_{tkd} [MeV/c]", 100, xmin=-50, xmax=50)
-        #hist.SetTitle("mean: "+str(mean)+" std: "+str(std))
-        hist.SetLineColor(2)
-        hist.Draw("SAME")
-        hist = xboa.common.make_root_histogram("Events in cut", p_tot_res_cut_ds, "p_{tku} - p_{tkd} [MeV/c]", 100, xmin=-50, xmax=50)
-        #hist.SetTitle("mean: "+str(mean)+" std: "+str(std))
-        hist.SetLineColor(8)
-        hist.Draw("SAME")
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+"p_tot_res."+format)
-
-        canvas = xboa.common.make_root_canvas("delta p vs p_tku")
-        hist = xboa.common.make_root_histogram("Events in cut", p_tot_us_cut_ds, "p_{tku} [MeV/c]", 50,
-                                                                p_tot_res_cut_ds, "p_{tku} - p_{tkd} [MeV/c]", 50,
-                                                                ymin=-50, ymax=50)
-        hist.Draw("COLZ")
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+"delta_p_vs_p_tku."+format)
-
-    def plot_analysis_b_field(self):
-        pass
-
-    # MAKE THIS A CONT PLOT AND SUPERIMPOSE EACH TOF BIN
-    def plot_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, min_max_1 = [None, None], min_max_2 = [None, None], cuts = -1):
-        if cuts == -1:
-            cuts =  self.will_cut_us
-        cuts_string = {self.will_cut_us:"upstream", self.will_cut_ds:"downstream", None:"none"}
-        name =  us_ds_1+"_"+var_1+"_"+ us_ds_2+"_"+var_2+"_cuts-"+cuts_string[cuts]
-        canvas = xboa.common.make_root_canvas(name)
-        data_1 = self.choose_data(us_ds_1, cuts)
-        data_2 = self.choose_data(us_ds_2, cuts)
-        data_1 = [u_in[var_1] for i, u_in in enumerate(data_1)]
-        data_2 = [u_out[var_2] for i, u_out in enumerate(data_2)]
-        lab_1 = us_ds_1+" "+var_1
-        lab_2 = us_ds_2+" "+var_2
-        print "Plot var", lab_1, "vs", lab_2, "for", len(data_1), "events"
-        hist = xboa.common.make_root_histogram(name,
-                                               data_1, lab_1, 50,
-                                               data_2, lab_2, 50,
-                                               xmin=min_max_1[0], xmax=min_max_1[1],
-                                               ymin=min_max_2[0], ymax=min_max_2[1])
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("COL")
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+name+"."+format)
-
-    def get_max(self, hist):
-        bins = [hist.GetBinContent(i) for i in range(1, 101)]
-        max_index = bins.index(max(bins))
-        bin_width = hist.GetBinWidth(max_index) # regular bins
-        return bins[max_index]/bin_width
-
-    def plot_kalman_pvalue(self, tracker):
-        pass
-
-    def plot_sp_residuals(self, tracker, axis):
+    def get_data_sp_residuals(self, tracker, axis):
         residuals_list = []
         residuals_cut_us_list = []
         residuals_cut_ds_list = []
         sp_detector = tracker+"_sp_"+str(self.config.tk_station)
-        for event in self.events:
+        axis = axis.replace("SP Res(", "")
+        axis = axis.replace(")", "")
+        for event in self.data_loader.events:
             tp = event[tracker]
             if tp == None:
                 continue # no track point recorded
@@ -434,263 +258,381 @@ class DataPlotter(object):
                 residuals_cut_us_list.append(sp[axis] - tp[axis])        
             if not self.will_cut_ds(event):
                 residuals_cut_ds_list.append(sp[axis] - tp[axis])        
+        return residuals_cut_us_list, residuals_cut_ds_list, residuals_list
 
-        xmin, xmax = -20., 20.
-        name = "sp_residuals_"+tracker+"_"+axis
-        canvas = xboa.common.make_root_canvas(name)
-        for i in range(3):
-            hist_raw = xboa.common.make_root_histogram(name, residuals_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 500, xmin=xmin, xmax=xmax)
-            hist_cut_us = xboa.common.make_root_histogram(name+"_cut", residuals_cut_us_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 500, xmin=xmin, xmax=xmax)
-            fit = scripts.utilities.fit_peak(hist_cut_us)
-            mean = fit.GetParameter(1)
-            sigma = fit.GetParameter(2)
-            xmin, xmax = round(mean-sigma*5, 1), round(mean+sigma*5, 1)
+    def get_tracker_hit_data(self, tracker, var, require_both_trackers):
+        if "SP Res" in var:
+            return self.get_data_sp_residuals(tracker, var)
+        data_all = []
+        data_cut_us = []
+        data_cut_ds = []
+        other_tracker = {"tku":"tkd", "tkd":"tku"}[tracker]
+        for event in self.data_loader.events:
+            if event[tracker] == None:
+                continue
+            if require_both_trackers and event[other_tracker] == None:
+                continue
+            data = event[tracker][var]
+            data_all.append(data)
+            if not self.will_cut_us(event):
+                data_cut_us.append(data)
+            if not self.will_cut_ds(event):
+                data_cut_ds.append(data)
+        return data_cut_us, data_cut_ds, data_all
 
-        hist_raw.SetTitle(self.config_analysis['name']+" mean "+str(round(mean, 4))+" sigma "+str(round(sigma, 4)))
-        hist_raw.Draw()
-        hist_cut_us.SetLineColor(2)
+    def birth_pvalues(self, tracker):
+        pvalues_cut_us, pvalues_cut_ds, pvalues_all = self.get_tracker_data(tracker, "pvalue")
+        axis =  "P Value ("+tracker+")"
+        hist = self.make_root_histogram("pvalue "+tracker, "pvalue all", pvalues_all, axis, 120, [], '', 0, [], -0.1, 1.1)
+        hist_cut_us = self.make_root_histogram("pvalue "+tracker, "pvalue us cut", pvalues_cut_us, axis, 120, [], '', 0, [], -0.1, 1.1)
+        hist_cut_ds = self.make_root_histogram("pvalue "+tracker, "pvalue ds cut", pvalues_cut_ds, axis, 120, [], '', 0, [], -0.1, 1.1)
+        hist.Draw()
         hist_cut_us.Draw("SAME")
-        hist_cut_ds = xboa.common.make_root_histogram(name+"_cut", residuals_cut_ds_list, "Space Point "+axis+"-Track point "+axis+" [mm]", 500, xmin=xmin, xmax=xmax)
-        hist_cut_us.SetLineColor(8)
+        hist_cut_ds.Draw("SAME")
+        self.get_plot("pvalue "+tracker)["canvas"].SetLogy()
+
+    def birth_chi2(self, tracker):
+        chi2_cut_us, chi2_cut_ds, chi2_all = self.get_tracker_data(tracker, "chi2")
+        axis =  "#chi^{2}/n_{df} ("+tracker+")"
+        hist = self.make_root_histogram("chi2 "+tracker, "chi2 all", chi2_all, axis, 100, [], '', 0, [], 0., 10.)
+        hist_cut_us = self.make_root_histogram("chi2 "+tracker, "chi2 us cut", chi2_cut_us, axis, 100, [], '', 0, [], 0., 10.)
+        hist_cut_ds = self.make_root_histogram("chi2 "+tracker, "chi2 ds cut", chi2_cut_ds, axis, 100, [], '', 0, [], 0., 10.)
+        hist.Draw()
+        hist_cut_us.Draw("SAME")
+        hist_cut_ds.Draw("SAME")
+        self.get_plot("chi2 "+tracker)["canvas"].SetLogy()
+
+    def birth_ndf(self, tracker):
+        ndf_cut_us, ndf_cut_ds, ndf_all = self.get_tracker_data(tracker, "ndf")
+        axis =  "n_{df} ("+tracker+")"
+        hist = self.make_root_histogram("ndf "+tracker, "ndf all", ndf_all, axis, 100, [], '', 0, [], 0., 20.)
+        hist_cut_us = self.make_root_histogram("ndf "+tracker, "ndf us cut", ndf_cut_us, axis, 100, [], '', 0, [], 0., 10.)
+        hist_cut_ds = self.make_root_histogram("ndf "+tracker, "ndf ds cut", ndf_cut_ds, axis, 100, [], '', 0, [], 0., 10.)
+        hist.Draw()
+        hist_cut_us.Draw("SAME")
+        hist_cut_ds.Draw("SAME")
+        self.get_plot("ndf "+tracker)["canvas"].SetLogy()
+
+    def process_tracker(self, tracker, key):
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_data(tracker, key)
+        tracker_hists = self.get_plot(key+" "+tracker)["histograms"]
+        for data, hist_key in (data_cut_us, "us cut"), (data_cut_ds, "ds cut"), (data_all, "all"):
+            hist = tracker_hists[key+" "+hist_key]
+            for item in data:
+                hist.Fill(item)
+
+    def get_p_tot_vs_tof_data(self, tof, tk, cuts):
+        predicate_all = lambda event: event[tof] != None and event[tk] != None
+        if cuts == "us cut":
+            predicate = lambda event: predicate_all(event) and not self.will_cut_us(event)
+        elif cuts == "ds cut":
+            predicate = lambda event: predicate_all(event) and not self.will_cut_ds(event)
+        elif cuts == "all":
+            predicate = predicate_all
+
+        tof_data = [event[tof] for event in self.data_loader.events if predicate(event)]
+        p_data = [event[tk]["p"] for event in self.data_loader.events if predicate(event)]
+        return tof_data, p_data
+
+    def birth_p_tot_vs_tof(self, tof, tk, cuts):
+        tof_data, p_data = self.get_p_tot_vs_tof_data(tof, tk, cuts)
+        hist = self.make_root_histogram("p_"+tk+"_vs_"+tof+"_"+cuts,
+                                        "p_tot_vs_tof", 
+                                        tof_data, tof+" [ns]", 100, p_data,
+                                        "p_{"+tk+"} [MeV/c]", 100, [],
+                                        25., 45., 0., 300., )
+        hist.Draw("COLZ")
+
+    def process_p_tot_vs_tof(self, tof, tk, cuts):
+        tof_data, p_data = self.get_p_tot_vs_tof_data(tof, tk, cuts)
+        hist = self.get_plot("p_"+tk+"_vs_"+tof+"_"+cuts)["histograms"]
+        hist = hist.values()[0]
+        for i in range(len(tof_data)):
+            hist.Fill(tof_data[i], p_data[i])
+
+    def birth_p_tot_res(self):
+        p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", True)
+        p_tkd_cut_us, p_tkd_cut_ds, p_tkd_all = self.get_tracker_hit_data("tkd", "p", True)
+        dp_cut_us = [p_tku - p_tkd_cut_us[i] for i, p_tku in enumerate(p_tku_cut_us)]
+        dp_cut_ds = [p_tku - p_tkd_cut_ds[i] for i, p_tku in enumerate(p_tku_cut_ds)]
+        dp_all = [p_tku - p_tkd_all[i] for i, p_tku in enumerate(p_tku_all)]
+
+        axis = "p_{tku} - p_{tkd} [MeV/c]"
+        hist = self.make_root_histogram("p_res", "p_res all", dp_all, axis, 100, [], '', 0, [], -50., 50.)
+        hist_cut_us = self.make_root_histogram("p_res", "p_res us cut", dp_cut_us, axis, 100, [], '', 0, [], -50., 50.)
+        hist_cut_ds = self.make_root_histogram("p_res", "p_res ds cut", dp_cut_ds, axis, 100, [], '', 0, [], -50., 50.)
+        hist.Draw()
+        hist_cut_us.Draw("SAME")
         hist_cut_ds.Draw("SAME")
 
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+name+"."+format)
-
-    def plot_var_1d(self, var_1, us_ds_1, min_max = [None, None]):
-        name =  us_ds_1+"_"+var_1
-        canvas = xboa.common.make_root_canvas(name)
-        data_1 = self.choose_data(us_ds_1, None)
-        data_1 = [u_in[var_1] for i, u_in in enumerate(data_1)]
-        lab_1 = us_ds_1+" "+var_1
-        print "Plot var", lab_1, "for", len(data_1), "events"
-        xmin = min_max[0]
-        xmax = min_max[1]
-        for i in range(3):
-            hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
-            hist.SetTitle(self.config_analysis['name'])
-            fit = ROOT.TF1("testfit", "gaus")
-            hist.Fit(fit, "QN")
-            print "Mean", fit.GetParameter(1), "rms", fit.GetParameter(2)
-            xmin = round(fit.GetParameter(1)-3*fit.GetParameter(2))
-            xmax = round(fit.GetParameter(1)+3*fit.GetParameter(2))
-            hist.Draw()
-            del fit
-        if min_max[0] != None:
-            xmin = min_max[0]
-        if min_max[1] != None:
-            xmax = min_max[1]
-
-        hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw()
-        data_1 = self.choose_data(us_ds_1, self.will_cut_us)
-        data_1 = [u_in[var_1] for i, u_in in enumerate(data_1)]
-        hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
-        hist.SetLineColor(2)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        data_1 = self.choose_data(us_ds_1, self.will_cut_ds)
-        data_1 = [u_in[var_1] for i, u_in in enumerate(data_1)]
-        hist = xboa.common.make_root_histogram(name, data_1, lab_1, 100, xmin=xmin, xmax=xmax)
-        hist.SetLineColor(8)
-        hist.SetTitle(self.config_analysis['name'])
-        hist.Draw("SAME")
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+name+"."+format)
-        if var_1 == "p" and us_ds_1 == "tku":
-            self.max_p_bin = self.get_max(hist)
-
-    def two_d_projection(self, matrix, i_1, i_2):
-        my_cov = numpy.zeros([2, 2])
-        for this_i, global_i in enumerate([i_1, i_2]):
-          for this_j, global_j in enumerate([i_1, i_2]):
-             my_cov[this_i, this_j] = matrix[global_i, global_j]
-        return my_cov
-
-    def cut_bunch(self, fout, cut_value, target_bunch):
-
-        cut_weight = None
-        cut_bunch = target_bunch.deepcopy()
-        while cut_bunch.bunch_weight() != cut_weight:
-            cut_weight = cut_bunch.bunch_weight()
-            cut_bunch.cut({'amplitude x y':cut_value}, operator.gt)
-            
-        cut_bunch.clear_local_weights()
-        mean_cut = cut_bunch.mean(self.mean_keys)
-        beta_cut = cut_bunch.get_beta(['x', 'y'])
-        alpha_cut = cut_bunch.get_alpha(['x', 'y'])
-        beta_x_cut = cut_bunch.get_beta(['x'])
-        alpha_x_cut = cut_bunch.get_alpha(['x'])
-        beta_y_cut = cut_bunch.get_beta(['y'])
-        alpha_y_cut = cut_bunch.get_alpha(['y'])
-        cut_cov = cut_bunch.covariance_matrix(['x', 'px', 'y', 'py'])
-        cut_weight = cut_bunch.bunch_weight()
-
-        print >> fout, "Tails cut (cut_weight:", cut_weight, "):"
-        print >> fout, "Cut means",
-        for key in self.mean_keys:
-            print >> fout, key+":", str(round(mean_cut[key], 2)),
-        print >> fout, "beta", beta_cut, "alpha", alpha_cut
-        print >> fout, "beta x", beta_x_cut, "alpha x", alpha_x_cut
-        print >> fout, "beta y", beta_y_cut, "alpha y", alpha_y_cut
-        print >> fout, cut_cov
-
-        return cut_cov
-
-    def bunch_plots(self, tracker):
-        target_bunch = Bunch.new_from_hits([event[tracker] for event in self.events if event[tracker] != None])
-        name = self.config_analysis['name']
-        fname = name.replace(' ', '_') 
-        fname = self.config_analysis["plot_dir"]+"/"+fname+"_summary_"+tracker
-        fout = open(fname+".txt", "w")
-        bz = 3e-3
-        p = 140.
-        if target_bunch.bunch_weight() == 0:
-            print >> fout, "No data - check cuts"
-            return
-        beta = target_bunch.get_beta(['x', 'y'])
-        alpha = target_bunch.get_alpha(['x', 'y'])
-        eps = target_bunch.get_emittance(['x', 'y'])
-
-        beta_x = target_bunch.get_beta(['x'])
-        alpha_x = target_bunch.get_alpha(['x'])
-        eps_x = target_bunch.get_emittance(['x'])
-
-        beta_y = target_bunch.get_beta(['y'])
-        alpha_y = target_bunch.get_alpha(['y'])
-        eps_y = target_bunch.get_emittance(['y'])
-
-        beam_mean = target_bunch.mean(self.mean_keys)
-        beam_cov = target_bunch.covariance_matrix(['x', 'px', 'y', 'py'])
-        beam_weight = target_bunch.bunch_weight()
-
-        penn_beta = p/bz/0.15*1e-3
-        penn_cov = Bunch.build_penn_ellipse(eps, xboa.common.pdg_pid_to_mass[13], penn_beta, 0., p, 0., bz, 1)
-        print >> fout, "runs", self.run_numbers
-        print >> fout, "name", name
-        print >> fout, "Found", beam_weight, "events"
-        print >> fout, "means",
-        for key in self.mean_keys:
-            print >> fout, key+":", str(round(beam_mean[key], 2)),
-        print >> fout
-        print >> fout, "beta", beta, "alpha", alpha, "emittance:", eps
-        print >> fout, "beta x", beta_x, "alpha x", alpha_x, "emittance x:", eps_x
-        print >> fout, "beta y", beta_y, "alpha y", alpha_y, "emittance y:", eps_y
-        print >> fout, "Matrix (x, px, y, py):"
-        print >> fout, beam_cov
-
-        cut_cov = self.cut_bunch(fout, eps*4, target_bunch)
-
-        print >> fout, "target beta", penn_beta, "target matrix:"
-        print >> fout, penn_cov
-        print >> fout, "theory matrix (based on measured beta, alpha, Lcan = 0):"
-        print >> fout, Bunch.build_penn_ellipse(eps, xboa.common.pdg_pid_to_mass[13], beta, alpha, p, 0., bz, 1)
-        fout.close()
-        fin = open(fname+".txt")
-        print fin.read()
-
-        for i_1, i_2, var_1, var_2 in [(0, 1, "x", "px"), (2, 3, "y", "py"), (0, 2, "x", "y")]:
-            units = {"x":"mm", "y":"mm", "px":"MeV/c", "py":"MeV/c", "pz":"MeV/c"}
-            limits = {"x":150., "y":150., "px":100., "py":100., "pz":300.}
-            canvas, hist = target_bunch.root_histogram(var_1, units[var_1],
-                                                        var_2, units[var_2],
-                                                        100, 100,
-                                                        xmin=-limits[var_1], 
-                                                        xmax=+limits[var_1], 
-                                                        ymin=-limits[var_2], 
-                                                        ymax=+limits[var_2])
-            canvas.cd()
-            hist.SetTitle(self.config_analysis['name'])
-            hist.Draw("COLZ")
-
-            ellipse = make_ellipse_graph([beam_mean[var_1], beam_mean[var_2]], self.two_d_projection(beam_cov, i_1, i_2), 1)
-            ellipse.Draw("SAMEL")
-
-            #ellipse = make_ellipse_graph([mean_cut[var_1], mean_cut[var_2]], self.two_d_projection(cut_cov, i_1, i_2), 14)
-            #ellipse.Draw("SAMEL")
-
-            ellipse = make_ellipse_graph([0., 0.], self.two_d_projection(penn_cov, i_1, i_2), 14)
-            ellipse.Draw("SAMEL")
-            canvas.Update()
-
-            for format in ["png", "root", "eps"]:
-                canvas.Print(self.plot_dir+"bunch_"+tracker+"_"+var_1+"_"+var_2+"."+format)
-
-        canvas, hist = target_bunch.root_histogram("r", "mm", "pt", "MeV/c", nx_bins=50, ny_bins=50, xmin=0., xmax=200., ymin=0., ymax=100.)
-        canvas.cd()
-        hist.SetTitle(self.config_analysis['name'])
+        hist = self.make_root_histogram("p_res_vs_p_tku", "p_res_vs_p_tku", p_tku_cut_ds, "p_{tku} [MeV/c]", 50,
+                                                          dp_cut_ds, "p_{tku} - p_{tkd} [MeV/c]", 50,
+                                                          [], None, None, -50, 50)
         hist.Draw("COLZ")
-        canvas.Update()
 
-        canvas.Update()
-        for format in ["png", "root", "eps"]:
-            canvas.Print(self.plot_dir+"bunch_r_pt."+format)
+    def process_p_tot_res(self):
+        p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", True)
+        p_tkd_cut_us, p_tkd_cut_ds, p_tkd_all = self.get_tracker_hit_data("tkd", "p", True)
+        dp_cut_us = [p_tku - p_tkd_cut_us[i] for i, p_tku in enumerate(p_tku_cut_us)]
+        dp_cut_ds = [p_tku - p_tkd_cut_ds[i] for i, p_tku in enumerate(p_tku_cut_ds)]
+        dp_all = [p_tku - p_tkd_all[i] for i, p_tku in enumerate(p_tku_all)]
 
-    # keys used for processing bunch data
-    mean_keys = ['x', 'y', 'px', 'py', 'p', 'z', 'energy']
+        p_res_hists = self.get_plot("p_res")["histograms"]
+        for data, hist_key in (dp_cut_us, "us cut"), (dp_cut_ds, "ds cut"), (dp_all, "all"):
+            hist = p_res_hists["p_res "+hist_key]
+            for item in data:
+                hist.Fill(item)
 
-def make_ellipse_graph(means, matrix, line_color):
-    shell = xboa.common._common.make_shell(31, matrix)
-    shell = [item.tolist()[0] for item in shell]
-    shell = sorted(shell, key = lambda x: math.atan2(x[1], x[0]))
-    x_list = [item[0]+means[0] for item in shell]
-    y_list = [item[1]+means[1] for item in shell]
-    hist, graph = xboa.common.make_root_graph("ellipse", x_list, "", y_list, "", sort = False)
-    graph.SetLineColor(line_color)
-    return graph
+        p_res_vs_p_hist = self.get_plot("p_res_vs_p_tku")["histograms"]
+        hist = p_res_vs_p_hist["p_res_vs_p_tku"]
+        for i in range(len(p_tku_cut_ds)):
+            hist.Fill(p_tku_cut_ds[i], dp_cut_ds[i])
 
+    def birth_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, min_max_1, min_max_2, cut):       
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds_1, var_1, us_ds_1 == us_ds_2)
+        data_1 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds_2, var_2, us_ds_1 == us_ds_2)
+        data_2 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
+        name =  us_ds_1+"_"+var_1+"_"+ us_ds_2+"_"+var_2+"_"+cut
+        lab_1 = us_ds_1+" "+var_1+" ["+scripts.utilities.default_units(var_1)+"]"
+        lab_2 = us_ds_2+" "+var_2+" ["+scripts.utilities.default_units(var_2)+"]"
+        hist = self.make_root_histogram(name, name,
+                                        data_1, lab_1, 50,
+                                        data_2, lab_2, 50, [],
+                                        min_max_1[0], min_max_1[1],
+                                        min_max_2[0], min_max_2[1])
+        hist.Draw("COLZ")
+
+    def process_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, cut):
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds_1, var_1, us_ds_1 == us_ds_2)
+        data_1 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds_2, var_2, us_ds_1 == us_ds_2)
+        data_2 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
+        name =  us_ds_1+"_"+var_1+"_"+ us_ds_2+"_"+var_2+"_"+cut
+        hist = self.get_plot(name)["histograms"][name]
+        for i, item_1 in enumerate(data_1):
+            item_2 = data_2[i]
+            hist.Fill(item_1, item_2)
+
+    def death_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, cut, build_ellipse):
+        if not build_ellipse:
+            return
+        name =  us_ds_1+"_"+var_1+"_"+ us_ds_2+"_"+var_2+"_"+cut
+        if us_ds_1 != us_ds_2:
+            raise RuntimeError("We don't track correlations between upstream and downstream variables - ellipse not plotted")
+        self.get_plot(name) # cd to the canvas
+        index_1 = self.ellipse_variables.index(var_1)
+        index_2 = self.ellipse_variables.index(var_2)
+        mean_1 = self.ellipse["mean_"+us_ds_1+"_"+cut][index_1]
+        mean_2 = self.ellipse["mean_"+us_ds_1+"_"+cut][index_2]
+        cov_index = [[(index_1, index_1), (index_1, index_2)], [(index_1, index_2), (index_2, index_2)]]
+        cov = self.ellipse["covariance_"+us_ds_1+"_"+cut]
+        beam_cov = [[cov[i][j] for (i, j) in row] for row in cov_index]
+
+        ellipse = self.make_ellipse_graph([mean_1, mean_2], beam_cov, 1)
+        ellipse.Draw("SAMEL")
+
+    @classmethod
+    def make_ellipse_graph(cls, means, matrix, line_color):
+        shell = xboa.common._common.make_shell(31, numpy.array(matrix))
+        shell = [item.tolist()[0] for item in shell]
+        shell = sorted(shell, key = lambda x: math.atan2(x[1], x[0]))
+        x_list = [item[0]+means[0] for item in shell]
+        y_list = [item[1]+means[1] for item in shell]
+        hist, graph = xboa.common.make_root_graph("ellipse", x_list, "", y_list, "", sort = False)
+        graph.SetLineColor(line_color)
+        return graph
+
+    def birth_ellipse(self, tracker, cut):
+        n_var = len(self.ellipse_variables)
+        self.ellipse["covariance_"+tracker+"_"+cut] = [[0. for j in range(n_var)] for i in range(n_var)]  
+        self.ellipse["mean_"+tracker+"_"+cut] = [0. for i in range(n_var)]
+        self.ellipse["nevents_"+tracker+"_"+cut] = 0
+        self.process_ellipse(tracker, cut)
+
+    def process_ellipse(self, tracker, cut):
+        mean = self.ellipse["mean_"+tracker+"_"+cut]
+        ellipse = self.ellipse["covariance_"+tracker+"_"+cut]
+        n_events = self.ellipse["nevents_"+tracker+"_"+cut]
+        n_var = len(self.ellipse_variables)
+        # cut predicate the data
+        if cut == "all":
+            my_predicate = lambda event: event[tracker] == None
+        elif cut == "us cut":
+            my_predicate = lambda event: event[tracker] == None or self.will_cut_us(event)
+        elif cut == "ds cut":
+            my_predicate = lambda event: event[tracker] == None or self.will_cut_ds(event)
+        # set up the matrix for this sample
+        m_events = 0
+        this_matrix = [[0. for j in range(n_var)] for i in range(n_var)]       
+        this_mean = [0. for i in range(n_var)]
+        for event in self.data_loader.events:
+            if my_predicate(event):
+                continue
+            m_events += 1
+            data = [event[tracker][var] for var in self.ellipse_variables]
+            for i in range(n_var):
+                this_mean[i] += data[i]
+                for j in range(i, n_var):
+                    this_matrix[i][j] += data[i]*data[j]
+
+        # update the main ellipse
+        for i in range(n_var):
+            mean[i] = mean[i]*n_events/(n_events+m_events) + \
+                      this_mean[i]/(n_events+m_events)
+            for j in range(i, n_var):
+                ellipse[i][j] = ellipse[i][j]*n_events/(n_events+m_events) + \
+                                this_matrix[i][j]/(n_events+m_events)
+                ellipse[j][i] = ellipse[i][j]
+        self.ellipse["mean_"+tracker+"_"+cut] = mean
+        self.ellipse["covariance_"+tracker+"_"+cut] = ellipse
+        self.ellipse["nevents_"+tracker+"_"+cut] += m_events
+
+    def birth_var_1d(self, var, us_ds):
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds, var, False)
+        name =  us_ds+"_"+var
+        label = us_ds+" "+var+" ["+scripts.utilities.default_units(var)+"]"
+        fit = scripts.utilities.fit_peak_data(data_all)
+        mean = fit.GetParameter(1)
+        sigma = fit.GetParameter(2)
+        xmin, xmax = round(mean-sigma*5, 1), round(mean+sigma*5, 1)
+
+        hist = self.make_root_histogram(name, name+" all",
+                                        data_all, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+        hist = self.make_root_histogram(name, name+" us cut",
+                                        data_cut_us, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+        hist = self.make_root_histogram(name, name+" ds cut",
+                                        data_cut_ds, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+
+    def process_var_1d(self, var, us_ds):       
+        data_cut_us, data_cut_ds, data_all = self.get_tracker_hit_data(us_ds, var, False)
+        name =  us_ds+"_"+var
+        hist_dict = self.get_plot(name)["histograms"]
+        for data, key in (data_all, "all"), (data_cut_ds, "ds cut"), (data_cut_us, "us cut"):
+            hist_name = name+" "+key
+            hist = hist_dict[hist_name]
+            for i, item in enumerate(data):
+                hist.Fill(item)
+
+    def get_delta_tof_data(self, tofs):
+        dtof_us_cut = [event["delta_"+tofs] for event in self.data_loader.events if not self.will_cut_us(event)]
+        dtof_us_cut = [dtof for dtof in dtof_us_cut if dtof != None]
+        dtof_ds_cut = [event["delta_"+tofs] for event in self.data_loader.events if not self.will_cut_ds(event)]
+        dtof_ds_cut = [dtof for dtof in dtof_ds_cut if dtof != None]
+        dtof_all = [event["delta_"+tofs] for event in self.data_loader.events]
+        dtof_all = [dtof for dtof in dtof_all if dtof != None]
+        return dtof_us_cut, dtof_ds_cut, dtof_all
+
+    def birth_delta_tof(self, tofs):
+        data_cut_us, data_cut_ds, data_all = self.get_delta_tof_data(tofs)
+        if len(data_all) == 0:
+            print "No delta tof plot - perhaps extrapolation is disabled?"
+            return
+        xmin = -15.
+        xmax = 10.
+        name = "delta_"+tofs
+        label = "#"+name.replace("_", " ")+" [ns]"
+        hist = self.make_root_histogram(name, name+" all",
+                                        data_all, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+        hist = self.make_root_histogram(name, name+" us cut",
+                                        data_cut_us, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+        hist = self.make_root_histogram(name, name+" ds cut",
+                                        data_cut_ds, label, 50,
+                                        [], "", 50, [], xmin, xmax)
+        self.get_plot(name)["canvas"].SetLogy()
+
+    def process_delta_tof(self, tofs):       
+        data_cut_us, data_cut_ds, data_all = self.get_delta_tof_data(tofs)
+        name = "delta_"+tofs
+        try:
+            hist_dict = self.get_plot(name)["histograms"]
+            for data, key in (data_all, "all"), (data_cut_ds, "ds cut"), (data_cut_us, "us cut"):
+                hist_name = name+" "+key
+                hist = hist_dict[hist_name]
+                for i, item in enumerate(data):
+                    hist.Fill(item)
+        except KeyError: # perhaps extrapolation was switched off?
+            return
+
+    def birth_cuts_summary(self):
+        self.global_cut = {"upstream_cut":0, "downstream_cut":0, "all_events":0}
+        self.upstream_cut = {}
+        self.downstream_cut = {}
+        for key in self.data_loader.events[0]["will_cut"]:
+            self.upstream_cut[key] = 0
+            self.downstream_cut[key] = 0
+        self.process_cuts_summary()
+
+    def process_cuts_summary(self):
+        for event in self.data_loader.events:
+            self.global_cut["all_events"] += 1
+            will_cut = event["will_cut"]
+            for key in will_cut:
+                if not will_cut[key]:
+                    self.upstream_cut[key] += 1
+                    if event["upstream_cut"]:
+                        continue
+                    self.downstream_cut[key] += 1
+            if not event["upstream_cut"]:
+                self.global_cut["upstream_cut"] += 1
+            if not event["downstream_cut"]:
+                self.global_cut["downstream_cut"] += 1
+
+    def death_cuts_summary(self):
+        fout = open(self.plot_dir+"/cuts_summary.txt", "w")
+        print >> fout, "========== cuts summary ============"
+        for key in ["all_events", "upstream_cut", "downstream_cut"]:
+            key_name = key.replace("_", " ")
+            print >> fout, "'"+key_name+":'", self.global_cut[key],
+        print >> fout
+
+        print >> fout, "   ", "'cut name'".ljust(25), "us?".ljust(8), "ds?".ljust(8), "passed".ljust(8), "'upstream passed and passed'".ljust(8)
+        for key in sorted(self.upstream_cut.keys()):
+            key_name = "'"+key.replace("_", " ")+"'"
+            is_active_us = self.config.upstream_cuts[key]
+            is_active_ds = self.config.downstream_cuts[key]
+            print >> fout, "   ", key_name.ljust(25), str(is_active_us).ljust(8), str(is_active_ds).ljust(8), str(self.upstream_cut[key]).ljust(8), str(self.downstream_cut[key]).ljust(8)
+        print >> fout
+        fout.close() 
+        fout = open(self.plot_dir+"/cuts_summary.txt", "r")
+        print fout.read()
+
+    def death_wiki_summary(self):
+        fout = open(self.plot_dir+"/wiki_summary.txt", "w")
+        wiki_summary = "| "+self.config_anal['name']+" | "
+        wiki_summary += " "+str(sorted(list(self.run_numbers)))+" |"
+        try:
+            cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(cut_dict['runs'])
+            cdb_dict["time"] = str(cdb_dict["time"][0])+" hrs "+str(cdb_dict["time"][1])+" mins"
+            cdb_keys = ["lmc1234", "tof1_triggers", "tof2_triggers", "time"]
+            for key in cdb_keys:
+                wiki_summary += " "+str(cdb_dict[key]).ljust(8)+" |"
+        except Exception:
+            wiki_summary += " Failed to contact cdb |"
+        for key in ["all_events", "upstream_cut", "downstream_cut"]:
+            wiki_summary += " "+str(self.global_cut[key]).ljust(8)+" |"
+        print >> fout, wiki_summary
+        print wiki_summary
+
+    ellipse_variables = ["x", "y", "px", "py"]
+
+
+ 
 def do_plots(config, config_anal, data_loader):
     xboa.common.clear_root()
     plotter = DataPlotter(config, config_anal, data_loader.events, lambda event: event["upstream_cut"], lambda event: event["downstream_cut"], data_loader.run_numbers)
     sys.stdout.flush()
 
-    plotter.plot_tof01()
-    plotter.plot_tof12()
     plotter.plot_delta_tof("tof01")
     plotter.plot_delta_tof("tof12")
-    plotter.plot_pvalues()
-    plotter.plot_chi2()
 
-    #plotter.plot_sp_residuals("tku", "x")
-    #plotter.plot_sp_residuals("tku", "y")
-    #plotter.plot_sp_residuals("tkd", "x")
-    #plotter.plot_sp_residuals("tkd", "y")
-    plotter.plot_var_2d("x", "tku", "px", "tku", [-150, 150], [-100, 100], plotter.will_cut_us)
-    plotter.plot_var_2d("y", "tku", "py", "tku", [-150, 150], [-100, 100], plotter.will_cut_us)
-    plotter.plot_var_2d("px", "tku", "py", "tku", [-100, 100], [-100, 100], plotter.will_cut_us)
-    plotter.plot_var_2d("x", "tku", "y", "tku", [-150, 150], [-150, 150], plotter.will_cut_us)
-    plotter.plot_var_2d("x", "tku", "y", "tku", [-150, 150], [-150, 150], None)
-    plotter.plot_var_1d("x", "tku")
-    plotter.plot_var_1d("px", "tku")
-    plotter.plot_var_1d("y", "tku")
-    plotter.plot_var_1d("py", "tku")
-    plotter.plot_var_1d("p", "tku", min_max=[80., 180.])
-    plotter.plot_var_1d("r", "tku")
-    plotter.plot_sp_residuals("tku", "x")
-    plotter.plot_p_tot_res()
-    plotter.plot_p_tot_vs_tof("tof01", "tku")
     plotter.bunch_plots("tku")
 
     plotter.bunch_plots("tkd")
-    plotter.plot_p_tot_vs_tof("tof12", "tkd")
-    plotter.plot_var_2d("y", "tkd", "py", "tkd", [-150, 150], [-100, 100])
-    plotter.plot_var_2d("px", "tkd", "py", "tkd", [-100, 100], [-100, 100])
-    plotter.plot_var_2d("x", "tkd", "px", "tkd", [-150, 150], [-100, 100])
-    plotter.plot_var_1d("x", "tkd")
-    plotter.plot_var_1d("px", "tkd")
-    plotter.plot_var_1d("y", "tkd")
-    plotter.plot_var_1d("py", "tkd")
-    plotter.plot_var_1d("p", "tkd", min_max=[80., 180.])
-    plotter.plot_var_1d("r", "tkd")
-    plotter.plot_var_2d("r", "tkd", "pt", "tkd")
 
-    accepted, accepted_data = plotter.get_cuts_summary()
-    wiki_summary = plotter.print_wiki_summary()
-    print
-    plotter.print_cuts_summary()
 
-    print wiki_summary, "\n\n"
-    return wiki_summary

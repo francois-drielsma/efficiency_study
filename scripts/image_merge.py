@@ -23,7 +23,7 @@ def target_list(image_files, directories):
     return target_list
 
 
-def merge(image_files, directories, plot_dir, will_require_complete):
+def merge(image_files, directories, plot_dir, will_require_complete, do_gthumb = True):
     try:
         shutil.rmtree(plot_dir)
     except OSError:
@@ -39,9 +39,9 @@ def merge(image_files, directories, plot_dir, will_require_complete):
             continue
         print image_list, merge_target
         subprocess.Popen(["convert"]+image_list+["-append", merge_target])
-
-    proc = subprocess.Popen(["gthumb"]+[plot_dir]) #gthumb_list)
-    proc.wait()
+    if do_gthumb:
+        proc = subprocess.Popen(["gthumb"]+[plot_dir]) #gthumb_list)
+        proc.wait()
 
 def main():
     image_files = [
@@ -49,47 +49,34 @@ def main():
     ]
 
     recon_directories = [
-        "output/2016-04_1.2_reco/plots_3-140/",
-        "output/2016-04_1.2_reco/plots_6-140/",
-        "output/2016-04_1.2_reco/plots_10-140/",
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_3-140_v2.8.5/",
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_6-140/",
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_10-140/",
     ]
-
-    reco_285_vs_291_directories = [
-        "output/2016-04_1.2_reco/plots_3-140_v2.8.5/",
-        "output/2016-04_1.2_reco/plots_3-140_test/",
-    ]
-
-
-    mc_vs_paolo_directories = [
-        "output/2016-04_1.2_reco/plots_3-140/",
-        "output/2016-04_1.2_mc_ds-cuts/plots_3-140_MC_Franchini/",
-        "output/2016-04_1.2_mc_ds-cuts/plots_3-140_MC_Prod/",
-    ]
-
 
     mc_directories = [
-        "output/2016-04_1.2_mc/plots_3-140_MC/",
-        "output/2016-04_1.2_mc/plots_6-140_MC/",
-        "output/2016-04_1.2_mc/plots_10-140_MC/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_3-140_MC/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_6-140_MC/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_10-140_MC/",
     ]
 
     e3_directories = [
-        "output/2016-04_1.2_reco/plots_3-140+M3-Test2_MAUS-v2.8.2/",
-        "output/2016-04_1.2_mc/plots_3-140_MC_Scale_D1=1.??_D2=0.93*/",
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_3-140/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_3-140_MC/",
     ]
 
     e6_directories = [
-        "output/2016-04_1.2_reco/plots_6-140+M3-Test2_MAUS-v2.8.5_Full_hi-stats/",
-        "output/2016-04_1.2_mc/plots_3-140_MC_Scale_D1=1.02_D2=1.02_DS=1.00_Br2.0_W1.4/",
-        "output/2016-04_1.2_mc/plots_6-140_MC_Scale_D1=1.02_D2=1.02_DS=1.00_Hacked-Geom"
-   ]
-
-    e10_directories = [
-        "output/2016-04_1.2_reco/plots_10-140+M3-Test3_MAUS-v2.8.5_Full_hi-stats/",
-        "output/2016-04_1.2_mc/plots_10-140_MC_Scale_D1=1.02_D2=1.02_DS=1.00_Br12.87_W8.4/",
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_6-140/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_6-140_MC/",
     ]
 
-    merge(image_files, reco_285_vs_291_directories, "plots/MAUS_285_vs_291", True)
+    e10_directories = [
+        "iteration_6_high-stats/2016-04_1.2_reco/plots_10-140/",
+        "iteration_6_high-stats/2016-04_1.2_mc/plots_10-140_MC/",
+    ]
+
+    merge(image_files, mc_directories, "plots/mc", True, False)
+    merge(image_files, recon_directories, "plots/recon", True, False)
 
 if __name__ == "__main__":
     main()

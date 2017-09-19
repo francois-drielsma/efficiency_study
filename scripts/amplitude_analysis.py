@@ -4,14 +4,16 @@ import bisect
 import operator
 import json
 import numpy
+import tempfile
 
 import ROOT
 import xboa.common as common
 from xboa.hit import Hit
 from xboa.bunch import Bunch
 import scripts.chi2_distribution
+from scripts.amplitude_data import AmplitudeData
 from scripts.binomial_confidence_interval import BinomialConfidenceInterval
-
+from analysis_base import AnalysisBase
 
 #REPHRASE SYSTEMATICS;
 #* efficiency and purity is the migration matrix from mc to reco mc
@@ -19,86 +21,52 @@ from scripts.binomial_confidence_interval import BinomialConfidenceInterval
 #* crossing probability is the migration matrix from recon_mc to recon
 #* field uncertainty is the migration matrix from recon to "recon with bfield" 
 
-class AmplitudeAnalysis(object):
-    def __init__(self, config, config_anal):
+class AmplitudeAnalysis(AnalysisBase):
+    def __init__(self, config, config_anal, data_loader):
+        super(AmplitudeAnalysis, self).__init__(config, config_anal, data_loader)
         self.config = config
         self.config_anal = config_anal
         self.amplitudes = {"momentum_uncertainty":{}, "inefficiency":{}, "crossing_probability":{}}
         self.bin_edge_list = [float(i) for i in range(0, 101, config.amplitude_bin_width)]
+        self.a_dir = tempfile.mkdtemp()
+        file_name = self.a_dir+"/amp_data_"
+        mu_mass = common.pdg_pid_to_mass[13]
+        self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass)
+        self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass)
+        self.reco_data_us = AmplitudeData(file_name+"recon_us", self.bin_edge_list, mu_mass)
+        self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass)
+        self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass)
+        self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass)
 
-    def delta_weight(self, bunch, delta):
-        weight_sum_accepted = 0
-        weight_sum_rejected = 0
-        for hit in bunch:
-            if (hit['spill'], hit['event_number']) in delta:
-                weight_sum_accepted += hit['weight']
-            else:
-                weight_sum_rejected += hit['weight']
-        return weight_sum_accepted, weight_sum_rejected
-
-    def fractional_amplitude(self, bunch):
-        """
-        bunch: all particles, on which amplitude is calculated
-        amplitude_list: the set of bin edges over which amplitude is calculated
-        bunch_delta: the set of particles which make it downstream
-        """
-        amplitude_bin_edges = sorted(self.bin_edge_list)[::-1] # bins
-        bunch = bunch.deepcopy()
-        bunch.clear_weights()
-        amplitude_dict = dict([((hit['spill'], hit['event_number']), None) for hit in bunch]) # mapping of spill/event to amplitude
-
-        for bin_upper_edge in amplitude_bin_edges[:-1]:
-            new_weight = -1
-            old_weight = 1
-            #print "Calc bin", bin_upper_edge,
-            while old_weight != new_weight:
-                old_weight = new_weight
-                try:
-                    amplitude_list = bunch.list_get_hit_variable(['amplitude x y'])[0]
-                    for i, amplitude in enumerate(amplitude_list):
-                        #print amplitude,
-                        hit = bunch[i]
-                        if amplitude > bin_upper_edge:
-                            #if hit['local_weight'] > 0.5:
-                            #    print amplitude, bin_upper_edge, hit['spill'], hit['event_number']
-                            hit['local_weight'] = 0
-                        else:
-                            amplitude_dict[(hit['spill'], hit['event_number'])] = amplitude
-                    new_weight = bunch.bunch_weight()
-                except Exception:
-                    sys.excepthook(*sys.exc_info())
-                    break
-            #print new_weight, len(amplitude_dict)
-        #for key, value in amplitude_dict.iteritems():
-        #    print key, value
-        #print amplitude_dict
-        return amplitude_dict
-
-    def delta_amplitude_calc(self, bunch_0, bunch_1, suffix):
+    def delta_amplitude_calc(self, suffix):
+        data_0, data_1 = {
+            "all_mc":(self.all_mc_data_us, self.all_mc_data_ds),
+            "reco":(self.reco_data_us, self.reco_data_ds),
+            "reco_mc":(self.reco_mc_data_us, self.reco_mc_data_ds),
+        }[suffix]
         print "Amplitude", suffix
         print "  starting delta_amplitude_calc    ", datetime.datetime.now()
         data = {}
         print "  Upstream amplitude calculation...  ", datetime.datetime.now()
-        fractional_amplitude_dict_0 = self.fractional_amplitude(bunch_0)
+        fractional_amplitude_dict_0 = data_0.fractional_amplitude()
         print "  n_events", len(fractional_amplitude_dict_0)
         print "  Downstream amplitude calculation...", datetime.datetime.now()
-        fractional_amplitude_dict_1 = self.fractional_amplitude(bunch_1)
+        fractional_amplitude_dict_1 = data_1.fractional_amplitude()
+        print "  n_events", len(fractional_amplitude_dict_1)
         print "  ... done                           ", datetime.datetime.now()
 
         data["amplitude_dict_upstream"] = fractional_amplitude_dict_0
         data["amplitude_dict_downstream"] = fractional_amplitude_dict_1
         data["all_upstream"] = self.get_pdfs(fractional_amplitude_dict_0)
         data["all_downstream"] = self.get_pdfs(fractional_amplitude_dict_1)
-        for name, bunch in [("all_upstream", bunch_0),
-                           ("all_downstream", bunch_1)]:
-            data[name]["z"] = bunch[0]["z"]
-            data[name]["beta_4D"] = bunch.get_beta(["x", "y"])
-            data[name]["emittance"] = bunch.get_emittance(["x", "y"])
-            data[name]["weight"] = bunch.bunch_weight()
-            data[name]["covariance_matrix"] = bunch.covariance_matrix(["x", "px", "y", "py"]).tolist()
+        for name, amp_data in [("all_upstream", data_0),
+                           ("all_downstream", data_1)]:
+            data[name]["emittance"] = amp_data.get_emittance()
+            data[name]["weight"] = sum(amp_data.n_events)
+            data[name]["covariance_matrix"] = amp_data.cov.tolist()
             data[name]["bin_edge_list"] = self.bin_edge_list
-        print "  upstream  ", data["all_upstream"]["pdf"]
-        print "  downstream", data["all_downstream"]["pdf"]
+        print "  upstream  ", data["all_upstream"]["pdf"], "sum", sum(data["all_upstream"]["pdf"])
+        print "  downstream", data["all_downstream"]["pdf"], "sum", sum(data["all_downstream"]["pdf"])
 
         data["migration_matrix"] = self.migration_matrix(fractional_amplitude_dict_0, fractional_amplitude_dict_1, False)
         data["upstream_scraped"], data["upstream_not_scraped"] = self.get_delta_pdfs(fractional_amplitude_dict_0, fractional_amplitude_dict_1)
@@ -202,7 +170,6 @@ class AmplitudeAnalysis(object):
         fractional_mc = self.amplitudes["all_mc"][amp_key]
         fractional_reco_mc = self.amplitudes["reco_mc"][amp_key]
         fractional_reco = self.amplitudes["reco"][amp_key]
-        print "Fractional mc", fractional_mc
         print "mc pdf", target, all_mc_pdf
         print "mc reco pdf", target, reco_mc_pdf
         inefficiency = []
@@ -242,6 +209,7 @@ class AmplitudeAnalysis(object):
         hist, graph = common.make_root_graph("inefficiency",
                                              self.get_bin_centre_list(), "Amplitude [mm]",
                                              inefficiency[:-1], "Inefficiency [fractional]")
+        hist.SetTitle(self.config_anal['name'])
         hist.Draw()
         graph.SetMarkerStyle(24)
         graph.Draw("p")
@@ -253,7 +221,6 @@ class AmplitudeAnalysis(object):
         graph.Draw("p")
         for format in "eps", "root", "png":
             canvas.Print(self.config_anal["plot_dir"]+"amplitude_inefficiency_zoom_"+target+"."+format)
-
 
     def matrix_str(self, matrix, rounding=2, width=10):
         matrix_str = ""
@@ -317,6 +284,7 @@ class AmplitudeAnalysis(object):
                 matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
         self.root_objects.append(matrix_hist)
         canvas = common.make_root_canvas(title)
+        matrix_hist.SetTitle(self.config_anal['name'])
         matrix_hist.SetStats(False)
         matrix_hist.Draw("COLZ")
         title = title.replace(" ", "_")
@@ -448,6 +416,7 @@ class AmplitudeAnalysis(object):
         text_box.SetTextAlign(12)
         text_box.AddText("ISIS Cycle 2016/04")
         text_box.AddText("MAUS v2.8.5")
+        text_box.AddText(self.config_anal['name'])
         text_box.Draw()
         self.root_objects.append(text_box)
 
@@ -500,31 +469,72 @@ class AmplitudeAnalysis(object):
             canvas.Print(self.config_anal["plot_dir"]+"amplitude_pdf_"+suffix+"_extras."+format)
         return canvas
 
+    def amplitude_scatter_plot(self, suffix):
+        amp_dict_ds = self.amplitudes[suffix]["amplitude_dict_downstream"]
+        amp_dict_us = self.amplitudes[suffix]["amplitude_dict_upstream"]
+        amp_list_us = []
+        amp_list_ds = []
+        amp_list_delta = []
+        for key, amp_ds in amp_dict_ds.iteritems():
+            try:
+                amp_us = amp_dict_us[key]
+            except KeyError:
+                sys.excepthook(*sys.exc_info())
+                continue
+            amp_delta = amp_us-amp_ds
+            amp_list_us.append(amp_us)
+            amp_list_ds.append(amp_ds)
+            amp_list_delta.append(amp_delta)
+        canvas = common.make_root_canvas("delta_amplitude_scatter")
+        canvas.Draw()
+        n_points = min(len(amp_list_us), 10000) # no more than 10k points in the scatter
+        hist, graph = common.make_root_graph("delta amplitude scatter",
+                                             amp_list_us, "Amplitude (us) [mm]",
+                                             amp_list_delta, "Amplitude (us) - Amplitude (ds) [mm]", xmin=0., xmax=100., ymin=-50., ymax=50.)
+        hist.SetTitle(self.config_anal['name'])
+        hist.Draw()
+        graph.Draw("P")
+        canvas.Update()
+        for format in ["eps", "png", "root"]:
+            canvas.Print(self.config_anal["plot_dir"]+"amplitude_delta_"+suffix+"_scatter."+format)
+
+        canvas = common.make_root_canvas("delta_amplitude_hist")
+        canvas.Draw()
+        hist = common.make_root_histogram("delta amplitude hist",
+                                          amp_list_us, "Amplitude (us) [mm]", 100,
+                                          amp_list_delta, "Amplitude (us) - Amplitude (ds) [mm]", 100,
+                                          xmin=0., xmax=100., ymin=-50., ymax=50.)
+        hist.SetTitle(self.config_anal['name'])
+        hist.Draw("COLZ")
+        canvas.Update()
+        for format in ["eps", "png", "root"]:
+            canvas.Print(self.config_anal["plot_dir"]+"amplitude_delta_"+suffix+"_hist."+format)
+      
+
     def tk_truth_is_okay(self, tk_mc_dict):
         radius_okay = [key for key, value in tk_mc_dict.iteritems() if value['r'] < 150.]     
         pid_okay = [key for key, value in tk_mc_dict.iteritems() if value['pid'] == -13]
         return [len(tk_mc_dict), len(radius_okay), len(pid_okay)]
 
-    def make_bunches(self, data_loader):
+    def append_data(self):
         hits_reco_us = []
-        hits_reco_ds = []
         hits_all_mc_us = []
-        hits_all_mc_ds = []
         hits_reco_mc_us = []
-        hits_reco_mc_ds = []
+        hits_reco_ds = []
+        hits_all_mc_ds = []
+        hits_reco_mc_ds= []
+
         if self.config_anal["do_mc"]:
             station_us = ["mc_virtual_"+str(station) for station in self.config.mc_plots["mc_stations"]["tku"]]
             station_ds = ["mc_virtual_"+str(station) for station in self.config.mc_plots["mc_stations"]["tkd"]]
 
-        for event in data_loader.events:
+        for event in self.data_loader.events:
             if 'any_cut' not in event:
                 print "Didnt find any_cut in", event.keys()
                 continue
 
             if event['upstream_cut']:
                 continue
-            spill = event['tku']['spill']
-            ev = event['tku']['event_number']
 
             mc_hit_us = None
             mc_hit_ds = None
@@ -544,37 +554,40 @@ class AmplitudeAnalysis(object):
                 tkd_truth = self.tk_truth_is_okay(mc_hit_dict_ds)
                 if tku_truth == [15, 15, 15]:
                     mc_hit_us = mc_hit_dict_us[station_us[0]]
-                    mc_hit_us['spill'] = spill
                     hits_all_mc_us.append(mc_hit_us)
-                    #print "mc hit us", len(hits_all_mc_us), mc_hit_us['spill'], mc_hit_us['event_number']
                 if tkd_truth == [15, 15, 15]:
                     mc_hit_ds = mc_hit_dict_ds[station_ds[0]]
-                    mc_hit_ds['spill'] = spill
-                    mc_hit_ds['event_number'] = ev
                     hits_all_mc_ds.append(mc_hit_ds)
             hits_reco_us.append(event['tku'])
             if mc_hit_us != None:
                 hits_reco_mc_us.append(mc_hit_us)
             elif tku_truth[0] != None:
-                print "tku impurity", tku_truth
+                pass #print "tku impurity", tku_truth
 
             if event['downstream_cut']:
                 continue
-            if event['tkd'] == None:
-                print event['tkd']
-                print [hit for hit in event['data'] if 'tkd' in hit['detector']]
-                print 'cuts', event['will_cut']
+            #if event['tkd'] == None:
+            #    print event['tkd']
+            #    print [hit for hit in event['data'] if 'tkd' in hit['detector']]
+            #    print 'cuts', event['will_cut']
             hits_reco_ds.append(event['tkd'])
             if mc_hit_ds != None:
                 hits_reco_mc_ds.append(mc_hit_ds)
             elif tkd_truth[0] != None:
-                print "tkd impurity", tkd_truth
+                #print "tkd impurity", tkd_truth
                 if tkd_truth[2] != 15 and tkd_truth[2] != None:
                     print
                     try:
                         print mc_hit_dict_ds[station_ds[0]]
                     except KeyError:
                         print mc_hit_dict_ds
+        self.all_mc_data_us.append_hits(hits_all_mc_us)
+        self.reco_mc_data_us.append_hits(hits_reco_mc_us)
+        self.reco_data_us.append_hits(hits_reco_us)
+        self.all_mc_data_ds.append_hits(hits_all_mc_ds)
+        self.reco_mc_data_ds.append_hits(hits_reco_mc_ds)
+        self.reco_data_ds.append_hits(hits_reco_ds)
+        return
         print "Loaded upstream:"
         print "    reco:   ", len(hits_reco_us)
         print "    all mc: ", len(hits_all_mc_us)
@@ -583,13 +596,6 @@ class AmplitudeAnalysis(object):
         print "    reco:   ", len(hits_reco_ds)
         print "    all mc: ", len(hits_all_mc_ds)
         print "    reco mc:", len(hits_reco_mc_ds)
-        reco_us = Bunch.new_from_hits(hits_reco_us)
-        reco_ds = Bunch.new_from_hits(hits_reco_ds)
-        all_mc_us = Bunch.new_from_hits(hits_all_mc_us)
-        all_mc_ds = Bunch.new_from_hits(hits_all_mc_ds)
-        reco_mc_us = Bunch.new_from_hits(hits_reco_mc_us)
-        reco_mc_ds = Bunch.new_from_hits(hits_reco_mc_ds)
-        return reco_us, reco_ds, all_mc_us, all_mc_ds, reco_mc_us, reco_mc_ds
 
     def print_data(self):
         fout = open(self.config_anal["plot_dir"]+"/amplitude.json", "w")
@@ -607,6 +613,8 @@ class AmplitudeAnalysis(object):
     def load_errors(self):
         if self.config_anal["amplitude_source"] != None and self.config_anal["do_mc"]:
             raise RuntimeError("Conflicted - do I get errors from mc or from amplitude source?")
+        if self.config_anal["amplitude_source"] == None and not self.config_anal["do_mc"]:
+            raise RuntimeError("No source for errors was selected - abort")
         if self.config_anal["amplitude_source"] == None:
             return 
         fin = open(self.config_anal["amplitude_source"])
@@ -624,25 +632,30 @@ class AmplitudeAnalysis(object):
 
     root_objects = []
 
-def do_amplitude_analysis(config, config_anal, data_loader):
-    print "Doing amplitude"
-    amp_anal = AmplitudeAnalysis(config, config_anal)
-    reco_us, reco_ds, all_mc_us, all_mc_ds, reco_mc_us, reco_mc_ds = amp_anal.make_bunches(data_loader)
-    amp_anal.load_errors()
-    amp_anal.delta_amplitude_calc(reco_us, reco_ds, "reco")
-    amp_anal.field_uncertainty_calc("all_upstream")
-    amp_anal.field_uncertainty_calc("all_downstream")
-    if config_anal["do_mc"]:
-        amp_anal.delta_amplitude_calc(all_mc_us, all_mc_ds, "all_mc")
-        amp_anal.delta_amplitude_calc(reco_mc_us, reco_mc_ds, "reco_mc")
-        amp_anal.systematics_calc("all_upstream")
-        amp_anal.systematics_calc("all_downstream")
-    if config_anal["do_mc"]:
-        for target in "all_upstream", "all_downstream":
-            amp_anal.systematics_plot(target)
-        for suffix in ["reco_mc", "all_mc"]:
-            amp_anal.delta_amplitude_plot(suffix)
-    for suffix in ["reco"]:
-        amp_anal.delta_amplitude_plot(suffix)
-    amp_anal.print_data()
+    def birth(self):
+        self.load_errors()
+        self.append_data()
+
+    def process(self):
+        self.append_data()
+
+    def death(self):
+        self.delta_amplitude_calc("reco")
+        self.field_uncertainty_calc("all_upstream")
+        self.field_uncertainty_calc("all_downstream")
+        if self.config_anal["do_mc"]:
+            self.delta_amplitude_calc("all_mc")
+            self.delta_amplitude_calc("reco_mc")
+            self.systematics_calc("all_upstream")
+            self.systematics_calc("all_downstream")
+        if self.config_anal["do_mc"]:
+            for target in "all_upstream", "all_downstream":
+                self.systematics_plot(target)
+            for suffix in ["reco_mc", "all_mc"]:
+                self.delta_amplitude_plot(suffix)
+                self.amplitude_scatter_plot(suffix)
+        for suffix in ["reco"]:
+            self.delta_amplitude_plot(suffix)
+            self.amplitude_scatter_plot(suffix)
+        self.print_data()
 

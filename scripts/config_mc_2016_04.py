@@ -12,7 +12,7 @@ def reco_file_names(run_number_list, maus):
         file_list.append(a_file)
     return file_list
 
-def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
+def get_analysis(job_name, name, tof01_max, data_dir):
     plot_dir = data_dir+"plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     return {
@@ -37,9 +37,9 @@ def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
             "amplitude_source":None,
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
-            "do_amplitude":False,
+            "do_amplitude":True,
             "do_extrapolation":False, #name == "3-140+M3-Test2",
-            "do_mc":False, #True,
+            "do_mc":True, #True,
             "do_plots":True,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":None, #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
@@ -50,7 +50,7 @@ def get_analysis(job_name, name, tof01_max, maus_version, data_dir):
 class Config(object):
     geometry = "Test.dat" #"geometry_08681/ParentGeometryFile.dat" 
     # location to which data and plots will be dumped following analysis
-    data_dir = "output/2016-04_1.2_mc_ds-cuts/"
+    data_dir = "output/2016-04_1.2_mc/"
     info_file = "geometry_08681/Maus_Information.gdml"
     will_require_tof1 = True # require at least one TOF1 Space point to even load the data
     will_require_tof2 = False # require at least one TOF2 Space point to even load the data
@@ -77,7 +77,7 @@ class Config(object):
           "chi2_ds":False,
           "tof01":True,
           "tof12":False,
-          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
+          "delta_tof01":False, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "p_tot_us":True,
           "p_tot_ds":False,
@@ -98,7 +98,9 @@ class Config(object):
     #analyses.append(get_analysis("rogers/data_8685_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br12.87_W8.4_hi-stats/*", "10-140 MC", 30, "MAUS-v2.8.2", data_dir))
     #analyses.append(get_analysis("rogers/data_8699_franchini_scale-d1=1.02_d2=1.02_ds=1.0_Br2.0_W1.6_hi-stats//*", "6-140 MC", 31, "MAUS-v2.8.2", data_dir))
     #analyses.append(get_analysis("franchini/", "3-140 MC Franchini", 32, "MAUS-v2.8.2", data_dir))
-    analyses.append(get_analysis("000056/0000?", "3-140 MC TestAbstraction1", 32, "MAUS-v2.8.2", data_dir)) #
+    analyses.append(get_analysis("000068/00???", "6-140 MC", 31, data_dir)) #
+    analyses.append(get_analysis("000067/00???", "10-140 MC", 30, data_dir)) #
+    analyses.append(get_analysis("000056/00???", "3-140 MC", 32, data_dir)) #
     #analyses.append(get_analysis("franchini/", "3-140 MC TestAbstraction2", 32, "MAUS-v2.8.2", data_dir)) #
     amplitude_bin_width = 5
 
@@ -108,7 +110,7 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    preanalysis_number_of_spills = 3 # number of spills to analyse during "pre-analysis"
+    preanalysis_number_of_spills = 10 # number of spills to analyse during "pre-analysis"
     analysis_number_of_spills = 10 # number of spills to analyse during each "analysis" step
     number_of_spills = None # maximum number of spills to analyse for each sub-analysis
     momentum_from_tracker = True # i.e. not from TOFs

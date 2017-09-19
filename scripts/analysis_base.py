@@ -16,6 +16,7 @@ class AnalysisBase(object):
             new_plot["canvas"] = xboa.common.make_root_canvas(name)
             new_plot["histograms"] = {}
             new_plot["graphs"] = {}
+            new_plot["misc"] = {}
             self.plots[name] = new_plot
             print "Adding canvas", name
         self.plots[name]["canvas"].cd()
@@ -37,8 +38,9 @@ class AnalysisBase(object):
     def print_plots(self):
         for name, my_plot in self.plots.iteritems():
             print "Printing canvas", name
-            my_plot["canvas"].Update()
+            my_plot["canvas"].cd()
             my_plot["canvas"].Draw()
+            my_plot["canvas"].Update()
             plot_title = name.replace(" ", "_")
             for format in ["png", "root", "eps"]:
                 my_plot["canvas"].Print(self.plot_dir+"/"+plot_title+"."+format)

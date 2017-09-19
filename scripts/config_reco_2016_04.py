@@ -34,21 +34,21 @@ def get_analysis(run_list, name, tof01_max, maus_version, data_dir, extrap, ampl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":5.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":"output/2016-04_1.2_mc_ds-cuts/plots_"+amplitude_source+"/amplitude.json",
+            "amplitude_source":"output/2016-04_1.2_mc/plots_"+amplitude_source+"/amplitude.json",
             "field_uncertainty":0.02,
             "do_magnet_alignment":False,
-            "do_amplitude":True, #True,
-            "do_extrapolation":False, #name == "3-140+M3-Test2",
+            "do_amplitude":True,
+            "do_extrapolation":False,
             "do_mc":False,
             "do_plots":True,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
-            "csv_output_filename":None, #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
+            "csv_output_filename":"test", #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
             "extrapolation_source":extrap
         }
 
 
 class Config(object):
-    geometry = "geometry_08681/ParentGeometryFile.dat" #"Test.dat" # "geometry_08681/ParentGeometryFile.dat" #
+    geometry = "geometry_08681/ParentGeometryFile.dat" #
     # location to which data and plots will be dumped following analysis
     data_dir = "output/2016-04_1.2_reco/"
     info_file = "geometry_08681/Maus_Information.gdml"
@@ -66,7 +66,7 @@ class Config(object):
           "scifi_nan_us":True,
           "scifi_track_points_us":False,
           "aperture_us":False,
-          "pvalue_us":True,
+          "pvalue_us":False,
           "chi2_us":True,
           "aperture_ds":False,
           "scifi_tracks_ds":False,
@@ -87,16 +87,16 @@ class Config(object):
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = True
     downstream_cuts["pvalue_ds"] = False
-    downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
-    downstream_cuts["scifi_tracks_ds"] = True
-    downstream_cuts["scifi_nan_ds"] = True
     downstream_cuts["chi2_ds"] = True
+    downstream_cuts["tof12"] = True # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
+    downstream_cuts["scifi_nan_ds"] = True
+    downstream_cuts["scifi_tracks_ds"] = True
     extrapolation_cuts = upstream_cuts
 
     analyses = []
-    analyses.append(get_analysis([8681], "3-140 v2.8.5", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC"))
-    #analyses.append(get_analysis([8699], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
-    #analyses.append(get_analysis([8685], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
+    analyses.append(get_analysis([8699, 8644, 8651, 8652, 8665, 8667, 8676, 8679, 8682], "6-140", 31., "MAUS-v2.8.5", data_dir, "tku_tp", "6-140_MC"))
+    analyses.append(get_analysis([8685, 8645, 8653, 8677, 8680, 8683, 8687, 8689, 8691, 8692, 8693], "10-140", 30., "MAUS-v2.8.5", data_dir, "tku_tp", "10-140_MC"))
+    analyses.append(get_analysis([8681, 8643, 8650, 8664, 8675, 8678, 8684, 8686, 8688, 8690, 8694, 8695, 8696, 8697, 8698, 8709], "3-140", 32, "MAUS-v2.8.5", data_dir, "tku_tp", "3-140_MC"))
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -107,6 +107,8 @@ class Config(object):
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
     number_of_spills = None #100 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
 

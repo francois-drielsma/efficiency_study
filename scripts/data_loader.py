@@ -27,6 +27,7 @@ class DataLoader(object):
         self.start_time = time.time()
 
         self.this_file_name = "a"
+        self.this_file_number = -1
         self.this_root_file = None
         self.this_run = 0
         self.this_spill = 0
@@ -66,18 +67,26 @@ class DataLoader(object):
     def next_file(self):
         try:
             self.this_file_name = self.file_name_list.pop(0)
-            print "Loading ROOT file", self.this_file_name
+            self.this_file_number += 1
+            print "Loading ROOT file", self.this_file_name, self.this_file_number
         except IndexError:
             self.this_file_name = ""
             print "No more files to load"
         self.this_tree = None
         self.this_daq_event = 0
 
+    def check_spill_count(self):
+        return self.spill_count < self.config.number_of_spills or \
+               self.config.number_of_spills == None
+
     def load_spills(self, number_of_daq_events):
         load_spills_daq_event = 0 # number of daq events loaded during this call
                                   # to load_spills
         self.load_new_file()
-        while load_spills_daq_event < number_of_daq_events and self.this_file_name != "" and self.this_tree != None:
+        while load_spills_daq_event < number_of_daq_events and \
+              self.this_file_name != "" and \
+              self.this_tree != None and \
+              self.check_spill_count():
             sys.stdout.flush()
             if self.this_file_name == "" or self.this_tree == None:
                 break # ran out of files
@@ -85,7 +94,7 @@ class DataLoader(object):
             while self.this_daq_event < self.this_tree.GetEntries() and \
                   load_spills_daq_event < number_of_daq_events:
                 new_t = time.time()
-                if new_t - old_t > 10.:
+                if new_t - old_t > 60.:
                     print "Spill", self.this_daq_event, "Time", round(new_t - self.start_time, 2)
                     old_t = new_t
                     sys.stdout.flush()
@@ -97,12 +106,15 @@ class DataLoader(object):
             if self.this_daq_event >= self.this_tree.GetEntries():
                 self.next_file()
                 self.load_new_file()
-            print "  ...loaded", self.spill_count, "'physics_event' spills and", self.event_count, "events"
+            print "  ...loaded", load_spills_daq_event, "'daq events'", self.spill_count, "'physics_event' spills and", self.event_count,"events",
+            if self.this_tree != None:
+                print " at", self.this_daq_event, "/", self.this_tree.GetEntries(), "spills from file", self.this_file_name, self.this_run
+            else:
+                print
             sys.stdout.flush()
         self.this_root_file.Close()
         self.this_tree = None
         self.update_cuts()
-
         # return True if there are more events
         return self.this_file_name != ""
 
@@ -120,7 +132,7 @@ class DataLoader(object):
                 continue
 
     def load_one_spill(self, spill):
-        self.this_run = spill.GetRunNumber()
+        self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
         self.run_numbers.add(self.this_run)
         self.this_spill = spill.GetSpillNumber()
         if spill.GetDaqEventType() == "physics_event":
@@ -136,6 +148,7 @@ class DataLoader(object):
                     pass
                 if event == None: # missing TOF1 - not considered further
                     continue 
+                event["run"] = self.this_run
                 self.event_count += 1
                 event["spill"] = spill.GetSpillNumber()
                 self.events.append(event)
@@ -145,6 +158,7 @@ class DataLoader(object):
                 for hit in event["data"]:
                     hit["hit"]["event_number"] = ev_number
                     hit["hit"]["spill"] = spill.GetSpillNumber()
+                    hit["hit"]["particle_number"] = self.this_run
 
     def load_mc_event(self, loaded_event, mc_event):
         # mc load functions return a list of hits
@@ -605,7 +619,7 @@ class DataLoader(object):
         for x in float_list:
             if math.isnan(x) or math.isinf(x) or x != x:
                 raise ZeroDivisionError("Nan found in tracker: "+str(float_list))
-            #if x > 150.:
+            #if x > 150.:load_file
             #    raise ValueError("Tracker recon out of range: "+str(float_list))
 
     def tm_data(self, event):
