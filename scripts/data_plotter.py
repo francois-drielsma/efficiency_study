@@ -434,11 +434,15 @@ class DataPlotter(AnalysisBase):
 
     @classmethod
     def make_ellipse_graph(cls, means, matrix, line_color):
-        shell = xboa.common._common.make_shell(31, numpy.array(matrix))
-        shell = [item.tolist()[0] for item in shell]
-        shell = sorted(shell, key = lambda x: math.atan2(x[1], x[0]))
-        x_list = [item[0]+means[0] for item in shell]
-        y_list = [item[1]+means[1] for item in shell]
+        try:
+            shell = xboa.common._common.make_shell(31, numpy.array(matrix))
+            shell = [item.tolist()[0] for item in shell]
+            shell = sorted(shell, key = lambda x: math.atan2(x[1], x[0]))
+            x_list = [item[0]+means[0] for item in shell]
+            y_list = [item[1]+means[1] for item in shell]
+        except Exception:
+            x_list = [0.]
+            y_list = [0.]
         hist, graph = xboa.common.make_root_graph("ellipse", x_list, "", y_list, "", sort = False)
         graph.SetLineColor(line_color)
         return graph
@@ -475,6 +479,8 @@ class DataPlotter(AnalysisBase):
                 this_mean[i] += data[i]
                 for j in range(i, n_var):
                     this_matrix[i][j] += data[i]*data[j]
+        if m_events+n_events == 0:
+            return
 
         # update the main ellipse
         for i in range(n_var):
