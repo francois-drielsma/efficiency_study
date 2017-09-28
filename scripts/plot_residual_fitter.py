@@ -2,7 +2,7 @@ import json
 
 import ROOT
 import xboa.common as common
-import config_reco_2016_04_magnet_alignment as config_file
+#import config_reco_2016_04_magnet_alignment as config_file
 
 ROOT_OBJECTS = []
 

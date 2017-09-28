@@ -36,7 +36,7 @@ def fit_peak_data(data, nsigma=3, frac_guess=0.99):
     fit = fit_peak(hist, nsigma)
     return fit
 
-def fit_peak(hist, nsigma=3):
+def fit_peak(hist, nsigma=3, fit_option="Q", draw_option=""):
     mean = hist.GetBinCenter(hist.GetMaximumBin())
     sigma = hist.GetRMS()
     name = hist.GetName()
@@ -49,12 +49,12 @@ def fit_peak(hist, nsigma=3):
         sigma = fit.GetParameter(2)
         
     fit = ROOT.TF1(name+"_fit", "gaus")
-    fit.SetLineColor(1)
+    #fit.SetLineColor(1)
     #fit.SetLineStyle(3)
     fit.SetLineWidth(2)
     fit.SetLineColor(hist.GetLineColor())
     ROOT_OBJECTS.append(fit)
-    hist.Fit(fit, "Q", "", mean-nsigma*sigma, mean+nsigma*sigma)
+    hist.Fit(fit, fit_option, draw_option, mean-nsigma*sigma, mean+nsigma*sigma)
     return fit
 
 text_boxes = []

@@ -48,7 +48,7 @@ def main():
     print "Generating some data"
     #my_file_name = "/home/cr67/MAUS/work/reco/mc/rogers/data_0.62_0.30_v2.8.0/0/maus_output.root"
     #my_file_name = "/home/cr67/MAUS/work/reco/other/08448/08448_recon.root"
-    my_file_name = "/home/cr67/MAUS/work/reco/MAUS-v2.8.2/08681/08681_recon.root"
+    my_file_name = "/home/cr67/work/reco/MAUS-v2.9.1/09628/09628_recon.root"
     n_spills = None
     #target_pid = 211
     target_station = 2

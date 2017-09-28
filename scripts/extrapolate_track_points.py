@@ -45,8 +45,8 @@ class ExtrapolateTrackPoints(AnalysisBase):
                     print "o"
 
     def birth(self):
-        print "Doing extrapolation using model:"
-        print "  ", self.tracking.geometry_model_string()
+        #print "Doing extrapolation using model:"
+        #print "  ", self.tracking.geometry_model_string()
         sys.stdout.flush()
         self.setup_csv()
         self.birth_misses()

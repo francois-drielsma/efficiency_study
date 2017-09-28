@@ -20,6 +20,7 @@ def get_time_sum(run_list):
     return hours, minutes
 
 def parse_one_setting(run_list):
+    run_list = [run for run in run_list if run > 2000]
     tof1_triggers = get_tof_triggers_sum("ToF1 Triggers", run_list)
     tof2_triggers = get_tof_triggers_sum("ToF2 Triggers", run_list)
     lmc1234 = get_tof_triggers_sum("LMC-1234 Count", run_list)
@@ -30,4 +31,4 @@ def parse_one_setting(run_list):
 # +ao    118 11575/20535 0.564
 
 if __name__ == "__main__":
-    print parse_one_setting([8526] )
+    print parse_one_setting([9620] )

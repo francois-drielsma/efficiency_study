@@ -3,6 +3,7 @@ import glob
 import itertools
 import math
 import time
+import bisect
 
 import ROOT
 import libMausCpp
@@ -22,6 +23,7 @@ class DataLoader(object):
         self.file_name_list = []
 
         self.spill_count = 0
+        self.suspect_spill_count = 0
         self.event_count = 0
         self.accepted_count = 0
         self.start_time = time.time()
@@ -124,6 +126,7 @@ class DataLoader(object):
             self.this_root_file = ROOT.TFile(self.this_file_name, "READ") # pylint: disable = E1101
             self.this_data = ROOT.MAUS.Data() # pylint: disable = E1101
             self.this_tree = self.this_root_file.Get("Spill")
+            self.this_run = None
             try:
                 self.this_tree.SetBranchAddress("data", self.this_data)
             except AttributeError:
@@ -132,9 +135,15 @@ class DataLoader(object):
                 continue
 
     def load_one_spill(self, spill):
+        old_this_run = self.this_run
         self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
         self.run_numbers.add(self.this_run)
         self.this_spill = spill.GetSpillNumber()
+        if old_this_run != None and old_this_run != self.this_run:
+            print "WARNING: run number changed from", old_this_run, "to", self.this_run,
+            print "in file", self.this_file_name, "daq event", self.this_daq_event,
+            print "spill", spill.GetSpillNumber(), "n recon events", spill.GetReconEvents().size(), "<------------WARNING"
+            self.suspect_spill_count += 1
         if spill.GetDaqEventType() == "physics_event":
             self.spill_count += 1
             for ev_number, reco_event in enumerate(spill.GetReconEvents()):
@@ -383,7 +392,9 @@ class DataLoader(object):
             }
             space_points_out.append({
               "hit":Hit.new_from_dict(sp_dict),
-              "detector":["tku_sp_", "tkd_sp_"][space_point.get_tracker()]
+              "detector":["tku_sp_", "tkd_sp_"][space_point.get_tracker()],
+              "n_channels":space_point.get_channels().GetEntries(),
+              "is_used":space_point.is_used(),
             })
             space_points_out[-1]["detector"] += str(space_point.get_station())
         return space_points_out
@@ -563,6 +574,60 @@ class DataLoader(object):
                                 track.chi2()/track.ndf() > self.config_anal["chi2_threshold"]
         return will_cut
 
+    def virtual_detector_lookup(self, z_pos):
+        det_list = self.config.virtual_detectors
+        detector = bisect.bisect_left(det_list, (z_pos, None, ""))
+        if detector == 0:
+            det_pos, dummy, det_name = det_list[detector]
+        elif detector == len(det_list):
+            det_pos, dummy, det_name = det_list[-1]
+        elif det_list[detector][0] - z_pos < z_pos - det_list[detector-1][0]:
+            det_pos, dummy, det_name = det_list[detector]
+        else:
+            det_pos, dummy, det_name = det_list[detector-1]
+        if abs(z_pos - det_pos) > 3:
+            print "Could not find virtual detector for z_pos", z_pos, "from"
+            for det in det_list:
+                print "   ", det
+            raise RuntimeError("Could not find virtual detector")
+        return det_name
+
+    def load_global_event(self, global_event):
+        virtual = 1
+        pid = self.config_anal["pid"]
+        track_points_out = []
+        mass = xboa.common.pdg_pid_to_mass[abs(pid)]
+        for track in global_event.get_tracks():
+            #if track.get_pid() != pid:
+            #    print "load_global_event::pid fail", track.get_pid()
+            #    continue
+            for track_point in track.GetTrackPoints(virtual):
+                pos = track_point.get_position()
+                mom = track_point.get_momentum()
+                if abs(mom.Mag2() - mass**2) > 0.1:
+                    break # next track please
+                tp_dict = {
+                  "x":pos.X(),
+                  "y":pos.Y(),
+                  "z":pos.Z(),
+                  "t":pos.T(),
+                  "px":mom.X(),
+                  "py":mom.Y(),
+                  "pz":mom.Z(),
+                  "energy":mom.T(),
+                  "pid":pid,
+                  "mass":mass,
+                }
+                detector = self.virtual_detector_lookup(pos.Z())
+                try:
+                    self.nan_check(tp_dict.values())
+                except:
+                    continue
+                track_points_out.append({
+                  "hit":Hit.new_from_dict(tp_dict, "energy"),
+                  "detector":detector,
+                })
+        return track_points_out, {}
 
     def load_reco_event(self, reco_event):
         tof_event = reco_event.GetTOFEvent()
@@ -576,10 +641,11 @@ class DataLoader(object):
             if "tof2" not in tofs and self.config.will_require_tof2:
                 return None
         scifi_loaded = self.load_scifi_event(scifi_event)
-        event = {"data":sorted(scifi_loaded[0]+tof_loaded[0], key = lambda tp: tp['hit']['z'])}
+        global_loaded = self.load_global_event(global_event)
+        event = {"data":sorted(scifi_loaded[0]+tof_loaded[0]+global_loaded[0], key = lambda tp: tp['hit']['z'])}
         event["particle_number"] = reco_event.GetPartEventNumber()
         
-        cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems())
+        cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems(), global_loaded[1].iteritems())
         cuts = (elem for elem in cuts_chain)
         event["will_cut"] = dict(cuts) # True means cut the thing
         event = self.tm_data(event)
@@ -668,6 +734,14 @@ class DataLoader(object):
         event["will_cut"]["delta_tof01"] = False # loaded during track extrapolation
         event["will_cut"]["delta_tof12"] = False # loaded during track extrapolation
         return event
+
+    def detector_list(self):
+        all_detectors = set()
+        for event in self.events:
+            detectors = set([hit["detector"] for hit in event["data"]])
+            all_detectors = all_detectors.union(detectors)
+        return sorted(list(all_detectors))
+
 
     cuts = None
 

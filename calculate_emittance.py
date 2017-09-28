@@ -25,7 +25,7 @@ import scripts.mc_plotter
 import scripts.data_plotter
 import scripts.amplitude_analysis
 import scripts.residual_fitter
-import scripts.plot_residual_fitter
+import scripts.globals_plotter
 import scripts.utilities
 import scripts.extrapolate_track_points
 config_file = None
@@ -80,14 +80,17 @@ class Analyser(object):
         self.data_loader = scripts.data_loader.DataLoader(self.config, self.config_anal)
         self.data_loader.get_file_list()
         if self.config_anal["do_extrapolation"]:
-            print "Doing Extrapolation"
+            print "Doing extrapolation"
             self.analysis_list.append(scripts.extrapolate_track_points.ExtrapolateTrackPoints(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_mc"]:
-            print "Doing MC"
+            print "Doing mc"
             self.analysis_list.append(scripts.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_plots"]:
             print "Doing plots"
             self.analysis_list.append(scripts.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_globals"]:
+            print "Doing globals"
+            self.analysis_list.append(scripts.globals_plotter.GlobalsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_amplitude"]:
             print "Doing amplitude"
             self.analysis_list.append(scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
