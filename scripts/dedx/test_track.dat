@@ -1,0 +1,15 @@
+Configuration Test
+{
+    PropertyString Material Galactic
+    PropertyHep3Vector Dimensions 1000. 1000. 1000. m
+    MiceModule Field
+    {
+        Volume None
+        PropertyString FieldType RectangularField
+        PropertyHep3Vector ConstantField 0.0 0.0 3.0 T
+        PropertyDouble Width 1000. m
+        PropertyDouble Height 1000. m
+        PropertyDouble Length 1000. m
+    }
+
+}
