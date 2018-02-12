@@ -17,17 +17,14 @@ import maus_cpp.polynomial_map
 import libxml2
 
 import scripts.amplitude_analysis
-from scripts.tm_calculator import TMCalculator
-from scripts.data_plotter import DataPlotter
-from scripts.tm_calculator import TOF12Predicate
 import scripts.data_loader
 import scripts.mc_plotter
 import scripts.data_plotter
+import scripts.cuts_plotter
 import scripts.amplitude_analysis
-import scripts.residual_fitter
 import scripts.globals_plotter
+import scripts.optics_plotter
 import scripts.utilities
-import scripts.extrapolate_track_points
 config_file = None
 
 class Analyser(object):
@@ -44,13 +41,21 @@ class Analyser(object):
         self.maus_globals(self.config)
         self.analysis_list = []
 
-    def do_analysis(self):
-        for i, self.config_anal in enumerate(self.config.analyses):
-            self.init_phase()
-            self.birth_phase()
-            self.process_phase()
-            self.print_phase()
-            self.finalise_phase()
+    def do_analysis(self, analysis_indices = []):
+        if analysis_indices == None:
+            analysis_indices = range(len(self.config.analyses))
+        for i in analysis_indices:
+            if i >= len(self.config.analyses):
+                continue
+            self.config_anal = self.config.analyses[i]
+            try:
+                self.init_phase()
+                self.birth_phase()
+                self.process_phase()
+                self.print_phase()
+                self.finalise_phase()
+            except Exception:
+                sys.excepthook(*sys.exc_info())
 
     def maus_globals(self, config):
         try:
@@ -79,18 +84,22 @@ class Analyser(object):
     def init_phase(self):
         self.data_loader = scripts.data_loader.DataLoader(self.config, self.config_anal)
         self.data_loader.get_file_list()
-        if self.config_anal["do_extrapolation"]:
-            print "Doing extrapolation"
-            self.analysis_list.append(scripts.extrapolate_track_points.ExtrapolateTrackPoints(self.config, self.config_anal, self.data_loader))
+        self.analysis_list = [] # force kill any analysis scripts in case death(...) did not happen in previous round
         if self.config_anal["do_mc"]:
             print "Doing mc"
             self.analysis_list.append(scripts.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_plots"]:
             print "Doing plots"
             self.analysis_list.append(scripts.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_cuts_plots"]:
+            print "Doing cuts plots"
+            self.analysis_list.append(scripts.cuts_plotter.CutsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_globals"]:
             print "Doing globals"
             self.analysis_list.append(scripts.globals_plotter.GlobalsPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_optics"]:
+            print "Doing optics"
+            self.analysis_list.append(scripts.optics_plotter.OpticsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_amplitude"]:
             print "Doing amplitude"
             self.analysis_list.append(scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
@@ -123,12 +132,14 @@ class Analyser(object):
     def finalise_phase(self):
         self.analysis_list = []
         self.data_loader = None
+        print "Finished ", self.config_anal["name"], "writing results to", self.config_anal["plot_dir"]
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print "Usage: python calculate_emittance.py </path/to/config/script>"
+    if len(sys.argv) < 2:
+        print "Usage: python calculate_emittance.py </path/to/config/script> [analyses list]"
         sys.exit(1)
     analyser = Analyser()
-    analyser.do_analysis()
+    analysis_indices = [int(i) for i in sys.argv[2:]]
+    analyser.do_analysis(analysis_indices)
     print "Done - press <CR> to finish"
 

@@ -19,13 +19,13 @@ class MCPlotter(AnalysisBase):
         self.failed_pids = {}
 
     def birth(self):
-        for key in self.config.mc_plots["mc_stations"].keys():
-            self.mc_stations[key] = self.config.mc_plots["mc_stations"][key][0]
+        self.set_plot_dir("mc_plots")
+        self.mc_stations = self.config.mc_plots["mc_stations"]
         pid_colors = {211:2, -13:4, -11:8, +11:ROOT.kGray}
-        for detector in ["tkd", "tku"]:
-            station = self.config.mc_plots["mc_stations"][detector][0]
-            virt_station = "mc_virtual_"+str(station)
-            self.birth_var_one_d("p_at_"+virt_station, virt_station, "pid", "p", pid_colors, True, 0., 300.)
+        for detector, virt_station_list in self.mc_stations.iteritems():
+            virt_station = virt_station_list[0]
+            self.birth_var_one_d("p_at_"+virt_station, virt_station, "pid", "p", pid_colors, "us cut", 0., 300.)
+            self.birth_var_one_d("r_at_"+virt_station, virt_station, "pid", "r", pid_colors, "us cut", 0., 300.)
             self.birth_var_two_d_scatter("x_vs_px_at_"+virt_station, virt_station, "pid", "x", "px", pid_colors, True)
         self.birth_var_two_d_scatter("x_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "x", pid_colors)
         self.birth_var_two_d_scatter("y_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "y", pid_colors)
@@ -57,31 +57,37 @@ class MCPlotter(AnalysisBase):
         print "   ", self.failed_pids
         self.print_plots()
 
-    def get_data_var_one_d(self, name, *args):
+    def get_data_var_one_d(self, detector, slice_variable, plot_variable, cuts):
         track_final = {}
+        cut_lambda = {
+            "all":lambda event: False,
+            "us cut":lambda event: event["upstream_cut"],
+            "ds cut":lambda event: event["downstream_cut"],
+        }[cuts]
         for event in self.data_loader.events:
-            if args[5] and event["any_cut"]:
+            if cut_lambda(event):
                 continue
             for detector_hit in event["data"]:
-                if detector_hit["detector"] != args[0]:
+                if detector_hit["detector"] != detector:
                     continue
-                slice_var = detector_hit["hit"][args[1]]
-                plot_var = detector_hit["hit"][args[2]]
+                slice_var = detector_hit["hit"][slice_variable]
+                plot_var = detector_hit["hit"][plot_variable]
                 if slice_var not in track_final:
                     track_final[slice_var] = []
                 track_final[slice_var].append(plot_var)
+                break
         all_list = []
         for value in track_final.values():
             all_list += value
         return (all_list, track_final)
 
-    def process_var_one_d(self, name, *args):
-        all_list, track_final = self.get_data_var_one_d(name, *args)
+    def process_var_one_d(self, name, detector, slice_variable, plot_variable, color_dict, cuts):
+        all_list, track_final = self.get_data_var_one_d(detector, slice_variable, plot_variable, cuts)
         for item in all_list:
             self.plots[name]["histograms"]["all"].Fill(item)
         for i, key in enumerate(sorted(track_final.keys())):
             hist_dict = self.plots[name]["histograms"]
-            plot_name = str(args[1])+" = "+str(key)
+            plot_name = str(slice_variable)+" = "+str(key)
             if plot_name not in hist_dict:
                 if key not in self.failed_pids:
                     self.failed_pids[key] = 0
@@ -90,10 +96,12 @@ class MCPlotter(AnalysisBase):
             for item in track_final[key]:
                 hist_dict[plot_name].Fill(item)
 
-    def birth_var_one_d(self, canvas_name, detector, slice_variable, plot_variable, color_dict, cuts = False, xmin = None, xmax = None):
-        all_list, track_final = self.get_data_var_one_d(canvas_name, detector, slice_variable, plot_variable, color_dict, cuts, xmin, xmax)
+    def birth_var_one_d(self, canvas_name, detector, slice_variable, plot_variable, color_dict, cuts = "all", xmin = None, xmax = None):
+        all_list, track_final = self.get_data_var_one_d(detector, slice_variable, plot_variable, cuts)
         hist = self.make_root_histogram(canvas_name, "all", all_list, plot_variable+" at "+detector, 100, [], '', 0, [], xmin, xmax)
+        hist.SetMarkerStyle(26)
         hist.Draw("P")
+        hist.SetStats(True)
         for i, key in enumerate(sorted(track_final.keys())):
             var_list = track_final[key]
             name = slice_variable+" = "+str(key)
@@ -104,13 +112,13 @@ class MCPlotter(AnalysisBase):
                 hist.SetMarkerColor(color_dict[key])
             hist.Draw("SAMEP")
         self.plots[canvas_name]["canvas"].SetLogy()
-        self.plots[canvas_name]["canvas"].BuildLegend()
-        self.process_args[canvas_name] = [self.process_var_one_d, (detector, slice_variable, plot_variable, color_dict, cuts, xmin, xmax)]
+        #self.plots[canvas_name]["canvas"].BuildLegend()
+        self.process_args[canvas_name] = [self.process_var_one_d, (detector, slice_variable, plot_variable, color_dict, cuts)]
 
     def get_data_var_two_d_scatter(self, name, *args):
         track_final = {}
         for event in self.data_loader.events:
-            if args[5] and event["any_cut"]:
+            if args[5] and event["downstream_cut"]:
                 continue
             for detector_hit in event["data"]:
                 if detector_hit["detector"] != args[0]:
@@ -198,11 +206,10 @@ class MCPlotter(AnalysisBase):
             for format in ["png", "eps", "root"]:
                 canvas.Print(self.plot_dir+"/mc_residual_"+suffix+"_"+var+"."+format)
 
-    def get_data_detector_residuals(self, tracker, station):
+    def get_data_detector_residuals(self, tracker, virt_name):
         residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
-        virt_name = "mc_virtual_"+str(station)
         for event in self.data_loader.events:
-            if event["any_cut"]:
+            if event["downstream_cut"]:
                 continue
             if event[tracker] == None:
                 continue
@@ -216,7 +223,8 @@ class MCPlotter(AnalysisBase):
         return residual_dict
 
     def process_data_detector_residuals(self):
-        for detector, virtual_station in self.mc_stations.iteritems():
+        for detector, virtual_station_list in self.mc_stations.iteritems():
+            virtual_station = virtual_station_list[0]
             residual_dict = self.get_data_detector_residuals(detector, virtual_station)
             for var in sorted(residual_dict.keys()):
                 canvas_name = "mc_residual_"+detector+"_"+var
@@ -226,11 +234,17 @@ class MCPlotter(AnalysisBase):
                     hist.Fill(item)
 
     def birth_data_detector_residuals(self):
-        for detector, virtual_station in self.mc_stations.iteritems():
+        for detector, virtual_station_list in self.mc_stations.iteritems():
+            virtual_station = virtual_station_list[0]
             residual_dict = self.get_data_detector_residuals(detector, virtual_station)
             for var in sorted(residual_dict.keys()):
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]
+                if len(data) == 0:
+                    for det in self.data_loader.detector_list():
+                        print "   ", det
+                    raise RuntimeError("Failed to find residual data for "+var+" "+detector+" "+virtual_station)
+                print detector, virtual_station, var
                 xmin, xmax = scripts.utilities.fractional_axis_range(data, 0.95)
                 hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()

@@ -58,13 +58,13 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
 
             "do_magnet_alignment":False,
             "do_extrapolation":False,
-            "do_globals":False, #do_globals,
+            "do_globals":do_globals,
             "do_mc":False,
-            "do_amplitude":False, #True,
-            "do_plots":False, #True,
+            "do_amplitude":True,
+            "do_plots":True,
             "do_cuts_plots":True,
             "do_tof01_weighting":False,
-            "do_optics":False, #True,
+            "do_optics":True,
     }
 
 
@@ -171,7 +171,7 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = 1000 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
     preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
     analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs

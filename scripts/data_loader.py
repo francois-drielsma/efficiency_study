@@ -11,6 +11,7 @@ import libMausCpp
 import xboa.common
 from xboa.hit import Hit
 
+import utilities
 # Fix tracker cuts!
 
 class DataLoader(object):
@@ -23,6 +24,7 @@ class DataLoader(object):
         self.file_name_list = []
 
         self.spill_count = 0
+        self.global_count = 0
         self.suspect_spill_count = 0
         self.event_count = 0
         self.accepted_count = 0
@@ -38,6 +40,9 @@ class DataLoader(object):
         self.this_tree = None
         self.all_root_files = [None] # f@@@ing root deletes histograms randomly if I let files go out of scope
 
+        self.time_offsets = {"tof0":self.config.tof0_offset,
+                            "tof1":self.config.tof1_offset,
+                            "tof2":self.config.tof2_offset}
         self.events = []
 
     def get_det_pos(self):
@@ -60,8 +65,9 @@ class DataLoader(object):
             self.file_name_list += glob.glob(fname)
         self.file_name_list = sorted(self.file_name_list)
         if len(self.file_name_list) == 0:
-            raise RuntimeError("No files")
-        print "Found", self.file_name_list, "files"
+            raise RuntimeError("No files from "+str(self.config_anal["reco_files"]))
+        print "Found", len(self.file_name_list), "files"
+        print "    ", self.file_name_list[0:3], "...", self.file_name_list[-3:]
         self.next_file()
         self.this_daq_event = 0
         self.spill_count = 0
@@ -80,6 +86,20 @@ class DataLoader(object):
     def check_spill_count(self):
         return self.spill_count < self.config.number_of_spills or \
                self.config.number_of_spills == None
+
+    def check_virtual_fails(self):
+        #print "Found global virtual detectors", self.global_set
+        if len(self.virtual_fail_list) != 0:
+            print "Could not find virtual detector for", len(self.virtual_fail_list)
+            return
+            for fail in self.virtual_fail_list:
+                print "   ", fail,
+            print "  for detectors",
+            for det in self.config.virtual_detectors:
+                print "   ", det,
+            print
+            self.virtual_fail_list = []
+            #raise RuntimeError("Could not find virtual detector")
 
     def load_spills(self, number_of_daq_events):
         load_spills_daq_event = 0 # number of daq events loaded during this call
@@ -109,6 +129,7 @@ class DataLoader(object):
                 self.next_file()
                 self.load_new_file()
             print "  ...loaded", load_spills_daq_event, "'daq events'", self.spill_count, "'physics_event' spills and", self.event_count,"events",
+            print "with", self.global_count, "through going globals",
             if self.this_tree != None:
                 print " at", self.this_daq_event, "/", self.this_tree.GetEntries(), "spills from file", self.this_file_name, self.this_run
             else:
@@ -117,6 +138,7 @@ class DataLoader(object):
         self.this_root_file.Close()
         self.this_tree = None
         self.update_cuts()
+        self.check_virtual_fails()
         # return True if there are more events
         return self.this_file_name != ""
 
@@ -136,7 +158,12 @@ class DataLoader(object):
 
     def load_one_spill(self, spill):
         old_this_run = self.this_run
-        self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
+        try:
+            self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
+        except ReferenceError:
+            print "WARNING: Spill was NULL"
+            self.suspect_spill_count += 1
+            return
         self.run_numbers.add(self.this_run)
         self.this_spill = spill.GetSpillNumber()
         if old_this_run != None and old_this_run != self.this_run:
@@ -148,8 +175,9 @@ class DataLoader(object):
             self.spill_count += 1
             for ev_number, reco_event in enumerate(spill.GetReconEvents()):
                 self.this_event = reco_event.GetPartEventNumber()
+                event = None
                 try:
-                    event = self.load_reco_event(reco_event)
+                    event = self.load_reco_event(reco_event, spill.GetSpillNumber())
                 except ValueError:
                     #sys.excepthook(*sys.exc_info())
                     print "spill", spill.GetSpillNumber(), "particle_number", reco_event.GetPartEventNumber()
@@ -168,6 +196,7 @@ class DataLoader(object):
                     hit["hit"]["event_number"] = ev_number
                     hit["hit"]["spill"] = spill.GetSpillNumber()
                     hit["hit"]["particle_number"] = self.this_run
+            #print "Global passes for spill", spill.GetSpillNumber(), ":", self.global_passes
 
     def load_mc_event(self, loaded_event, mc_event):
         # mc load functions return a list of hits
@@ -257,6 +286,23 @@ class DataLoader(object):
         }
         return [loaded_primary]
 
+    global_set = set()
+    def virtual_detector_lookup(self, z_pos):
+        det_list = self.config.virtual_detectors
+        detector = bisect.bisect_left(det_list, (z_pos, None, ""))
+        if detector == 0:
+            det_pos, dummy, det_name = det_list[detector]
+        elif detector == len(det_list):
+            det_pos, dummy, det_name = det_list[-1]
+        elif det_list[detector][0] - z_pos < z_pos - det_list[detector-1][0]:
+            det_pos, dummy, det_name = det_list[detector]
+        else:
+            det_pos, dummy, det_name = det_list[detector-1]
+        my_det = "mc_"+det_name
+        #self.global_set.add(my_det)
+        return my_det
+
+
     def load_virtuals(self, virtual_vector):
         loaded_virtual_vector = [None]*len(virtual_vector)
         #print "Virtuals",
@@ -283,11 +329,9 @@ class DataLoader(object):
             hit.mass_shell_condition('energy')
             loaded_virtual = {
                 "hit":hit,
-                "detector":"mc_virtual_"+str(hit["station"])
+                "detector":self.virtual_detector_lookup(hit["z"])
             }
             loaded_virtual_vector[i] = loaded_virtual
-            #print str(hit["station"])+":"+str(hit["z"]),
-        #print
         return loaded_virtual_vector
 
     def load_tof_mc_hits(self, tof_mc_vector):
@@ -332,15 +376,28 @@ class DataLoader(object):
             "x":tof_sp.GetGlobalPosX(),
             "y":tof_sp.GetGlobalPosY(),
             "z":tof_sp.GetGlobalPosZ(),
-            "t":tof_sp.GetTime(),
+            "t":tof_sp.GetTime()+self.time_offsets[station],
         }
         loaded_sp = {
             "hit":Hit.new_from_dict(sp_dict),
             "detector":station,
             "covariance":cov,
+            "dt":tof_sp.GetDt(),
         }
         return loaded_sp
 
+    def load_n_slabs(self, tof_event):
+        tof_event_slabs = tof_event.GetTOFEventSlabHit()
+        tof0_slabs = [0, 0]
+        tof1_slabs = [0, 0]
+        tof2_slabs = [0, 0]
+        for slab in tof_event_slabs.GetTOF0SlabHitArray():
+            tof0_slabs[slab.GetPlane()] += 1
+        for slab in tof_event_slabs.GetTOF1SlabHitArray():
+            tof1_slabs[slab.GetPlane()] += 1
+        for slab in tof_event_slabs.GetTOF2SlabHitArray():
+            tof2_slabs[slab.GetPlane()] += 1
+        return {"tof0":tof0_slabs, "tof1":tof1_slabs, "tof2":tof2_slabs}
 
     def load_tof_event(self, tof_event):
         space_points = tof_event.GetTOFEventSpacePoint()
@@ -372,7 +429,7 @@ class DataLoader(object):
         return (tof_sp_list, {
             "tof_0_sp":space_points.GetTOF0SpacePointArray().size() != 1,
             "tof_1_sp":space_points.GetTOF1SpacePointArray().size() != 1,
-            "tof_2_sp":space_points.GetTOF2SpacePointArray().size() != 1,
+            "tof_2_sp":len([det for det in detectors if det == "tof2"]) != 1,
             "tof01":tof01_cut,
             "tof12":tof12_cut,
           })
@@ -403,13 +460,14 @@ class DataLoader(object):
         track_points_out = []
         for track in scifi_event.scifitracks():
             detector = ["tku_tp", "tkd_tp"][track.tracker()]
+            this_track_points = []
             for track_point in track.scifitrackpoints():
                 #print track.tracker(), track_point.station(), track_point.pos().z()
                 if track_point.station() != self.config.tk_station or track_point.plane() != self.config.tk_plane:
                     continue
                 position = track_point.pos() # maybe global coordinates?
                 momentum = track_point.mom() # maybe global coordinates?
-                if abs(position.z() - self.det_pos[detector]) > 5.: # detector station is a couple mm thick
+                if abs(position.z() - self.det_pos[detector]) > 10.: # detector station is a couple mm thick
                     det_str = " - detector "+str(detector)+" track pos "+str(position.z())+" det pos "+str(self.det_pos[detector])
                     raise RuntimeError("Track point z position not consistent with config"+det_str)
                 index = 0
@@ -421,7 +479,7 @@ class DataLoader(object):
                     except Exception:
                         #print "\nCov nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event
                         #print "    ", [x for x in track_point.covariance()]
-                        track_points_out.append({
+                        this_track_points.append({
                           "detector":detector+"_nan",
                           "hit":{"z":999},
                         })
@@ -446,22 +504,50 @@ class DataLoader(object):
                     self.nan_check(tp_dict.values())
                 except:
                     #print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
-                    track_points_out.append({
+                    this_track_points.append({
                       "detector":detector+"_nan",
                       "hit":{"z":999},
                     })
                     break
-                track_points_out.append({
+                this_track_points.append({
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
                   "detector":detector,
                   "covariance":cov,
                   "pvalue":track.P_value(),
                   "chi2":track.chi2(),
                   "ndf":track.ndf(),
+                  "max_r2":-99., # maximum radius squared between this track point and the next one in the same tracker
                 })
+            this_track_points = sorted(this_track_points)
+            this_track_points = self.set_max_r(this_track_points)
+            track_points_out += this_track_points
         track_points_out = sorted(track_points_out, key = lambda tp: tp["hit"]["z"])
         return track_points_out
 
+    def get_xyphi(self, a_track_point):
+        # x = x0 + r0 cos(\phi) ## BUG sine vs cosine
+        # y = y0 + r0 sin(\phi)
+        # r^2 = x^2 + y^2 = x0^2+y0^2+r0^2 + 2 r0 [x0 cos(\phi) + y0 sin(\phi)]
+        # dr/dphi = 0 => d(r^2)/dphi = 0 when \phi = \phi_{max}
+        # d(r^2)/dphi = 2 r0 [- x0 sin(\phi_{max}) + y0 cos(\phi_{max})] = 0
+        # => tan(\phi_{max}) = y0/x0
+        return 0., 0., 0.
+
+    def set_max_r(self, track_point_list):
+        for i, tp in enumerate(track_point_list):
+            track_point_list[i]["max_r2"] = tp["hit"]["x"]**2 + tp["hit"]["y"]**2
+        return track_point_list
+        
+    def will_cut_on_scifi_fiducial(self, track_point_list):
+        max_r2 = [-111., -111.]
+        for tp in track_point_list:
+            if "tku" in tp["detector"]:
+                max_r2[0] = max(max_r2[0], tp["max_r2"])
+            else:
+                max_r2[1] = max(max_r2[1], tp["max_r2"])
+        fiducial_r2 = self.config_anal["tracker_fiducial_radius"]**2
+        return [max_r2[0] > fiducial_r2, max_r2[0] > fiducial_r2]
+                
     def load_scifi_event(self, scifi_event):
         will_cut_on_scifi_cluster = self.will_cut_on_scifi_clusters(scifi_event)
         will_cut_on_scifi_space_points = self.will_cut_on_scifi_space_points(scifi_event)
@@ -484,6 +570,7 @@ class DataLoader(object):
             print "NAN?"
             print nan_cut_downstream
             raw_input()
+        will_cut_on_scifi_fiducial = self.will_cut_on_scifi_fiducial(track_points)
         points = space_points + track_points
         return [
             points, {
@@ -491,6 +578,8 @@ class DataLoader(object):
                 "scifi_space_clusters":will_cut_on_scifi_cluster, 
                 "scifi_tracks_us":will_cut_on_scifi_tracks[0],
                 "scifi_tracks_ds":will_cut_on_scifi_tracks[1],
+                "scifi_fiducial_us":will_cut_on_scifi_fiducial[0], # BUG - not finished yet
+                "scifi_fiducial_ds":will_cut_on_scifi_fiducial[1],
                 "scifi_track_points_us":will_cut_on_scifi_track_points[0],
                 "scifi_track_points_ds":will_cut_on_scifi_track_points[1],
                 "scifi_nan_us":len(nan_cut_upstream) != 0,
@@ -550,11 +639,21 @@ class DataLoader(object):
         #else:
         #    return True
 
-    def will_cut_on_scifi_tracks(self, scifi_event):
-        """Require exactly one track in each tracker"""
+    def get_n_tracks(self, scifi_event):
         n_tracks = [0, 0]
         for track in scifi_event.scifitracks():
             n_tracks[track.tracker()] += 1
+        return n_tracks
+
+    def get_n_clusters(self, scifi_event):
+        n_clusters = [0, 0]
+        for cluster in scifi_event.clusters():
+            n_clusters[cluster.get_tracker()] += 1
+        return n_clusters
+
+    def will_cut_on_scifi_tracks(self, scifi_event):
+        """Require exactly one track in each tracker"""
+        n_tracks = self.get_n_tracks(scifi_event)
         n_tracks = [i != 1 for i in n_tracks]
         return n_tracks
 
@@ -567,14 +666,51 @@ class DataLoader(object):
         return will_cut
 
     def will_cut_on_chi2(self, scifi_event):
-        """Require any track in a tracker to have pvalue greater than threshold"""
-        will_cut = [True, True]
+        """Require all tracks in a tracker to have pvalue greater than threshold"""
+        will_cut = [False, False]
         for track in scifi_event.scifitracks():
             will_cut[track.tracker()] = will_cut[track.tracker()] and \
                                 track.chi2()/track.ndf() > self.config_anal["chi2_threshold"]
         return will_cut
 
-    def virtual_detector_lookup(self, z_pos):
+    detectors = {
+        32:"_tof0",
+        33:"_tof0",
+        34:"_tof0",
+        35:"_ckov",
+        36:"_ckov",
+        37:"_tof1",
+        38:"_tof1",
+        39:"_tof1",
+        40:"_tku_tp",
+        41:"_tku_tp",
+        42:"_tku_2",
+        43:"_tku_3",
+        44:"_tku_4",
+        45:"_tku_5",
+        46:"_tkd_tp",
+        47:"_tkd_tp",
+        48:"_tkd_2",
+        49:"_tkd_3",
+        50:"_tkd_4",
+        51:"_tkd_5",
+        52:"_tof2",
+        53:"_tof2",
+        54:"_tof2",
+        55:"_kl",
+        56:"_emr",
+    }
+
+    global_set = set()
+    def global_detector_lookup(self, z_pos, detector_type, prefix):
+        if detector_type == 0:
+            raise KeyError("Failed to recognise global track point with undefined type.")
+        elif detector_type != 1: # 1 is virtual
+            if detector_type not in self.detectors.keys():
+                #print "no id for detector", detector_type
+                return "global_real"
+            return prefix+self.detectors[detector_type]
+        # virtual detectors
         det_list = self.config.virtual_detectors
         detector = bisect.bisect_left(det_list, (z_pos, None, ""))
         if detector == 0:
@@ -585,51 +721,133 @@ class DataLoader(object):
             det_pos, dummy, det_name = det_list[detector]
         else:
             det_pos, dummy, det_name = det_list[detector-1]
-        if abs(z_pos - det_pos) > 3:
-            print "Could not find virtual detector for z_pos", z_pos, "from"
-            for det in det_list:
-                print "   ", det
-            raise RuntimeError("Could not find virtual detector")
-        return det_name
+        #if abs(z_pos - det_pos) > 1.:
+            #self.virtual_fail_list.append(z_pos)
+            #print "Failed to find virtual at", z_pos
+        my_det = prefix+"_"+det_name
+        #self.global_set.add(my_det)
+        return my_det
 
-    def load_global_event(self, global_event):
-        virtual = 1
+    def get_global_prefix(self, track):
+        tku_pos = utilities.detector_position("tku_tp", self.config)
+        tkd_pos = utilities.detector_position("tkd_tp", self.config)
+        has_us, has_ds = False, False
+        for track_point in track.GetTrackPoints():
+            pos = track_point.get_position()
+            has_us = has_us or pos.Z() < tku_pos # needs to clear tku by 100 mm...
+            has_ds = has_ds or pos.Z() > tkd_pos # needs to clear tku by 100 mm...
+        if has_us and has_ds:
+            return "global_through"
+        elif has_us:
+            return "global_us"
+        elif has_ds:
+            return "global_ds"
+        return None # not useful for this analysis
+
+    def get_global_prefix_alt(self, track):
+        tku_pos = utilities.detector_position("tku_tp", self.config)
+        has_us = False
+        has_ds = False
+        print "    global prefix alt",
+        has_us = track.GetTrackPoints()[0].get_position().Z() < tku_pos - 100.
+        has_ds = track.GetTrackPoints().back().get_position().Z() > tku_pos + 100.
+        
+        print
+
+        has_tof1 = track.GetTrackPoints(37).size() > 0
+        has_tku = track.GetTrackPoints(41).size() > 0
+        has_tkd = track.GetTrackPoints(47).size() > 0
+
+        has_us = has_us and has_tof1 and has_tku
+        has_ds = has_ds and has_tkd
+        prefix = None
+        if has_us and has_ds:
+            prefix = "global_through"
+        elif has_us:
+            prefix = "global_us"
+        elif has_ds:
+            prefix = "global_ds"
+        print "    ... prefix allocated:", prefix
+        return prefix # not useful for this analysis
+
+    def load_global_event(self, global_event, verbose = False):
+        # verbose = True
+        cuts = {"upstream_aperture_cut":False, "downstream_aperture_cut":False}
+        match_cuts = ["global_through_tof0", "global_through_tof1", "global_through_tof2",
+                      "global_through_tku_tp", "global_through_tkd_tp",]
+        for a_cut in match_cuts: # require global match of given detector type
+            cuts[a_cut] = True
+        if not verbose:
+            sys.stdout = open("/dev/null", "w")
+        print "Load global event"
         pid = self.config_anal["pid"]
         track_points_out = []
         mass = xboa.common.pdg_pid_to_mass[abs(pid)]
         for track in global_event.get_tracks():
-            #if track.get_pid() != pid:
-            #    print "load_global_event::pid fail", track.get_pid()
-            #    continue
-            for track_point in track.GetTrackPoints(virtual):
+            # we require a TKU hit on the track
+            this_track_points = []
+            prefix = self.get_global_prefix(track)
+            if prefix == None or prefix == "global_us":
+                continue
+            print prefix
+            for track_point in track.GetTrackPoints():
                 pos = track_point.get_position()
                 mom = track_point.get_momentum()
-                if abs(mom.Mag2() - mass**2) > 0.1:
-                    break # next track please
                 tp_dict = {
                   "x":pos.X(),
                   "y":pos.Y(),
                   "z":pos.Z(),
                   "t":pos.T(),
-                  "px":mom.X(),
-                  "py":mom.Y(),
-                  "pz":mom.Z(),
-                  "energy":mom.T(),
                   "pid":pid,
                   "mass":mass,
                 }
-                detector = self.virtual_detector_lookup(pos.Z())
+                if mom.Mag2() > 0.1: # TOF does not have any momentum info stored
+                    if False:# and abs(mom.Mag2()/mass - mass) > 1.0: # mass-shell check DISABLED
+                        print "\nFailed to load track point; failed mass shell check, with", mom.Mag2()**0.5,
+                        print "detector", track_point.get_detector()
+                        continue # next track point please
+                    tp_dict["px"] = mom.X()
+                    tp_dict["py"] = mom.Y()
+                    tp_dict["pz"] = mom.Z()
+                    tp_dict["energy"] = mom.T()
+                detector = self.global_detector_lookup(pos.Z(), track_point.get_detector(), prefix)
+                if detector == "global_real":
+                    continue
+                if "tof" in detector:
+                    # through-going tracks get time from tof1
+                    if "global_through" in detector or "global_us":
+                        tp_dict["t"] -= self.config.tof1_offset
+                    # ds tracks get time from tof2
+                    elif "global_ds" in detector:
+                        tp_dict["t"] -= self.config.tof2_offset
                 try:
                     self.nan_check(tp_dict.values())
                 except:
                     continue
-                track_points_out.append({
-                  "hit":Hit.new_from_dict(tp_dict, "energy"),
+                hit = Hit.new_from_dict(tp_dict, "energy")
+                print "       ", hit["x"], hit["y"], hit["z"], ";", hit["t"], "**", \
+                                hit["px"], hit["py"], hit["pz"], ";", hit["energy"], "**", \
+                                detector
+                this_track_points.append({
+                  "hit":hit,
                   "detector":detector,
                 })
-        return track_points_out, {}
+                if detector in self.config.upstream_aperture_cut:
+                    if hit["r"] > self.config.upstream_aperture_cut[detector]:
+                       cuts["upstream_aperture_cut"] = True
+                if detector in self.config.downstream_aperture_cut:
+                    if hit["r"] > self.config.downstream_aperture_cut[detector]:
+                       cuts["downstream_aperture_cut"] = True
+                for ref_detector in match_cuts:
+                    if detector == ref_detector:
+                        cuts[ref_detector] = False
+            print "   ", track.GetTrackPoints().size(), "track points including", track.GetTrackPoints(1).size(), "virtual hits"
+            track_points_out += this_track_points
+        sys.stdout = sys.__stdout__
+        return track_points_out, cuts
 
-    def load_reco_event(self, reco_event):
+    global_passes = []
+    def load_reco_event(self, reco_event, spill_number):
         tof_event = reco_event.GetTOFEvent()
         global_event = reco_event.GetGlobalEvent()
         scifi_event = reco_event.GetSciFiEvent()
@@ -641,8 +859,14 @@ class DataLoader(object):
             if "tof2" not in tofs and self.config.will_require_tof2:
                 return None
         scifi_loaded = self.load_scifi_event(scifi_event)
-        global_loaded = self.load_global_event(global_event)
+        verbose = False #spill_number < 5
+        global_loaded = self.load_global_event(global_event, verbose)
+        if len(global_loaded[0]) > 0:
+            self.global_count += 1
         event = {"data":sorted(scifi_loaded[0]+tof_loaded[0]+global_loaded[0], key = lambda tp: tp['hit']['z'])}
+        event["tof_slabs"] = self.load_n_slabs(tof_event)
+        event["scifi_n_tracks"] = self.get_n_tracks(scifi_event)
+        event["scifi_n_clusters"] = self.get_n_clusters(scifi_event)
         event["particle_number"] = reco_event.GetPartEventNumber()
         
         cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems(), global_loaded[1].iteritems())
@@ -653,17 +877,16 @@ class DataLoader(object):
 
     def update_cuts(self):
         for event in self.events:
-            event["any_cut"] = False
             event["upstream_cut"] = False
             event["downstream_cut"] = False
-            event["data_cut"] = False
+            event["extrapolation_cut"] = False
             for key, value in event["will_cut"].iteritems():
                 if value and self.config.upstream_cuts[key]:
-                    event["any_cut"] = True
-                    event["data_cut"] = True
                     event["upstream_cut"] = True
                 if value and self.config.downstream_cuts[key]:
                     event["downstream_cut"] = True
+                if value and self.config.extrapolation_cuts[key]:
+                    event["extrapolation_cut"] = True
 
     def will_do_p_cut_us(self, event):
         p_bins = self.config_anal["p_bins"]
@@ -678,6 +901,20 @@ class DataLoader(object):
             return False
         return event["tkd"]["p"] < self.config_anal["p_tot_ds_low"] or \
                event["tkd"]["p"] > self.config_anal["p_tot_ds_high"]
+
+    def will_do_delta_tof01_cut(self, event):
+        delta_tof01 = event["delta_tof01"]
+        if delta_tof01 == None:
+            return False
+        return delta_tof01 < self.config_anal["delta_tof01_lower"] or \
+               delta_tof01 > self.config_anal["delta_tof01_upper"]
+        
+    def will_do_delta_tof12_cut(self, event):
+        delta_tof12 = event["delta_tof12"]
+        if delta_tof12 == None:
+            return False
+        return delta_tof12 < self.config_anal["delta_tof12_lower"] or \
+               delta_tof12 > self.config_anal["delta_tof12_upper"]
 
     def nan_check(self, float_list):
         if float_list == None:
@@ -694,6 +931,9 @@ class DataLoader(object):
         tof0 = None
         tof1 = None
         tof2 = None
+        global_tof0 = None
+        global_tof1 = None
+        global_tof2 = None
         for point in event["data"]:
             point["hit"]["particle_number"] = self.this_run
             point["hit"]["event_number"] = self.this_event
@@ -708,6 +948,12 @@ class DataLoader(object):
                 tof1 = point["hit"]["t"]
             elif point["detector"] == "tof2":
                 tof2 = point["hit"]["t"]
+            elif point["detector"] == "global_through_tof0":
+                global_tof0 = point["hit"]["t"]
+            elif point["detector"] == "global_through_tof1":
+                global_tof1 = point["hit"]["t"]
+            elif point["detector"] == "global_through_tof2":
+                global_tof2 = point["hit"]["t"]
         try:
             event["tof12"] = tof2 - tof1
         except TypeError:
@@ -716,23 +962,23 @@ class DataLoader(object):
             event["tof01"] = tof1 - tof0
         except TypeError:
             event["tof01"] = None
+        try:
+            event["delta_tof12"] = (global_tof2 - global_tof1) - (tof2 - tof1)
+        except TypeError:
+            event["delta_tof12"] = None
+        try:
+            event["delta_tof01"] = (global_tof1 - global_tof0) - (tof1 - tof0)
+        except TypeError:
+            event["delta_tof01"] = None
         event["apertures_us"] = [] # list of apertures that the event hit upstream of tku
         event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
-        if event["will_cut"]["scifi_tracks_us"] == False and tku == None:
-              pass #print 'tku', event['tku']
-              #print 'tku_sp', [item for item in event['data'] if 'tku_sp' in item['detector']]
-              #print 'tku_tp', [item for item in event['data'] if 'tku_tp' in item['detector']]
-              #raw_input()
-        event["delta_tof01"] = None # loaded during track extrapolation
-        event["delta_tof12"] = None # loaded during track extrapolation
+        event["will_cut"]["delta_tof01"] = self.will_do_delta_tof01_cut(event)
+        event["will_cut"]["delta_tof12"] = self.will_do_delta_tof12_cut(event)
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
-        event["will_cut"]["aperture_us"] = False # loaded during track extrapolation
-        event["will_cut"]["aperture_ds"] = False # loaded during track extrapolation
-        event["will_cut"]["delta_tof01"] = False # loaded during track extrapolation
-        event["will_cut"]["delta_tof12"] = False # loaded during track extrapolation
+        event["will_cut"]["tof01_selection"] = False
         return event
 
     def detector_list(self):
@@ -742,7 +988,7 @@ class DataLoader(object):
             all_detectors = all_detectors.union(detectors)
         return sorted(list(all_detectors))
 
-
+    virtual_fail_list = []
     cuts = None
 
 

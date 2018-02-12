@@ -214,13 +214,13 @@ class AmplitudeAnalysis(AnalysisBase):
         graph.SetMarkerStyle(24)
         graph.Draw("p")
         for format in "eps", "root", "png":
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_inefficiency_"+target+"."+format)
+            canvas.Print(self.plot_dir+"amplitude_inefficiency_"+target+"."+format)
         hist.GetYaxis().SetRangeUser(-0.1, 0.1)
         hist.Draw()
         graph.SetMarkerStyle(24)
         graph.Draw("p")
         for format in "eps", "root", "png":
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_inefficiency_zoom_"+target+"."+format)
+            canvas.Print(self.plot_dir+"amplitude_inefficiency_zoom_"+target+"."+format)
 
     def matrix_str(self, matrix, rounding=2, width=10):
         matrix_str = ""
@@ -284,12 +284,13 @@ class AmplitudeAnalysis(AnalysisBase):
                 matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
         self.root_objects.append(matrix_hist)
         canvas = common.make_root_canvas(title)
+        canvas.SetFrameFillColor(scripts.utilities.get_frame_fill())
         matrix_hist.SetTitle(self.config_anal['name'])
         matrix_hist.SetStats(False)
         matrix_hist.Draw("COLZ")
         title = title.replace(" ", "_")
         for format in ["eps", "png", "root"]:
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_"+title+"."+format)
+            canvas.Print(self.plot_dir+"amplitude_"+title+"."+format)
 
     def get_delta_graphs(self, suffix):
         data = self.amplitudes[suffix]
@@ -414,8 +415,6 @@ class AmplitudeAnalysis(AnalysisBase):
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.03)
         text_box.SetTextAlign(12)
-        text_box.AddText("ISIS Cycle 2016/04")
-        text_box.AddText("MAUS v2.8.5")
         text_box.AddText(self.config_anal['name'])
         text_box.Draw()
         self.root_objects.append(text_box)
@@ -442,12 +441,15 @@ class AmplitudeAnalysis(AnalysisBase):
         self.text_box([upstream_graph, downstream_graph, upstream_scraped_graph])
         canvas.Update()
         for format in ["eps", "png", "root"]:
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_pdf_"+suffix+"."+format)
+            canvas.Print(self.plot_dir+"amplitude_pdf_"+suffix+"."+format)
 
-        hist.GetXaxis().SetRangeUser(0, 100.)
-        upstream_not_scraped_graph.SetMarkerColor(ROOT.kGray+2)
-        upstream_not_scraped_graph.SetMarkerStyle(25)
-        upstream_not_scraped_graph.Draw("SAMEP")
+        canvas = common.make_root_canvas("amplitude pdf extras")
+        hist.GetXaxis().SetRangeUser(0, 100)
+        hist.Draw()
+        upstream_graph.Draw("SAMEP")
+        downstream_graph.Draw("SAMEP")
+        upstream_scraped_graph.Draw("SAMEP")
+        #upstream_not_scraped_graph.Draw("SAMEP")
 
         raw_upstream_graph.SetMarkerStyle(20)
         raw_upstream_graph.SetMarkerColor(ROOT.kBlue)
@@ -456,17 +458,18 @@ class AmplitudeAnalysis(AnalysisBase):
         raw_downstream_graph.SetMarkerStyle(22)
         raw_downstream_graph.SetMarkerColor(ROOT.kRed)
         raw_downstream_graph.Draw("SAMEP")
-
-        upstream_chi2 = self.chi2_graph(suffix, "all_upstream")
-        upstream_chi2.SetLineColor(ROOT.kBlue+2) 
-        upstream_chi2.Draw("SAMEL")
-        downstream_chi2 = self.chi2_graph(suffix, "all_downstream")
-        downstream_chi2.SetLineColor(ROOT.kRed+2) 
-        downstream_chi2.Draw("SAMEL")
+        if self.config_anal["amplitude_chi2"]:
+            upstream_chi2 = self.chi2_graph(suffix, "all_upstream")
+            upstream_chi2.SetLineColor(ROOT.kBlue+2) 
+            upstream_chi2.Draw("SAMEL")
+            downstream_chi2 = self.chi2_graph(suffix, "all_downstream")
+            downstream_chi2.SetLineColor(ROOT.kRed+2)
+            downstream_chi2.Draw("SAMEL")
+        self.text_box([upstream_graph, downstream_graph, upstream_scraped_graph, raw_upstream_graph, raw_downstream_graph])
 
         canvas.Update()
         for format in ["eps", "png", "root"]:
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_pdf_"+suffix+"_extras."+format)
+            canvas.Print(self.plot_dir+"amplitude_pdf_"+suffix+"_extras."+format)
         return canvas
 
     def amplitude_scatter_plot(self, suffix):
@@ -496,10 +499,11 @@ class AmplitudeAnalysis(AnalysisBase):
         graph.Draw("P")
         canvas.Update()
         for format in ["eps", "png", "root"]:
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_delta_"+suffix+"_scatter."+format)
+            canvas.Print(self.plot_dir+"amplitude_delta_"+suffix+"_scatter."+format)
 
         canvas = common.make_root_canvas("delta_amplitude_hist")
         canvas.Draw()
+        canvas.SetFrameFillColor(scripts.utilities.get_frame_fill())
         hist = common.make_root_histogram("delta amplitude hist",
                                           amp_list_us, "Amplitude (us) [mm]", 100,
                                           amp_list_delta, "Amplitude (us) - Amplitude (ds) [mm]", 100,
@@ -508,7 +512,7 @@ class AmplitudeAnalysis(AnalysisBase):
         hist.Draw("COLZ")
         canvas.Update()
         for format in ["eps", "png", "root"]:
-            canvas.Print(self.config_anal["plot_dir"]+"amplitude_delta_"+suffix+"_hist."+format)
+            canvas.Print(self.plot_dir+"amplitude_delta_"+suffix+"_hist."+format)
       
 
     def tk_truth_is_okay(self, tk_mc_dict):
@@ -525,14 +529,10 @@ class AmplitudeAnalysis(AnalysisBase):
         hits_reco_mc_ds= []
 
         if self.config_anal["do_mc"]:
-            station_us = ["mc_virtual_"+str(station) for station in self.config.mc_plots["mc_stations"]["tku"]]
-            station_ds = ["mc_virtual_"+str(station) for station in self.config.mc_plots["mc_stations"]["tkd"]]
+            station_us = self.config.mc_plots["mc_stations"]["tku"]
+            station_ds = self.config.mc_plots["mc_stations"]["tkd"]
 
         for event in self.data_loader.events:
-            if 'any_cut' not in event:
-                print "Didnt find any_cut in", event.keys()
-                continue
-
             if event['upstream_cut']:
                 continue
 
@@ -550,12 +550,15 @@ class AmplitudeAnalysis(AnalysisBase):
                         mc_hit_dict_ds[detector_hit["detector"]] = detector_hit["hit"]
                     else:
                         continue
+                #print "amplitude_analysis.append_data mc event:"
+                #print "   ", len(mc_hit_dict_us), mc_hit_dict_us.keys()
+                #print "   ", len(mc_hit_dict_ds), mc_hit_dict_ds.keys()
                 tku_truth = self.tk_truth_is_okay(mc_hit_dict_us)
                 tkd_truth = self.tk_truth_is_okay(mc_hit_dict_ds)
-                if tku_truth == [15, 15, 15]:
+                if station_us[0] in mc_hit_dict_us:#tku_truth == [15, 15, 15]:
                     mc_hit_us = mc_hit_dict_us[station_us[0]]
                     hits_all_mc_us.append(mc_hit_us)
-                if tkd_truth == [15, 15, 15]:
+                if station_ds[0] in mc_hit_dict_ds:#tkd_truth == [15, 15, 15]:
                     mc_hit_ds = mc_hit_dict_ds[station_ds[0]]
                     hits_all_mc_ds.append(mc_hit_ds)
             hits_reco_us.append(event['tku'])
@@ -598,7 +601,7 @@ class AmplitudeAnalysis(AnalysisBase):
         print "    reco mc:", len(hits_reco_mc_ds)
 
     def print_data(self):
-        fout = open(self.config_anal["plot_dir"]+"/amplitude.json", "w")
+        fout = open(self.plot_dir+"/amplitude.json", "w")
         for suffix in self.amplitudes:
             print self.amplitudes[suffix].keys()
             try:
@@ -610,13 +613,44 @@ class AmplitudeAnalysis(AnalysisBase):
         fout.write(out_str)
         fout.close()
 
+    def empty_data(self):
+        n_bins = 21
+        diagonal = [[0. for i in range(n_bins)] for j in range(n_bins)]
+        for i in range(n_bins):
+            diagonal[i][i] = 1.
+        self.amplitudes = {
+          "momentum_uncertainty":{
+              "all_upstream":{
+                  "migration_matrix":diagonal
+              },
+              "all_downstream":{
+                  "migration_matrix":diagonal
+              },
+          }, 
+          "inefficiency":{
+              "all_upstream":{
+                  "pdf_ratio":[1. for i in range(n_bins)]
+              },
+              "all_downstream":{
+                  "pdf_ratio":[1. for i in range(n_bins)]
+              },
+          },
+          "crossing_probability":{
+              "all_upstream":{
+                  "migration_matrix":diagonal
+              },
+              "all_downstream":{
+                  "migration_matrix":diagonal
+              },
+          }, 
+        }
+
     def load_errors(self):
         if self.config_anal["amplitude_source"] != None and self.config_anal["do_mc"]:
             raise RuntimeError("Conflicted - do I get errors from mc or from amplitude source?")
-        if self.config_anal["amplitude_source"] == None and not self.config_anal["do_mc"]:
-            raise RuntimeError("No source for errors was selected - abort")
         if self.config_anal["amplitude_source"] == None:
-            return 
+            self.empty_data()
+            return
         fin = open(self.config_anal["amplitude_source"])
         amp_str = fin.read()
         self.amplitudes = json.loads(amp_str)
@@ -633,6 +667,7 @@ class AmplitudeAnalysis(AnalysisBase):
     root_objects = []
 
     def birth(self):
+        self.set_plot_dir("amplitude")
         self.load_errors()
         self.append_data()
 
