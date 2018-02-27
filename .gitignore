@@ -2,3 +2,6 @@
 *~
 output
 geometry_*
+iteration*
+nohup.out
+logs
