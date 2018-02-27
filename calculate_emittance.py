@@ -16,6 +16,7 @@ import maus_cpp.field
 import maus_cpp.polynomial_map
 import libxml2
 
+import scripts.data_loader.load_all
 import scripts.amplitude_analysis
 import scripts.data_loader
 import scripts.mc_plotter
@@ -82,7 +83,7 @@ class Analyser(object):
         shutil.copy(config_file_name, self.config_anal["plot_dir"])
 
     def init_phase(self):
-        self.data_loader = scripts.data_loader.DataLoader(self.config, self.config_anal)
+        self.data_loader = scripts.data_loader.load_all.LoadAll(self.config, self.config_anal)
         self.data_loader.get_file_list()
         self.analysis_list = [] # force kill any analysis scripts in case death(...) did not happen in previous round
         if self.config_anal["do_mc"]:

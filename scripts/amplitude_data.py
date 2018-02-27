@@ -1,43 +1,55 @@
 import sys
 import numpy
+import bisect
 
 from xboa.hit import Hit
 
 class AmplitudeData(object):
     def __init__(self, file_name, bin_edges, mass):
         """
-        Initialise the AmplitudeData class
+        Initialise the AmplitudeData class for the basic amplitude calculation
         * File name is the name of the (temporary) file to which the amplitude data is written
         * bin_edges is a list of bin edges for grouping the amplitude data; must have a regular bin step size
         * mass is the particle mass used for calculating emittance
+
+        Internally, we store using numpy.memmap (which is a buffered file-based 
+        array thingy). We have several memmaps for each bin:
+        * run_array stores the run number of each event in the bin
+        * spill_array stores the spill number of each event in the bin
+        * event_array stores the event number of each event in the bin
+        * ps_matrix stores the 4D phase space vector of each event in the bin
+        Each one is stored in a memmap file, based on "file_name"+suffix
+        During the amplitude calculation, for events whose amplitude we have
+        not yet finished counting:
+        * mean, cov (covariance matrix) and cov_inv (inverse covariance matrix)
+        * number of events in the covariance matrix
+        And:
+        * number of events in each bin
+        We build, during the calculation, an "amplitude_list"
+        * tuple of id, amplitude like ((run, spill, event), amplitude)
         """
         self.file_name = file_name
         self.bins = bin_edges
-        if abs(self.bins[1] - self.bins[0]) < 1e-6:
-            raise ValueError("Bin spacing is too small")
-        for i in range(len(self.bins)-1):
-            if abs((self.bins[i+1] - self.bins[i])/(self.bins[1]-self.bins[0]) - 1) > 1e-6:
-                raise ValueError("Bins should have regular spacing")
+        self.n_bins = len(self.bins) # we have an overflow bin
+        for i in range(self.n_bins-1):
+            if self.bins[i+1] - self.bins[i] < 1e-6:
+                print "Found bins:", self.bins
+                raise ValueError("Bin spacing is too small for bin "+str(i))
         self.mass = mass # for emittance calculation
         self.clear()
 
     def __del__(self):
         pass
-        #for i in range(self.n_bins): # getting "too many open files" error - need to close manually?      
-        #    self.spill_array[i]._mmap.close()
-        #    self.event_array[i]._mmap.close()
-        #    self.ps_matrix[i]._mmap.close()
 
     def clear(self):
-        self.n_bins = len(self.bins) # we have an overflow bin
+        n_var = 4
         self.run_array = [numpy.memmap(self.file_name+"_run_"+str(i), dtype='int32', mode='w+', shape=(1)) for i in range(self.n_bins)]
         self.spill_array = [numpy.memmap(self.file_name+"_spill_"+str(i), dtype='int32', mode='w+', shape=(1)) for i in range(self.n_bins)]
         self.event_array = [numpy.memmap(self.file_name+"_event_"+str(i), dtype='int32', mode='w+', shape=(1)) for i in range(self.n_bins)]
-        self.ps_matrix = [numpy.memmap(self.file_name+"_ps_"+str(i), dtype='float32', mode='w+', shape=(1, 4)) for i in range(self.n_bins)]
+        self.ps_matrix = [numpy.memmap(self.file_name+"_ps_"+str(i), dtype='float32', mode='w+', shape=(1, n_var)) for i in range(self.n_bins)]
         self.n_events = [0 for i in range(self.n_bins)]
         self.n_cov_events = 0.
         self.amplitude_list = []
-        n_var = 4
         self.mean = numpy.array([0. for i in range(n_var)])
         self.cov = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
         self.cov_inv = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
@@ -146,7 +158,6 @@ class AmplitudeData(object):
 
     def get_rebins(self, bin):
         emittance = self.get_emittance()
-        bin_step = (self.bins[1]-self.bins[0])/emittance
         self.cov_inv = numpy.linalg.inv(self.cov)
         rebins = [[] for i in range(self.n_bins)]
         for i, event in enumerate((self.retrieve(bin))):
@@ -154,16 +165,17 @@ class AmplitudeData(object):
             psv_t = numpy.transpose(psv)
             amplitude = numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
             try:
-                new_bin = int(amplitude/bin_step)
+                new_bin = bisect.bisect_right(self.bins, amplitude)-1
+                print amplitude, bin, new_bin, self.bins[new_bin], self.bins[new_bin+1]
             except ValueError:
                 print "Error calculating amplitude for bin", bin, "event", i, \
                        "data", event[0], event[1], event[2], event[3], "amplitude", amplitude, \
-                       "step", bin_step, "det(cov)", numpy.linalg.det(self.cov), "cov:"
+                       "det(cov)", numpy.linalg.det(self.cov), "cov:"
                 print self.cov
                 raise
-            new_bin = min(self.n_bins-1, new_bin)
             if new_bin != bin:
                 rebins[new_bin].append(i)
+        print
         return rebins
 
     def get_emittance(self):
@@ -171,7 +183,6 @@ class AmplitudeData(object):
         return emittance
 
     def queue_for_amplitude(self, runs, spills, events, psvs, target_bin):
-        bin_step = self.bins[1]-self.bins[0]
         new_list = [None]*spills.shape[0]
         emittance = self.get_emittance()
         for i in range(spills.shape[0]):
@@ -190,8 +201,6 @@ class AmplitudeData(object):
             all_rebins += rebin_list
         if len(all_rebins) == 0:
             return
-
-        #print "Apply rebin from", source_bin, "to", [len(a_bin) for a_bin in rebins]
         source_run_array, source_spill_array, source_event_array, source_ps_matrix = self.get_data(source_bin, 'r+')
         for target_bin, rebin_list in enumerate(rebins):
             runs = numpy.array([source_run_array[i] for i in rebin_list])
@@ -203,14 +212,22 @@ class AmplitudeData(object):
             if target_bin >= cut_bin and source_bin < cut_bin:
                 self.queue_for_amplitude(runs, spills, events, psvs, target_bin)
                 self.remove_from_cov_matrix(psvs)
-            # add to covariance matrix if we are moving things to inside the cut
-            #elif target_bin < cut_bin and source_bin >= cut_bin:
-            #    self.add_to_cov_matrix(psvs)
-        #print "Removing", len(all_rebins), "events from bin", source_bin, "which has currently", self.n_events[source_bin], "events"
-        #print sorted(all_rebins)
         self.delete(all_rebins, source_bin)
 
     def fractional_amplitude(self):
+        """
+        calculate the covariance matrix
+        bin the data
+        loop over "cut_bin" from the outer bin inwards
+            get data in the cut_bin
+            calculate amplitudes in the cut bin
+            remove from cov matrix anything in the cut_bin
+            while events are still being cut
+                loop over bin from the "cut bin"-1 inwards
+                    calculate amplitudes
+                    rebin events
+                    remove from cov matrix anything in the cut_bin
+        """
         self.get_cov_matrix()
         for bin in reversed(range(self.n_bins)):
             rebins = self.get_rebins(bin)

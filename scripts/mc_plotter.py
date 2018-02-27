@@ -241,10 +241,7 @@ class MCPlotter(AnalysisBase):
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]
                 if len(data) == 0:
-                    for det in self.data_loader.detector_list():
-                        print "   ", det
                     raise RuntimeError("Failed to find residual data for "+var+" "+detector+" "+virtual_station)
-                print detector, virtual_station, var
                 xmin, xmax = scripts.utilities.fractional_axis_range(data, 0.95)
                 hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()

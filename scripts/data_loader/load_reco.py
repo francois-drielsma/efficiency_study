@@ -1,365 +1,30 @@
 import sys
-import glob
-import itertools
 import math
-import time
+import itertools
 import bisect
-
-import ROOT
-import libMausCpp
 
 import xboa.common
 from xboa.hit import Hit
 
 import utilities
-# Fix tracker cuts!
 
-class DataLoader(object):
+
+class LoadReco(object):
     def __init__(self, config, config_anal):
         self.config = config
         self.config_anal = config_anal
+
         self.det_pos = self.get_det_pos()
-        self.maus_version = ""
-        self.run_numbers = set([])
-        self.file_name_list = []
-
-        self.spill_count = 0
-        self.global_count = 0
-        self.suspect_spill_count = 0
-        self.event_count = 0
-        self.accepted_count = 0
-        self.start_time = time.time()
-
-        self.this_file_name = "a"
-        self.this_file_number = -1
-        self.this_root_file = None
-        self.this_run = 0
-        self.this_spill = 0
-        self.this_event = 0
-        self.this_daq_event = 0
-        self.this_tree = None
-        self.all_root_files = [None] # f@@@ing root deletes histograms randomly if I let files go out of scope
-
         self.time_offsets = {"tof0":self.config.tof0_offset,
                             "tof1":self.config.tof1_offset,
                             "tof2":self.config.tof2_offset}
-        self.events = []
-
-    def get_det_pos(self):
-        det_pos = {}
-        for det in self.config.detectors:
-            det_pos[det[2]] = det[0]
-        return det_pos
-
-    def clear_data(self):
-        self.events = []
-
-    def load_data(self, min_daq_event, max_daq_event):
-        self.get_file_list()
-        self.root_event = min_daq_event
-        self.load_spills(max_daq_event - min_daq_event)
-
-    def get_file_list(self):
-        self.file_name_list = []
-        for fname in self.config_anal["reco_files"]:
-            self.file_name_list += glob.glob(fname)
-        self.file_name_list = sorted(self.file_name_list)
-        if len(self.file_name_list) == 0:
-            raise RuntimeError("No files from "+str(self.config_anal["reco_files"]))
-        print "Found", len(self.file_name_list), "files"
-        print "    ", self.file_name_list[0:3], "...", self.file_name_list[-3:]
-        self.next_file()
-        self.this_daq_event = 0
-        self.spill_count = 0
-
-    def next_file(self):
-        try:
-            self.this_file_name = self.file_name_list.pop(0)
-            self.this_file_number += 1
-            print "Loading ROOT file", self.this_file_name, self.this_file_number
-        except IndexError:
-            self.this_file_name = ""
-            print "No more files to load"
-        self.this_tree = None
-        self.this_daq_event = 0
-
-    def check_spill_count(self):
-        return self.spill_count < self.config.number_of_spills or \
-               self.config.number_of_spills == None
-
-    def check_virtual_fails(self):
-        #print "Found global virtual detectors", self.global_set
-        if len(self.virtual_fail_list) != 0:
-            print "Could not find virtual detector for", len(self.virtual_fail_list)
-            return
-            for fail in self.virtual_fail_list:
-                print "   ", fail,
-            print "  for detectors",
-            for det in self.config.virtual_detectors:
-                print "   ", det,
-            print
-            self.virtual_fail_list = []
-            #raise RuntimeError("Could not find virtual detector")
-
-    def load_spills(self, number_of_daq_events):
-        load_spills_daq_event = 0 # number of daq events loaded during this call
-                                  # to load_spills
-        self.load_new_file()
-        while load_spills_daq_event < number_of_daq_events and \
-              self.this_file_name != "" and \
-              self.this_tree != None and \
-              self.check_spill_count():
-            sys.stdout.flush()
-            if self.this_file_name == "" or self.this_tree == None:
-                break # ran out of files
-            old_t = time.time()
-            while self.this_daq_event < self.this_tree.GetEntries() and \
-                  load_spills_daq_event < number_of_daq_events:
-                new_t = time.time()
-                if new_t - old_t > 60.:
-                    print "Spill", self.this_daq_event, "Time", round(new_t - self.start_time, 2)
-                    old_t = new_t
-                    sys.stdout.flush()
-                self.this_tree.GetEntry(self.this_daq_event)
-                spill = self.this_data.GetSpill()
-                self.load_one_spill(spill)
-                load_spills_daq_event += 1
-                self.this_daq_event += 1
-            if self.this_daq_event >= self.this_tree.GetEntries():
-                self.next_file()
-                self.load_new_file()
-            print "  ...loaded", load_spills_daq_event, "'daq events'", self.spill_count, "'physics_event' spills and", self.event_count,"events",
-            print "with", self.global_count, "through going globals",
-            if self.this_tree != None:
-                print " at", self.this_daq_event, "/", self.this_tree.GetEntries(), "spills from file", self.this_file_name, self.this_run
-            else:
-                print
-            sys.stdout.flush()
-        self.this_root_file.Close()
-        self.this_tree = None
-        self.update_cuts()
-        self.check_virtual_fails()
-        # return True if there are more events
-        return self.this_file_name != ""
-
-    def load_new_file(self):
-        while self.this_tree == None and self.this_file_name != "":
-            self.all_root_files[0] = self.this_root_file
-            self.this_root_file = ROOT.TFile(self.this_file_name, "READ") # pylint: disable = E1101
-            self.this_data = ROOT.MAUS.Data() # pylint: disable = E1101
-            self.this_tree = self.this_root_file.Get("Spill")
-            self.this_run = None
-            try:
-                self.this_tree.SetBranchAddress("data", self.this_data)
-            except AttributeError:
-                print "Failed to load 'Spill' tree for file", self.this_file_name, "maybe it isnt a MAUS output file?"
-                self.this_tree = None
-                continue
-
-    def load_one_spill(self, spill):
-        old_this_run = self.this_run
-        try:
-            self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
-        except ReferenceError:
-            print "WARNING: Spill was NULL"
-            self.suspect_spill_count += 1
-            return
-        self.run_numbers.add(self.this_run)
-        self.this_spill = spill.GetSpillNumber()
-        if old_this_run != None and old_this_run != self.this_run:
-            print "WARNING: run number changed from", old_this_run, "to", self.this_run,
-            print "in file", self.this_file_name, "daq event", self.this_daq_event,
-            print "spill", spill.GetSpillNumber(), "n recon events", spill.GetReconEvents().size(), "<------------WARNING"
-            self.suspect_spill_count += 1
-        if spill.GetDaqEventType() == "physics_event":
-            self.spill_count += 1
-            for ev_number, reco_event in enumerate(spill.GetReconEvents()):
-                self.this_event = reco_event.GetPartEventNumber()
-                event = None
-                try:
-                    event = self.load_reco_event(reco_event, spill.GetSpillNumber())
-                except ValueError:
-                    #sys.excepthook(*sys.exc_info())
-                    print "spill", spill.GetSpillNumber(), "particle_number", reco_event.GetPartEventNumber()
-                except ZeroDivisionError:
-                    pass
-                if event == None: # missing TOF1 - not considered further
-                    continue 
-                event["run"] = self.this_run
-                self.event_count += 1
-                event["spill"] = spill.GetSpillNumber()
-                self.events.append(event)
-                event["event_number"] = ev_number
-                if self.config_anal["do_mc"] and len(spill.GetMCEvents()) > ev_number:
-                    self.load_mc_event(event, spill.GetMCEvents()[ev_number])
-                for hit in event["data"]:
-                    hit["hit"]["event_number"] = ev_number
-                    hit["hit"]["spill"] = spill.GetSpillNumber()
-                    hit["hit"]["particle_number"] = self.this_run
-            #print "Global passes for spill", spill.GetSpillNumber(), ":", self.global_passes
-
-    def load_mc_event(self, loaded_event, mc_event):
-        # mc load functions return a list of hits
-        primary = mc_event.GetPrimary()
-        primary_loaded = self.load_primary(primary)
-        track_vector = mc_event.GetTracks()
-        track_loaded = self.load_tracks(track_vector)
-        virtual_vector = mc_event.GetVirtualHits()
-        virtual_loaded = self.load_virtuals(virtual_vector)
-        tof_hit_vector = mc_event.GetTOFHits()
-        tof_hit_loaded = self.load_tof_mc_hits(tof_hit_vector)
-        temp_event = sorted(primary_loaded+track_loaded+virtual_loaded+tof_hit_loaded, key = lambda tp: tp['hit']['z'])
-        loaded_event["data"] += temp_event
-        
-    def load_tracks(self, track_vector):
-        loaded_track_vector = []
-        for track in track_vector:
-            if abs(track.GetParticleId()) == 211 and track.GetKillReason() != "":
-                print "Pion killed because", track.GetKillReason()
-            hit = {}
-            hit["x"] = track.GetInitialPosition().x()
-            hit["y"] = track.GetInitialPosition().y()
-            hit["z"] = track.GetInitialPosition().z()
-            hit["px"] = track.GetInitialMomentum().x()
-            hit["py"] = track.GetInitialMomentum().y()
-            hit["pz"] = track.GetInitialMomentum().z()
-            hit["pid"] = track.GetParticleId()
-            try:
-                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
-            except KeyError:
-                hit["mass"] = 0.
-            try:
-                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
-            except KeyError:
-                hit["charge"] = 0.
-
-            hit = {}
-            hit["x"] = track.GetFinalPosition().x()
-            hit["y"] = track.GetFinalPosition().y()
-            hit["z"] = track.GetFinalPosition().z()
-            hit["px"] = track.GetFinalMomentum().x()
-            hit["py"] = track.GetFinalMomentum().y()
-            hit["pz"] = track.GetFinalMomentum().z()
-            hit["pid"] = track.GetParticleId()
-            try:
-                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
-            except KeyError:
-                hit["mass"] = 0.
-            try:
-                hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
-            except KeyError:
-                hit["charge"] = 0.
-       
-            loaded_track_initial = {
-                "hit":Hit.new_from_dict(hit, "energy"),
-                "detector":"mc_track_initial"
-            }
-            loaded_track_final = {
-                "hit":Hit.new_from_dict(hit, "energy"),
-                "detector":"mc_track_final",
-            }
-            loaded_track_vector += [loaded_track_initial, loaded_track_final]
-        return loaded_track_vector
-
-    def load_primary(self, primary):
-        hit = {}
-        hit["x"] = primary.GetPosition().x()
-        hit["y"] = primary.GetPosition().y()
-        hit["z"] = primary.GetPosition().z()
-        hit["px"] = primary.GetMomentum().x()
-        hit["py"] = primary.GetMomentum().y()
-        hit["pz"] = primary.GetMomentum().z()
-        hit["pid"] = primary.GetParticleId()
-        hit["energy"] = primary.GetEnergy()
-        hit["t"] = primary.GetTime()
-        try:
-            hit["mass"] = xboa.common.pdg_pid_to_mass[abs(hit["pid"])]
-        except KeyError:
-            hit["mass"] = 0.
-        try:
-            hit["charge"] = xboa.common.pdg_pid_to_charge[hit["charge"]]
-        except KeyError:
-            hit["charge"] = 0.
-        loaded_primary = {
-            "hit":Hit.new_from_dict(hit),
-            "detector":"mc_primary"
-        }
-        return [loaded_primary]
-
-    global_set = set()
-    def virtual_detector_lookup(self, z_pos):
-        det_list = self.config.virtual_detectors
-        detector = bisect.bisect_left(det_list, (z_pos, None, ""))
-        if detector == 0:
-            det_pos, dummy, det_name = det_list[detector]
-        elif detector == len(det_list):
-            det_pos, dummy, det_name = det_list[-1]
-        elif det_list[detector][0] - z_pos < z_pos - det_list[detector-1][0]:
-            det_pos, dummy, det_name = det_list[detector]
-        else:
-            det_pos, dummy, det_name = det_list[detector-1]
-        my_det = "mc_"+det_name
-        #self.global_set.add(my_det)
-        return my_det
 
 
-    def load_virtuals(self, virtual_vector):
-        loaded_virtual_vector = [None]*len(virtual_vector)
-        #print "Virtuals",
-        for i, virtual_hit in enumerate(virtual_vector):
-            hit = xboa.hit.Hit()
-            hit["x"] = virtual_hit.GetPosition().x()
-            hit["y"] = virtual_hit.GetPosition().y()
-            hit["z"] = virtual_hit.GetPosition().z()
-            hit["px"] = virtual_hit.GetMomentum().x()
-            hit["py"] = virtual_hit.GetMomentum().y()
-            hit["pz"] = virtual_hit.GetMomentum().z()
-            hit["bx"] = virtual_hit.GetBField().x()
-            hit["by"] = virtual_hit.GetBField().y()
-            hit["bz"] = virtual_hit.GetBField().z()
-            hit["ex"] = virtual_hit.GetEField().x()
-            hit["ey"] = virtual_hit.GetEField().y()
-            hit["ez"] = virtual_hit.GetEField().z()
-            hit["pid"] = virtual_hit.GetParticleId()
-            hit["station"] = virtual_hit.GetStationId()
-            hit["particle_number"] = virtual_hit.GetTrackId()
-            hit["t"] = virtual_hit.GetTime()
-            hit["mass"] = virtual_hit.GetMass()
-            hit["charge"] = virtual_hit.GetCharge()
-            hit.mass_shell_condition('energy')
-            loaded_virtual = {
-                "hit":hit,
-                "detector":self.virtual_detector_lookup(hit["z"])
-            }
-            loaded_virtual_vector[i] = loaded_virtual
-        return loaded_virtual_vector
+    def load(self, event, spill, ev_number):
+        reco_event = spill.GetReconEvents()[ev_number]
+        spill_number = spill.GetSpillNumber()
+        self.load_reco_event(event, reco_event, spill_number)
 
-    def load_tof_mc_hits(self, tof_mc_vector):
-        loaded_tof_mc_vector = [None]*len(tof_mc_vector)
-        for i, tof_mc_hit in enumerate(tof_mc_vector):
-            hit = xboa.hit.Hit()
-            hit["x"] = tof_mc_hit.GetPosition().x()
-            hit["y"] = tof_mc_hit.GetPosition().y()
-            hit["z"] = tof_mc_hit.GetPosition().z()
-            hit["px"] = tof_mc_hit.GetMomentum().x()
-            hit["py"] = tof_mc_hit.GetMomentum().y()
-            hit["pz"] = tof_mc_hit.GetMomentum().z()
-            hit["pid"] = tof_mc_hit.GetParticleId()
-            hit["station"] = tof_mc_hit.GetChannelId().GetStation()
-            hit["particle_number"] = tof_mc_hit.GetTrackId()
-            hit["t"] = tof_mc_hit.GetTime()
-            hit["energy"] = tof_mc_hit.GetEnergy()
-            hit["e_dep"] = tof_mc_hit.GetEnergyDeposited()
-            try:
-                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(tof_mc_hit.GetParticleId())]
-            except KeyError:
-                hit["mass"] = (hit["energy"]**2-hit["p"]**2)**0.5
-            loaded_tof_mc = {
-                "hit":hit,
-                "detector":"mc_tof_"+str(hit["station"]),
-            }
-            loaded_tof_mc_vector[i] = loaded_tof_mc
-        return loaded_tof_mc_vector
 
     def load_tof_sp(self, tof_sp, station):
         xerr = tof_sp.GetGlobalPosXErr()
@@ -645,10 +310,17 @@ class DataLoader(object):
             n_tracks[track.tracker()] += 1
         return n_tracks
 
-    def get_n_clusters(self, scifi_event):
-        n_clusters = [0, 0]
+    def get_n_planes_with_clusters(self, scifi_event):
+        """
+        Number of planes with at least one cluster
+        """
+        n_clusters = [[0 for i in range(15)], [0 for i in range(15)]]
         for cluster in scifi_event.clusters():
-            n_clusters[cluster.get_tracker()] += 1
+            tracker = cluster.get_tracker()
+            plane = (cluster.get_station()-1)*3+cluster.get_plane()
+            n_clusters[tracker][plane] += 1
+        n_clusters[0] = len([i for i in n_clusters[0] if i > 0])
+        n_clusters[1] = len([i for i in n_clusters[1] if i > 0])
         return n_clusters
 
     def will_cut_on_scifi_tracks(self, scifi_event):
@@ -847,7 +519,7 @@ class DataLoader(object):
         return track_points_out, cuts
 
     global_passes = []
-    def load_reco_event(self, reco_event, spill_number):
+    def load_reco_event(self, event, reco_event, spill_number):
         tof_event = reco_event.GetTOFEvent()
         global_event = reco_event.GetGlobalEvent()
         scifi_event = reco_event.GetSciFiEvent()
@@ -861,12 +533,10 @@ class DataLoader(object):
         scifi_loaded = self.load_scifi_event(scifi_event)
         verbose = False #spill_number < 5
         global_loaded = self.load_global_event(global_event, verbose)
-        if len(global_loaded[0]) > 0:
-            self.global_count += 1
-        event = {"data":sorted(scifi_loaded[0]+tof_loaded[0]+global_loaded[0], key = lambda tp: tp['hit']['z'])}
+        event["data"] += scifi_loaded[0]+tof_loaded[0]+global_loaded[0]
         event["tof_slabs"] = self.load_n_slabs(tof_event)
         event["scifi_n_tracks"] = self.get_n_tracks(scifi_event)
-        event["scifi_n_clusters"] = self.get_n_clusters(scifi_event)
+        event["scifi_n_planes_with_clusters"] = self.get_n_planes_with_clusters(scifi_event)
         event["particle_number"] = reco_event.GetPartEventNumber()
         
         cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems(), global_loaded[1].iteritems())
@@ -874,19 +544,6 @@ class DataLoader(object):
         event["will_cut"] = dict(cuts) # True means cut the thing
         event = self.tm_data(event)
         return event
-
-    def update_cuts(self):
-        for event in self.events:
-            event["upstream_cut"] = False
-            event["downstream_cut"] = False
-            event["extrapolation_cut"] = False
-            for key, value in event["will_cut"].iteritems():
-                if value and self.config.upstream_cuts[key]:
-                    event["upstream_cut"] = True
-                if value and self.config.downstream_cuts[key]:
-                    event["downstream_cut"] = True
-                if value and self.config.extrapolation_cuts[key]:
-                    event["extrapolation_cut"] = True
 
     def will_do_p_cut_us(self, event):
         p_bins = self.config_anal["p_bins"]
@@ -935,9 +592,6 @@ class DataLoader(object):
         global_tof1 = None
         global_tof2 = None
         for point in event["data"]:
-            point["hit"]["particle_number"] = self.this_run
-            point["hit"]["event_number"] = self.this_event
-            point["hit"]["spill"]  = self.this_spill
             if point["detector"] == "tku_tp":
                 tku = point["hit"]
             elif point["detector"] == "tkd_tp":
@@ -981,14 +635,9 @@ class DataLoader(object):
         event["will_cut"]["tof01_selection"] = False
         return event
 
-    def detector_list(self):
-        all_detectors = set()
-        for event in self.events:
-            detectors = set([hit["detector"] for hit in event["data"]])
-            all_detectors = all_detectors.union(detectors)
-        return sorted(list(all_detectors))
-
-    virtual_fail_list = []
-    cuts = None
-
+    def get_det_pos(self):
+        det_pos = {}
+        for det in self.config.detectors:
+            det_pos[det[2]] = det[0]
+        return det_pos
 

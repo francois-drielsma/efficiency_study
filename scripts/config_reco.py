@@ -18,7 +18,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     return file_list
 
 def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitude_source, p_bins, tkd_cut, do_globals):
-    plot_dir = data_dir+"plots_"+name+"/"
+    plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
@@ -109,11 +109,17 @@ class Config(object):
           "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "global_through_tof0":global_through_cuts,
-          "global_through_tof1":global_through_cuts,
-          "global_through_tku_tp":global_through_cuts,
+          "global_through_tof1":False,
+          "global_through_tku_tp":False,
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
           "tof01_selection":False,
+          "mc_muon_us":False,
+          "mc_stations_us":False,
+          "mc_scifi_fiducial_us":False,
+          "mc_muon_ds":False,
+          "mc_stations_ds":False,
+          "mc_scifi_fiducial_ds":False,
     }
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = True
@@ -129,39 +135,43 @@ class Config(object):
     extrapolation_cuts["tof2_sp"] = True
     extrapolation_cuts["global_through_tkd_tp"] = True
     extrapolation_cuts["global_through_tof2"] = True
-    cut_report  = ["hline", "all events", "hline",]
-    cut_report += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "scifi_nan_us", "chi2_us", "scifi_fiducial_us", "hline",]
-    cut_report += ["delta_tof01", "tof01", "p_tot_us", "hline",]
+    mc_true_us_cuts = copy.deepcopy(upstream_cuts)
+    mc_true_ds_cuts = copy.deepcopy(upstream_cuts)
+    cut_report  = [[]]
+    cut_report[0] = ["hline", "all events", "hline",]
+    cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "scifi_nan_us", "chi2_us", "scifi_fiducial_us", "hline",]
+    cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
     if global_through_cuts:
-        cut_report += ["global_through_tku_tp", "global_through_tof1", "global_through_tof0",]
-    cut_report += ["upstream_aperture_cut", "hline",]
-    cut_report += ["upstream_cut", "hline",]
-    cut_report += ["scifi_tracks_ds", "scifi_nan_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
-    cut_report += ["downstream_cut", "hline",]
-    cut_report += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report += ["extrapolation_cut", "hline"]
+        cut_report[0] += ["global_through_tof0",]
+    cut_report[0] += ["upstream_aperture_cut", "hline",]
+    cut_report[0] += ["upstream_cut", "hline",]
+    cut_report[0] += ["scifi_tracks_ds", "scifi_nan_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[0] += ["downstream_cut", "hline",]
+    cut_report[0] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
+    cut_report[0] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02_delete/" # to which data is written
+    data_dir = "output/2017-02/" # to which data is written
     src_dir = "MAUS-rogers_2018-01-30/"
+    correct_amplitude = True
     analyses = []
-    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [27, 32], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [27, 32], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [27, 32], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [27, 32], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
 
     #analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH", [27, ?], "MAUS-v3.0.1/scifitest/newcalib/lsq/", data_dir,   "plots_Simulated_2017-2.7_3-140_lH2_empty", [[135, 145]], [100, 200], True))
     #analyses.append(get_analysis([10445], "2017-2.7 4-140 None", [27, ?], "MAUS-v3.0.1/scifitest/newcalib/lsq/", data_dir,   "plots_Simulated_2017-2.7_3-140_lH2_empty", [[135, 145]], [100, 200], True))
 
-    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [27, 31], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [27, 31], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [27, 31], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [27, 31], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
 
-    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [27, 30], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [27, 30], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [27, 30], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [27, 30], src_dir, data_dir, None, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -172,8 +182,8 @@ class Config(object):
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
     number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
-    preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
-    analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
+    preanalysis_number_of_spills = 500 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 500 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     tof0_offset = 0.

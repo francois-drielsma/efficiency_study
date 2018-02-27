@@ -170,9 +170,7 @@ class GlobalsPlotter(AnalysisBase):
                 data_cut_ex.append(data)
         if len(data_all) == 0:
             print "WARNING - No data in get_residual_data(", detector, var, prefix, ")"
-            print self.data_loader.detector_list()
             print "number of det hits", n_det_hits, "global hits", n_global_hits
-            #raise RuntimeError("No data")
         return data_cut_us, data_cut_ds, data_cut_ex, data_all
 
     def get_miss_data(self, detector, var):

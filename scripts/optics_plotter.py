@@ -53,6 +53,8 @@ class OpticsPlotter(AnalysisBase):
                             ("beta_y", None),
                             ("l_kin", None),
                             ("nevents", None),
+                            ("sigma", 0),
+                            ("sigma", 2),
                         ]:
                 try:
                     self.plot("ds", var, sub_var, color) # mean z
@@ -104,6 +106,7 @@ class OpticsPlotter(AnalysisBase):
         }
         ellipse["covariance"] = [[0. for j in range(n_var)] for i in range(n_var)]  
         ellipse["mean"] = [0. for i in range(n_var)]
+        ellipse["sigma"] = [0. for i in range(n_var)]
         ellipse["nevents"] = 0.
         ellipse["emit_4d"] = 0.
         ellipse["beta_4d"] = 0.
@@ -117,6 +120,13 @@ class OpticsPlotter(AnalysisBase):
         if detector not in self.ellipse_dict:
             self.ellipse_dict[detector] = {}
         self.ellipse_dict[detector][cut] = ellipse
+
+    @classmethod
+    def print_ellipse(cls, ellipse):
+        for row in ellipse:
+          for cell in row:
+            print str(round(cell)).rjust(8),
+          print
 
     def process_ellipse(self, detector, cut):
         ellipse = self.get_ellipse(detector, cut)
@@ -152,11 +162,16 @@ class OpticsPlotter(AnalysisBase):
                 rms_ellipse[j][i] = rms_ellipse[i][j]
 
         ellipse["mean"] = mean
+        ellipse["sigma"] = [abs(rms_ellipse[i][i])**0.5 for i in range(n_var)] # abs(sigma) as sigma_z == 0 causes nan error
         ellipse["covariance"] = rms_ellipse
         ellipse["nevents"] += m_events
-        mu_mass = xboa.common.pdg_pid_to_mass[13]
         matrix = numpy.array(rms_ellipse)[0:4, 0:4]
-        emit = numpy.linalg.det(matrix)**0.25/mu_mass
+        det = numpy.linalg.det(matrix)
+        if det < 1e-9:
+            # right at the back, near EMR, beam becomes very upright and det < 0
+            return
+        mu_mass = xboa.common.pdg_pid_to_mass[13]
+        emit = det**0.25/mu_mass
         if abs(emit) > 1e-9:
             beta = (matrix[0][0]+matrix[2][2])*mean[4]/2./mu_mass/emit
             alpha = (matrix[0][1]+matrix[2][3])/2./mu_mass/emit
@@ -166,12 +181,15 @@ class OpticsPlotter(AnalysisBase):
         ellipse["emit_4d"] = emit
         for axis, index in [("x", 0), ("y", 2)]:
             matrix = numpy.array(rms_ellipse)[index:index+2, index:index+2]
-            emit = numpy.linalg.det(matrix)**0.5/mu_mass
-            if abs(emit) > 1e-9:
-                beta = (matrix[0][0])*mean[4]/mu_mass/emit
-                alpha = (matrix[0][1])/mu_mass/emit
-                ellipse["beta_"+axis] = beta
-                ellipse["alpha_"+axis] = alpha
+            det = numpy.linalg.det(matrix)
+            if det < 1e-9:
+                # right at the back, near EMR, beam becomes very upright and det < 0
+                continue
+            emit = det**0.5/mu_mass
+            beta = (matrix[0][0])*mean[4]/mu_mass/emit
+            alpha = (matrix[0][1])/mu_mass/emit
+            ellipse["beta_"+axis] = beta
+            ellipse["alpha_"+axis] = alpha
             ellipse["emit_"+axis] = emit
 
     def death_ellipse(self, tracker, cut, print_to_screen):
@@ -217,6 +235,8 @@ class OpticsPlotter(AnalysisBase):
             var_list = [ellipse[var] for ellipse in ellipse_list if pred(ellipse)]
         else:
             var_list = [ellipse[var][sub_var] for ellipse in ellipse_list if pred(ellipse)]
+        if "beta" in var:
+            var_list = [ellipse[var][sub_var]*1e-3 for ellipse in ellipse_list if pred(ellipse)]
         name, axis = self.name_lookup(var, sub_var, cut)
         hist, graph = self.make_root_graph(name, name,
                       z_list, "z [m]", var_list, axis, True,
@@ -243,7 +263,6 @@ class OpticsPlotter(AnalysisBase):
             else:
                 line_color = ROOT.kGreen
             graph.SetLineColor(line_color)
-            print "Detector graph", detector, "z:", z_det, "var:", var_min, var_max, graph.GetLineColor(), line_color, ROOT.kBlue, ROOT.kGreen, ROOT.kRed
             graph.SetLineStyle(2)
             graph.Draw("same l")
 

@@ -25,7 +25,6 @@ class DataPlotter(AnalysisBase):
         self.will_cut_ds = lambda event: event["downstream_cut"]
         self.upstream_cut = {}
         self.downstream_cut = {}
-        self.cuts_report_full = {}
         self.ellipse = {}
         self.reset_tof_eff_counter()
         self.root_objects = []
@@ -127,7 +126,6 @@ class DataPlotter(AnalysisBase):
         self.birth_ellipse("tkd", "ds cut")
         self.birth_ellipse("tkd", "all")
 
-        self.birth_cuts_summary()
 
     def process(self):
         self.run_numbers.update(self.data_loader.run_numbers)
@@ -218,8 +216,6 @@ class DataPlotter(AnalysisBase):
         self.process_ellipse("tkd", "ds cut")
         self.process_ellipse("tkd", "all")
 
-        self.process_cuts_summary()
-
     def death(self):
         self.base_death()
 
@@ -248,7 +244,6 @@ class DataPlotter(AnalysisBase):
         self.death_ellipse("tkd", "all", True) # print_to_screen True
 
         self.death_wiki_summary()
-        self.death_cuts_summary()
         eff_cut_us, eff_cut_ds, eff_all = self.get_tof_slab_efficiency()
         print "TOF slab efficiency\n  all:   ", eff_all, "\n  us cut:", eff_cut_us, "\n  ds cut:", eff_cut_ds
         self.reset_tof_eff_counter()
@@ -921,92 +916,6 @@ class DataPlotter(AnalysisBase):
         except KeyError: # perhaps extrapolation was switched off?
             return
 
-    def birth_cuts_summary(self):
-        self.global_cut = {"upstream_cut":0, "downstream_cut":0, "extrapolation_cut":0, "all_events":0}
-        self.upstream_cut = {}
-        self.downstream_cut = {}
-        self.extrapolation_cut = {}
-        self.cuts_report_full = {}
-        for key in self.data_loader.events[0]["will_cut"]:
-            self.upstream_cut[key] = 0
-            self.downstream_cut[key] = 0
-            self.extrapolation_cut[key] = 0
-        for key in self.config.cut_report:
-            if key == "hline":
-                continue
-            self.cuts_report_full[key] = 0
-        self.process_cuts_summary()
-
-    def process_cuts_summary(self):
-        for event in self.data_loader.events:
-            self.global_cut["all_events"] += 1
-            will_cut = event["will_cut"]
-            for key in will_cut:
-                if not will_cut[key]:
-                    self.upstream_cut[key] += 1
-                    if event["upstream_cut"]:
-                        continue
-                    self.downstream_cut[key] += 1
-                    if event["downstream_cut"]:
-                        continue
-                    self.extrapolation_cut[key] += 1
-            if not event["upstream_cut"]:
-                self.global_cut["upstream_cut"] += 1
-            if not event["downstream_cut"]:
-                self.global_cut["downstream_cut"] += 1
-            if not event["extrapolation_cut"]:
-                self.global_cut["extrapolation_cut"] += 1
-            will_cut = False
-            self.cuts_report_full["all events"] += 1
-            for key in self.config.cut_report:
-                if key == "hline" or key == "all events":
-                    continue
-                if will_cut:
-                    continue
-                if key in event["will_cut"]:
-                    if event["will_cut"][key]:
-                        will_cut = True
-                elif key in event:
-                    # e.g. tof01 is a float, also a cut
-                    if type(event[key]) == type(True) and event[key]:
-                        will_cut = True
-                if not will_cut:
-                    self.cuts_report_full[key] += 1
-
-
-    def death_cuts_summary(self):
-        fout = open(self.plot_dir+"/cuts_summary.txt", "w")
-        print >> fout, "========== cuts summary ============"
-        for key in ["all_events", "upstream_cut", "downstream_cut", "extrapolation_cut"]:
-            key_name = key.replace("_", " ")
-            print >> fout, "'"+key_name+":'", self.global_cut[key],
-        print >> fout
-
-        print >> fout, "   ", "'cut name'".ljust(25), "us?".ljust(8), "ds?".ljust(8), "ex?".ljust(8), "passed".ljust(8), \
-                       "'us passed and passed'".ljust(8), "'ds passed and passed'".ljust(8)
-        for key in sorted(self.upstream_cut.keys()):
-            key_name = "'"+key.replace("_", " ")+"'"
-            is_active_us = self.config.upstream_cuts[key]
-            is_active_ds = self.config.downstream_cuts[key]
-            is_active_ex = self.config.extrapolation_cuts[key]
-            print >> fout, "   ", key_name.ljust(25), \
-                          str(is_active_us).ljust(8), str(is_active_ds).ljust(8), str(is_active_ex).ljust(8), \
-                          str(self.upstream_cut[key]).ljust(8), str(self.downstream_cut[key]).ljust(8), str(self.extrapolation_cut[key]).ljust(8)
-        print >> fout
-        fout.close() 
-        fout = open(self.plot_dir+"/cuts_summary.txt", "r")
-        print fout.read()
-        fout = open(self.plot_dir+"/cuts_summary.tex", "w")
-        print >> fout, ("cut").ljust(20), "&", self.config_anal["name"], "//"
-        for key in self.config.cut_report:
-            if key == "hline":
-                print >> fout, "\hline"
-                continue
-            print >> fout, key.ljust(20), "&", str(self.cuts_report_full[key]), "//"
-        fout.close()
-        fout = open(self.plot_dir+"/cuts_summary.tex", "r")
-        print fout.read()
-
 
     def death_wiki_summary(self):
         fout = open(self.plot_dir+"/wiki_summary.txt", "w")
@@ -1022,8 +931,8 @@ class DataPlotter(AnalysisBase):
         except Exception:
             sys.excepthook(*sys.exc_info())
             wiki_summary += " Failed to contact cdb |"
-        for key in ["all_events", "upstream_cut", "downstream_cut"]:
-            wiki_summary += " "+str(self.global_cut[key]).ljust(8)+" |"
+        #for key in ["all_events", "upstream_cut", "downstream_cut"]:
+        #    wiki_summary += " "+str(self.global_cut[key]).ljust(8)+" |"
         print >> fout, wiki_summary
         print wiki_summary
 

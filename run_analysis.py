@@ -72,11 +72,11 @@ def main(jobs, number_of_concurrent_processes, cards_list):
     print "\nFinished ... press <cr> to end"
 
 if __name__ == "__main__":
-    jobs = [6]#, 6, 10] #[7, 0, 1, 4, 5, 8, 9] #6, 7, 10,  # [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    jobs = range(12)
     if is_scarf():
         n_procs = min(len(jobs), 100)
     else:
-        n_procs = 2
-    cards_list = ["scripts/config_mc.py"] #"scripts/config_mc.py", #["scripts/config_reco_2017_03.py"]#
+        n_procs = 3
+    cards_list = ["scripts/config_mc.py", "scripts/config_reco.py"]
     main(jobs, n_procs, cards_list)
 

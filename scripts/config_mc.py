@@ -22,7 +22,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     return file_list
 
 def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_globals):
-    plot_dir = data_dir+"plots_"+name+"/"
+    plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
@@ -63,7 +63,6 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_tof01_weighting":False,
             "do_optics":True,
         }
-
 
 class Config(object):
     geometry = "Test.dat" #"geometry_08681/ParentGeometryFile.dat" #
@@ -106,11 +105,17 @@ class Config(object):
           "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "global_through_tof0":global_through_cuts,
-          "global_through_tof1":global_through_cuts,
-          "global_through_tku_tp":global_through_cuts,
+          "global_through_tof1":False,
+          "global_through_tku_tp":False,
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
           "tof01_selection":False,
+          "mc_muon_us":False,
+          "mc_stations_us":False,
+          "mc_scifi_fiducial_us":False,
+          "mc_muon_ds":False,
+          "mc_stations_ds":False,
+          "mc_scifi_fiducial_ds":False,
     }
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = True
@@ -126,36 +131,46 @@ class Config(object):
     extrapolation_cuts["tof2_sp"] = True
     extrapolation_cuts["global_through_tkd_tp"] = True
     extrapolation_cuts["global_through_tof2"] = True
-    cut_report  = ["hline", "all events", "hline",]
-    cut_report += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "scifi_nan_us", "chi2_us", "scifi_fiducial_us", "hline",]
-    cut_report += ["delta_tof01", "tof01", "p_tot_us", "hline",]
+    mc_true_us_cuts = copy.deepcopy(upstream_cuts)
+    mc_true_us_cuts["mc_muon_us"] = True
+    mc_true_us_cuts["mc_stations_us"] = True
+    mc_true_us_cuts["mc_scifi_fiducial_us"] = True
+    mc_true_ds_cuts = copy.deepcopy(mc_true_us_cuts)
+    mc_true_ds_cuts["mc_muon_ds"] = True
+    mc_true_ds_cuts["mc_stations_ds"] = True
+    mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
+    cut_report = [[], []]
+    cut_report[0]  = ["hline", "all events", "hline",]
+    cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "scifi_nan_us", "chi2_us", "scifi_fiducial_us", "hline",]
+    cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
     if global_through_cuts:
-        cut_report += ["global_through_tku_tp", "global_through_tof1", "global_through_tof0",]
-    cut_report += ["upstream_aperture_cut", "hline",]
-    cut_report += ["upstream_cut", "hline",]
-    cut_report += ["scifi_tracks_ds", "scifi_nan_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
-    cut_report += ["downstream_cut", "hline",]
-    cut_report += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report += ["extrapolation_cut", "hline"]
+        cut_report[0] += ["global_through_tof0",]
+    cut_report[0] += ["upstream_aperture_cut", "hline",]
+    cut_report[0] += ["upstream_cut", "hline",]
+    cut_report[0] += ["scifi_tracks_ds", "scifi_nan_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[0] += ["downstream_cut", "hline",]
+    cut_report[0] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
+    cut_report[0] += ["extrapolation_cut", "hline"]
+    cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut",
+                     "hline", "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline", "mc_true_ds_cut", "hline", "downstream_cut"]
 
-    data_dir = "output/2017-02-delete/"
-
+    data_dir = "output/2017-02"
     files = "*"
     analyses = []
-    analyses.append(get_analysis("10069_v1/*", "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9971_v1/*", "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10483_v1/*", "Simulated 2017-2.7 3-140 LiH", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10444_v1/*", "Simulated 2017-2.7 3-140 None", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9971_v1/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None", [27, 32], data_dir, [[135, 145]], [100, 200], True))
 
-    analyses.append(get_analysis("10051_v1/*", "Simulated 2017-2.7 6-140 lH2 empty", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9966_v1/*", "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10485_v1/*", "Simulated 2017-2.7 6-140 LiH", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10446_v1/*", "Simulated 2017-2.7 6-140 None", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None", [27, 31], data_dir, [[135, 145]], [100, 200], True))
 
-    analyses.append(get_analysis("10052_v1/*", "Simulated 2017-2.7 10-140 lH2 empty", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9970_v1/*", "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10486_v1/*", "Simulated 2017-2.7 10-140 LiH", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10447_v1/*", "Simulated 2017-2.7 10-140 None", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10052_v1/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None", [27, 30], data_dir, [[135, 145]], [100, 200], True))
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -166,8 +181,9 @@ class Config(object):
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
     number_of_spills = None #100 # if set to an integer, limits the number of spills loaded for each sub-analysis
-    preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
-    analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
+    # NOTE on memory usage: looks like about 10% + 5-10% per 200 spills with 16 GB RAM
+    preanalysis_number_of_spills = 200 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 200 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
 
@@ -197,7 +213,7 @@ class Config(object):
     # 17242: lH2 window mount ds (ds edge)
     # 17585: SSU aperture
     # 18733: SSU He window
-    tkd_offset = 8.
+    tkd_pos = 18836.8+8.
     detectors = [
         (5287.2, None, "tof0"),
         (12929.6-25., None, "tof1_us"),
@@ -208,11 +224,11 @@ class Config(object):
         (14618.0, None, "tku_3"),
         (14867.0, None, "tku_2"),
         (15068.0, None, "tku_tp"),
-        (18836.8+tkd_offset, None, "tkd_tp"),
-        (18855.+tkd_offset, None, "tkd_2"),
-        (19205.+tkd_offset, None, "tkd_3"),
-        (19505.+tkd_offset, None, "tkd_4"),
-        (19855.+tkd_offset, None, "tkd_5"),
+        (tkd_pos+0., None, "tkd_tp"),
+        (tkd_pos+200., None, "tkd_2"),
+        (tkd_pos+450., None, "tkd_3"),
+        (tkd_pos+750., None, "tkd_4"),
+        (tkd_pos+1100., None, "tkd_5"),
         (21114.4, None, "tof2"),
         (21139.4, None, "tof2"),
         (21159.4, None, "tof2"),
@@ -263,8 +279,8 @@ class Config(object):
     for z, dummy, plane in virtual_detectors:
         print z, plane
 
-    mc_plots = {
-        "mc_stations" : { # one virtual plane for each tracker view
+    mc_plots = { # Used for virtual_cuts as well as plots
+        "mc_stations" : { # one virtual plane for each tracker view; first must be tracker reference plane
             "tku":["mc_virtual_tku_tp", "mc_virtual_tku_2", "mc_virtual_tku_3", "mc_virtual_tku_4", "mc_virtual_tku_5",],
             "tkd":["mc_virtual_tkd_tp", "mc_virtual_tkd_2", "mc_virtual_tkd_3", "mc_virtual_tkd_4", "mc_virtual_tkd_5",],
         }
