@@ -44,13 +44,27 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "chi2_threshold":5.0, # maximum allowed chi2/dof for chi2 cut
+            "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_source":amplitude_source,
+            "amplitude_systematic_reference":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":0.2,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
+                #"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":0.2,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
+            },
             "field_uncertainty":0.02,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":"test", #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
             "extrapolation_source":"tku_tp",
             "amplitude_chi2":False,
+            "amplitude_mc":False,
             "weight_tof01_source":None,
             "weight_tof01_target":plot_dir+"tof01_weights",
             "weight_tof01_mode":"build_distribution",
@@ -58,18 +72,18 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
 
             "do_magnet_alignment":False,
             "do_extrapolation":False,
-            "do_globals":do_globals,
+            "do_globals":False, #do_globals,
             "do_mc":False,
             "do_amplitude":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_plots":False, #True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
-            "do_optics":True,
+            "do_optics":False, #True,
+            "do_data_recorder":False, #True,
     }
 
 
 class Config(object):
-    geometry = "Test.dat" #"geometry_08681/ParentGeometryFile.dat" #
     # location to which data and plots will be dumped following analysis
     info_file = "geometry_08681/Maus_Information.gdml"
     will_require_tof1 = True # require at least one TOF1 Space point to even load the data
@@ -84,7 +98,7 @@ class Config(object):
           "scifi_space_clusters":False,
           "scifi_space_points":False,
           "scifi_tracks_us":True,
-          "scifi_nan_us":True,
+          "scifi_nan_us":False,
           "scifi_track_points_us":False,
           "scifi_fiducial_us":True,
           "aperture_us":False,
@@ -128,7 +142,6 @@ class Config(object):
     downstream_cuts["chi2_ds"] = True
     downstream_cuts["scifi_fiducial_ds"] = True
     downstream_cuts["tof12"] = False # if TOF12 is out of range chuck it (but ignore "no TOF2" events)
-    downstream_cuts["scifi_nan_ds"] = True
     downstream_cuts["scifi_tracks_ds"] = True
     extrapolation_cuts = copy.deepcopy(downstream_cuts)
     extrapolation_cuts["downstream_aperture_cut"] = True
@@ -137,22 +150,23 @@ class Config(object):
     extrapolation_cuts["global_through_tof2"] = True
     mc_true_us_cuts = copy.deepcopy(upstream_cuts)
     mc_true_ds_cuts = copy.deepcopy(upstream_cuts)
-    cut_report  = [[]]
+    cut_report  = [[], []]
     cut_report[0] = ["hline", "all events", "hline",]
-    cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "scifi_nan_us", "chi2_us", "scifi_fiducial_us", "hline",]
+    cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
     cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
     if global_through_cuts:
         cut_report[0] += ["global_through_tof0",]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
-    cut_report[0] += ["scifi_tracks_ds", "scifi_nan_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[0] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
     cut_report[0] += ["downstream_cut", "hline",]
-    cut_report[0] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report[0] += ["extrapolation_cut", "hline"]
+    cut_report[1] =  ["downstream_cut", "hline",]
+    cut_report[1] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
+    cut_report[1] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02/" # to which data is written
-    src_dir = "MAUS-rogers_2018-01-30/"
+    data_dir = "output/2017-02-Test-8/" # to which data is written
+    src_dir = "MAUS-Test-4-npe"
     correct_amplitude = True
     analyses = []
     analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [100, 200], True))
@@ -181,9 +195,9 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
-    preanalysis_number_of_spills = 500 # number of spills to analyse during "pre-analysis"
-    analysis_number_of_spills = 500 # number of spills to analyse during each "analysis" step
+    number_of_spills = 1000 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     tof0_offset = 0.
@@ -215,6 +229,7 @@ class Config(object):
     # 17242: lH2 window mount ds (ds edge)
     # 17585: SSU aperture
     # 18733: SSU He window
+    tku_offset = -3.
     tkd_offset = 8.
     detectors = [
         (5287.2-25., None, "tof0_us"),
@@ -223,11 +238,11 @@ class Config(object):
         (12929.6-25., None, "tof1_us"),
         (12929.6, None, "tof1"),
         (12929.6+25., None, "tof1_ds"),
-        (13968.0, None, "tku_5"),
-        (14318.0, None, "tku_4"),
-        (14618.0, None, "tku_3"),
-        (14867.0, None, "tku_2"),
-        (15068.0, None, "tku_tp"),
+        (15068.0-1100.+tku_offset, None, "tku_5"),
+        (15068.0-750.+tku_offset, None, "tku_4"),
+        (15068.0-450.+tku_offset, None, "tku_3"),
+        (15068.0-200.+tku_offset, None, "tku_2"),
+        (15068.0+tku_offset, None, "tku_tp"),
         (18836.8+tkd_offset, None, "tkd_tp"),
         (18836.8+200.+tkd_offset, None, "tkd_2"),
         (18836.8+450.+tkd_offset, None, "tkd_3"),

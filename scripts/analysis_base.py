@@ -62,16 +62,24 @@ class AnalysisBase(object):
 
     def print_plots(self):
         for name, my_plot in self.plots.iteritems():
+            plot_dir = self.plot_dir
+            if my_plot["config"]["sub_dir"] != None:
+                plot_dir = os.path.join(plot_dir, my_plot["config"]["sub_dir"])
+                try:
+                    os.makedirs(plot_dir)
+                except OSError:
+                    pass
             my_plot["canvas"].cd()
             my_plot["canvas"].Draw()
             my_plot["canvas"].Update()
             plot_title = name.replace(" ", "_")
             for format in ["png", "root", "eps"]:
-                my_plot["canvas"].Print(self.plot_dir+"/"+plot_title+"."+format)
+                my_plot["canvas"].Print(plot_dir+"/"+plot_title+"."+format)
 
     def get_default_config(self):
         return {
             "rescale":False,
+            "logy":False,
             "fit_1d_cuts":False,
             "draw_1d_cuts":False,
             "normalise":False,
@@ -82,6 +90,7 @@ class AnalysisBase(object):
                 "title_size":0.08,
                 "label_size":0.05,
             },
+            "sub_dir":None,
         }
 
     def base_death(self):
@@ -94,8 +103,10 @@ class AnalysisBase(object):
             # Note the order is important
             if plot_config["normalise"]: # normalise histograms to integral = 1
                 self.normalise(plot_name)
+            if plot_config["logy"]: # logy histograms axis
+                self.logy(plot_name)
             if plot_config["rescale"]: # rescale histograms axis
-                self.rescale=(plot_name)
+                self.rescale(plot_name)
             if plot_config["draw_1d_cuts"]: # color according to all, us cut, ds cut then draw
                 self.draw_1d_cuts(plot_name)
             if plot_config["fit_1d_cuts"]: # fit and make a text box according to all, us cut, ds cut
@@ -106,7 +117,6 @@ class AnalysisBase(object):
                 self.set_title(plot_name)
             self.set_label_size(plot_name)
             self.plots[plot_name]["canvas"].Update()
-
 
     def set_title(self, plot_name):
         hist_dict = self.get_plot(plot_name)["histograms"]
@@ -126,6 +136,10 @@ class AnalysisBase(object):
                 hist = hist_dict[hist_name]
                 hist.SetLineColor(color)
                 hist.Draw(draw_option)
+
+    def logy(self, plot_name):
+        self.get_plot(plot_name)["canvas"].SetLogy(True)
+        self.get_plot(plot_name)["pad"].SetLogy(True)
 
     def rescale(self, plot_name):
         hist_dict = self.get_plot(plot_name)["histograms"]

@@ -1,9 +1,14 @@
+import time
+import importlib
+import sys
+
+import ROOT
+
 import Configuration
 import maus_cpp.globals
 import maus_cpp.material
+
 import xboa.common
-import ROOT
-import time
 
 def initialise_maus():
     configuration = Configuration.Configuration().\
@@ -17,15 +22,17 @@ def material_to_colour(material):
         material = material[3:]
     if material not in MATERIAL_LIST:
         MATERIAL_LIST.append(material)
-    if material in ("Galactic", "AIR", "He"):
+    if material in ("Galactic"):
         return None
+    elif material in ("AIR", "He"):
+        return ROOT.kYellow
     if material in ("Fe"): # "kill volumes"
         return 1
-    if material in ("MYLAR", "POLYSTYRENE", "RenCast6400", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10", "TUFNOL"):
+    if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10", "TUFNOL"):
         return 8
     if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON"):
         return 2
-    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE"):
+    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "RenCast6400"):
         return 4
     print "UNRECOGNISED MATERIAL", material
     return 1
@@ -46,12 +53,15 @@ def get_materials(radius, z_start, z_end, z_step):
     return material_start
 
 ROOT_GRAPHS = []
-def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step):
+def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
     global ROOT_GRAPHS
-    canvas = xboa.common.make_root_canvas("materials")
+    if name == "" or name == None:
+        name = "materials"
+    canvas = xboa.common.make_root_canvas(name)
     canvas.SetWindowSize(1900, 1000)
     n_steps = int((r_end-r_start)/r_step)
-    hist = ROOT.TH2D("materials", ";z [mm]; x [mm]", 1000, z_start, z_end, 1000, r_start, r_end)
+    title = name+" z_step: "+str(z_step)+" r_step: "+str(r_step)
+    hist = ROOT.TH2D(name, title+";z [mm]; x [mm]", 1000, z_start, z_end, 1000, r_start, r_end)
     hist.SetStats(False)
     hist.Draw()
     ROOT_GRAPHS.append(hist)
@@ -85,14 +95,26 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step):
 
     canvas.Update()
     for format in "png", "eps", "root":
-        canvas.Print("plots/materials."+format)
+        canvas.Print("plots/"+name+"."+format)
 
-def main():
+def get_z_tk(config_mod):
+    config = importlib.import_module("config_reco").Config
+    z_list = [(det[0], det[2]) for det in config.detectors if "tku" in det[2] or "tkd" in det[2]]
+    print "Found tracker detectors at", z_list
+    return z_list
+
+def plot_trackers():
+    z_tk_list = get_z_tk("scripts/config_reco.py")
     initialise_maus()
     old_time = time.time()
-    plot_materials(-250.5, 250.5, 1., 12000., 23000., 0.1)
+    for z_tk, name in z_tk_list[4:5]:
+        plot_materials(-1.5, 1.5, 0.01, z_tk-3., z_tk+3., 0.01, name = name)
     print "Plotting took", time.time() - old_time, "seconds"
-    print "Found the following materials", MATERIAL_LIST
+    print "Found the following materials", MATERIAL_LIST 
+
+def main():
+    plot_trackers()
+    raw_input()
 
 if __name__ == "__main__":
     main()

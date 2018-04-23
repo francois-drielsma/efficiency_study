@@ -104,7 +104,7 @@ def set_root_verbosity(verbose_level):
     #verb_map = [ROOT.kPrint, ROOT.kInfo, ROOT.kWarning, ROOT.kError, ROOT.kBreak, ROOT.kSysError, ROOT.kFatal]
     ROOT.gErrorIgnoreLevel = 6000
 
-def set_palette():
+def setup_gstyle():
     stops = [0.0000, 0.1250, 0.2500, 0.3750, 0.5000, 0.6250, 0.7500, 0.8750, 1.0000]
     red   = [0.2082, 0.0592, 0.0780, 0.0232, 0.1802, 0.5301, 0.8186, 0.9956, 0.9764]
     green = [0.1664, 0.3599, 0.5041, 0.6419, 0.7178, 0.7492, 0.7328, 0.7862, 0.9832]
@@ -119,71 +119,89 @@ def set_palette():
     ROOT.TColor.CreateGradientColorTable(npoints, s, r, g, b, ncontours)
     ROOT.gStyle.SetNumberContours(ncontours)
 
-def get_frame_fill(level = 0.9):
+    # axes and labels
+    ROOT.gStyle.SetPadBottomMargin(0.15)
+    ROOT.gStyle.SetPadLeftMargin(0.15)
+    ROOT.gStyle.SetPadRightMargin(0.15)
+    for axis in "X", "Y":
+        ROOT.gStyle.SetNdivisions(505, axis)
+        ROOT.gStyle.SetLabelSize(0.05, axis)
+        ROOT.gStyle.SetTitleSize(0.06, axis)
+        ROOT.gStyle.SetTitleOffset(1.10, axis)
+
+def get_frame_fill():
+    level = 0.9
     return ROOT.TColor.GetColor(0.2082*level, 0.1664*level, 0.5293*level)
 
-def set_palette_old_delete(name = None, ncontours=999):
-    """Set a color palette from a given RGB list
-    stops, red, green and blue should all be lists of the same length
-    see set_decent_colors for an example"""
-    if name == None:
-        ROOT.gStyle.SetPalette(57) # ROOT 6.04
-        return
-
-    if name == "gray" or name == "grayscale":
-        stops = [0.00, 0.34, 0.61, 0.84, 1.00]
-        red   = [1.00, 0.84, 0.61, 0.34, 0.00]
-        green = [1.00, 0.84, 0.61, 0.34, 0.00]
-        blue  = [1.00, 0.84, 0.61, 0.34, 0.00]
-    # elif name == "whatever":
-        # (define more palettes)
-    elif name == "old default":
-        # default palette, looks cool
-        stops = [0.00, 0.34, 0.61, 0.84, 1.00]
-        red   = [0.00, 0.00, 0.87, 1.00, 0.51]
-        green = [0.00, 0.81, 1.00, 0.20, 0.00]
-        blue  = [0.51, 1.00, 0.12, 0.00, 0.00]
-    elif name == "lighter_to_darker":
-        stops = [0.00, 0.34, 0.61, 0.84, 1.00]
-        red   = [0.90, 0.80, 0.50, 0.35, 0.20]
-        green = [0.95, 0.90, 0.70, 0.55, 0.30]
-        blue  = [0.70, 0.50, 0.40, 0.50, 0.60]
-    s = numpy.array(stops)
-    r = numpy.array(red)
-    g = numpy.array(green)
-    b = numpy.array(blue)
-
-    npoints = len(s)
-    ROOT.TColor.CreateGradientColorTable(npoints, s, r, g, b, ncontours)
-    ROOT.gStyle.SetNumberContours(ncontours)
-
 import random
-def test_palette():
-    set_palette("lighter_to_darker")
-    canvas = ROOT.TCanvas("test", "test")
-    hist = ROOT.TH2D("test", "test", 100, -1, 1, 100, -1, 1)
-    graph = ROOT.TGraph(100000)
+root_objects = []
+
+def test_hist_2d():
+    canvas = ROOT.TCanvas("test 2d", "test 2d")
+    hist = ROOT.TH2D("test 2d", ";x axis [units];y axis [units]", 50, -1, 1, 50, -1, 1)
     hist.SetStats(False)
     for i in range(100000):
         x, y = random.gauss(0, 0.3), random.gauss(0, 0.3)
         hist.Fill(x, y)
-        graph.SetPoint(i, x, y)
     canvas.Draw()
+    # if you want to emphasise the tails, leave the frame white
     hist.Draw("COLZ")
     canvas.Update()
-    canvas.Print("test_hist.eps")
-    canvas.Print("test_hist.png")
+    canvas.Print("test_hist_2d_no_fill.eps")
+    canvas.Print("test_hist_2d_no_fill.png")
 
-    canvas2 = ROOT.TCanvas("test2", "test2")
-    hist2 = ROOT.TH2D("test2", "test2", 100, -1, 1, 100, -1, 1)
-    hist2.Draw()
-    graph.Draw("p")
-    canvas2.Print("test_scatter.eps")
-    canvas2.Print("test_scatter.png")
+    # if you want to de-emphasise the tails, use a frame fill
+    canvas.SetFrameFillColor(get_frame_fill())
 
-    raw_input()
+    do_axes(hist)
+    hist.Draw("COLZ")
+    canvas.Update()
+    canvas.Print("test_hist_2d_fill.eps")
+    canvas.Print("test_hist_2d_fill.png")
+    # these two lines force python to keep the ROOT stuff in memory
+    root_objects.append(canvas)
+    root_objects.append(hist)
+
+def test_hist_1d():
+    canvas = ROOT.TCanvas("test 1d", "test 1d")
+    hist_data = ROOT.TH1D("test 1d data", ";x axis [units];y axis [units]", 100, -1, 1)
+    hist_mc = ROOT.TH1D("test 1d mc", ";x axis [units];y axis [units]", 100, -1, 1)
+    hist_data.SetStats(False)
+    hist_mc.SetStats(False)
+    for i in range(100000):
+        x_data = random.gauss(0, 0.3)
+        hist_data.Fill(x_data)
+        x_mc = random.gauss(0.01, 0.27)
+        hist_mc.Fill(x_mc)
+    canvas.Draw()
+    hist_mc.SetFillColor(ROOT.kOrange-2)
+    hist_mc.Draw()
+
+    hist_data.SetMarkerStyle(20)
+    hist_data.Draw("e1 p same")
+    canvas.Update()
+    canvas.Print("test_hist_1d.eps")
+    canvas.Print("test_hist_1d.png")
+    # these two lines force python to keep the ROOT stuff in memory
+    root_objects.append(canvas)
+    root_objects.append(hist_data)
+    root_objects.append(hist_mc)
+
+    # if you are comparing MC graph with data graph, then following style is recommended:
+    hist_mc.SetMarkerStyle(26)
+    hist_mc.SetMarkerColor(ROOT.kRed)
+    hist_mc.SetLineColor(ROOT.kRed)
+    hist_mc.Draw("e1 p")
+
+    hist_data.SetMarkerStyle(20)
+    hist_data.Draw("e1 p same")
+    canvas.Update()
+    canvas.Print("test_graph_1d.eps")
+    canvas.Print("test_graph_1d.png")
 
 if __name__ == "__main__":
-    test_palette()
-
+    setup_gstyle()
+    test_hist_2d()
+    test_hist_1d()
+    raw_input("Finished")
 

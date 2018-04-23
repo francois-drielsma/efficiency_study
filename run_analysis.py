@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import time
+import analysis_base # check that the path is correct
 import xboa.common
 
 def is_scarf():
@@ -72,11 +73,13 @@ def main(jobs, number_of_concurrent_processes, cards_list):
     print "\nFinished ... press <cr> to end"
 
 if __name__ == "__main__":
-    jobs = range(12)
     if is_scarf():
         n_procs = min(len(jobs), 100)
     else:
-        n_procs = 3
-    cards_list = ["scripts/config_mc.py", "scripts/config_reco.py"]
-    main(jobs, n_procs, cards_list)
+        n_procs = 4
+    #job_list = [4, 5, 6, 7] #range(12)
+    #cards_list = ["scripts/config_reco.py",] #] # "scripts/config_mc.py", 
+    job_list = range(0, 300)
+    cards_list = ["scripts/config_mc_systematics.py",] #
+    main(job_list, n_procs, cards_list)
 

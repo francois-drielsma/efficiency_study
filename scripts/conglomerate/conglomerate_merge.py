@@ -56,6 +56,12 @@ class ConglomerateMerge(object):
         legend_size = None
         if cong.legend != None:
             legend_size = cong.options["legend"]["pos"]
+        for hist in cong.hist_list:
+            hist.GetYaxis().SetLabelOffset(100)
+            #hist.GetYaxis().SetNdivisions(0, 0, 0)
+            hist.GetYaxis().SetRangeUser(0, 100000)
+
+        cong.label_size = 0.1
         cong.redraw(pad, cong.hist_list, cong.graph_list)
 
         #for graph in cong.graph_list:
@@ -63,7 +69,8 @@ class ConglomerateMerge(object):
         #        graph.Draw("LP")
         #    else:
         #        graph.Draw("SAME L")
-        self.do_legend(i, j, cong.legend, legend_size, pad)
+        if i == 0 and j == 2:
+            self.do_legend(i, j, cong.legend, legend_size, pad)
 
     def merge_one(self, canvas_name):
         """
@@ -81,12 +88,10 @@ class ConglomerateMerge(object):
         merge_canvas = ROOT.TCanvas(canvas_name+"_c1", canvas_name+"_c1", 1400, 1000)
         merge_dict["canvas"] = merge_canvas
         merge_canvas.Draw()
-        merge_canvas.Divide(1, 1, 0., 0.)
-        merge_pad = merge_canvas.GetPad(1)
-        y_min, x_min = 0.1, 0.1
-        merge_pad.SetPad(x_min, y_min, 0.99, 0.99)
         hist_index = 0
-        merge_pad.Divide(self.cols, self.rows, 0., 0.)
+        merge_canvas.Divide(1, 1, 0.1, 0.1)
+        pad = merge_canvas.cd(1)
+        pad.Divide(self.cols, self.rows, 0., 0.)
         for i in range(self.rows):
             for j in range(self.cols):
                 cong_base = self.conglomerate_list[hist_index]
@@ -96,7 +101,7 @@ class ConglomerateMerge(object):
                 source_x_axis = cong.x_axis
                 source_y_axis = cong.y_axis
                 target_dir = cong.config.target_plot_dir
-                self.draw_cong(merge_pad.GetPad(hist_index+1), cong, i, j)
+                self.draw_cong(pad.GetPad(hist_index+1), cong, i, j)
                 hist_index += 1
 
         merge_canvas.cd()

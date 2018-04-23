@@ -27,7 +27,7 @@ class ConglomerateOne(object):
         self.legend = None
         self.x_axis = None
         self.y_axis = None
-
+        self.label_size = 0.05
 
     def get_pad(self, canvas):
         pad = canvas # if we cant find pad, use canvas instead
@@ -69,6 +69,7 @@ class ConglomerateOne(object):
             for graph_name in graph_name_list:
                 if graph_name in name:
                     if type(an_object) not in graph_types:
+                        print name, "matches", graph_name, "but type", type(an_object), "not a graph"
                         continue
                     graph_list.append(an_object)
                     graph_name_list.remove(graph_name)
@@ -109,14 +110,20 @@ class ConglomerateOne(object):
         x_range = self.options["rescale_x"]
         for hist in hist_list:
             hist.GetXaxis().SetRangeUser(x_range[0], x_range[1])
+        print "RESCALED", x_range
 
     def replace_hist(self, canvas, hist_list, graph_list):
         if not self.options["replace_hist"]:
             return
         x_range = self.options["rescale_x"]
         y_range = self.options["rescale_y"]
-        hist = ROOT.TH2D("replacement", "", 1000, x_range[0], x_range[1], y_range[0], y_range[1])
+        if not x_range or not y_range:
+            print "Error - need to define rescale_x and rescale_y if replace_hist"
+        hist = ROOT.TH2D(canvas.GetName()+" hist replacement", "", 1000, x_range[0], x_range[1], 1000, y_range[0], y_range[1])
         hist.SetStats(False)
+        for axis in hist.GetXaxis(), hist.GetYaxis():
+            axis.SetNdivisions(5, 5, 0)
+            axis.SetLabelSize(self.label_size)
         hist_list.insert(0, hist)
         
     def rescale_y(self, canvas, hist_list, graph_list):
@@ -174,7 +181,7 @@ class ConglomerateOne(object):
             hist.GetYaxis().SetTitle("")
         canvas.cd()
         if self.options["axis_title"]["x"] != None:
-            x_text_box = ROOT.TPaveText(0.10, 0.015, 0.97, 0.04, "NDC")
+            x_text_box = ROOT.TPaveText(0.10, 0.02, 0.97, 0.04, "NDC")
             x_text_box.SetFillColor(0)
             x_text_box.SetBorderSize(0)
             x_text_box.SetTextSize(0.05)
@@ -213,6 +220,9 @@ class ConglomerateOne(object):
                 hist.SetLineColor(redraw["line_color"][i])
                 hist.SetFillColor(redraw["fill_color"][i])
                 hist.SetMarkerStyle(redraw["marker_style"][i])
+                for axis in hist.GetXaxis(), hist.GetYaxis():
+                    axis.SetNdivisions(5, 5, 0)
+                    axis.SetLabelSize(self.label_size)
                 hist.SetName(hist.GetName()+"_"+self.uid())
             draw_option = redraw["draw_option"]
             draw_order = redraw["draw_order"]
@@ -249,7 +259,6 @@ class ConglomerateOne(object):
         if len(hist_list) != len(self.options["legend"]["text"]):
             print "Failed to find all the histograms for legend(...)"
             return
-        legend.SetHeader(self.config.name[1]+" "+self.config.name[2])
         for i, text in enumerate(self.options["legend"]["text"]):
             if text == None:
                 continue
@@ -262,21 +271,23 @@ class ConglomerateOne(object):
     def mice_logo(self, canvas, hist_list, graph_list):
         if not self.options["mice_logo"]:
             return
-        text_box = ROOT.TPaveText(0.7, 0.2, 0.9, 0.3, "NDC")
+        text_box = ROOT.TPaveText(0.55, 0.3, 0.9, 0.4, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
-        text_box.AddText("MICE INTERNAL")
+        text_box.AddText("Internal Only")
         text_box.Draw()
         self.root_objects.append(text_box)
-        text_box = ROOT.TPaveText(0.7, 0.12, 0.9, 0.2, "NDC")
+        text_box = ROOT.TPaveText(0.55, 0.15, 0.9, 0.3, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
-        text_box.SetTextSize(0.02)
+        text_box.SetTextSize(0.03)
         text_box.SetTextAlign(12)
         text_box.AddText("ISIS Cycle 2017/02 and 2017/03")
-        text_box.AddText("MAUS v3.x")
+        text_box.AddText(str(self.config.channel))
+        text_box.AddText(str(self.config.beamline))
+        text_box.AddText(str(self.config.absorber))
         text_box.Draw()
         self.root_objects.append(text_box)
 
@@ -306,6 +317,7 @@ class ConglomerateOne(object):
             canvas.Print(name+"."+fmt)
 
     def murgle_many(self, canvas, hist_list, graph_list):
+        self.label_size = 0.1
         #self.rebin(canvas, hist_list, graph_list)
         #self.normalise(canvas, hist_list, graph_list)
         #self.defit(canvas, hist_list, graph_list)
@@ -320,6 +332,7 @@ class ConglomerateOne(object):
         #self.axis_title(canvas, hist_list, graph_list)
 
     def murgle_histograms(self, canvas, hist_list, graph_list):
+        self.label_size = 0.05
         self.rebin(canvas, hist_list, graph_list)
         self.normalise(canvas, hist_list, graph_list)
         self.defit(canvas, hist_list, graph_list)

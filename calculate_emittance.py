@@ -25,7 +25,10 @@ import scripts.cuts_plotter
 import scripts.amplitude_analysis
 import scripts.globals_plotter
 import scripts.optics_plotter
+import scripts.data_recorder
 import scripts.utilities
+import scripts.root_style
+
 config_file = None
 
 class Analyser(object):
@@ -34,8 +37,8 @@ class Analyser(object):
         config_mod = config_mod.replace("/", ".")
         print "Using configuration module", config_mod
         config_file = importlib.import_module(config_mod)
-        scripts.utilities.set_palette()
-        scripts.utilities.set_root_verbosity(5)
+        scripts.root_style.setup_gstyle()
+        scripts.root_style.set_root_verbosity()
         ROOT.gROOT.SetBatch(True)
         self.config = config_file.Config()
         self.config_anal = None
@@ -67,7 +70,6 @@ class Analyser(object):
         str_conf = Configuration.Configuration().\
                                           getConfigJSON(command_line_args=False)
         json_conf = json.loads(str_conf)
-        json_conf["simulation_geometry_filename"] = config.geometry
         json_conf["verbose_level"] = config.maus_verbose_level
         maus_conf = json.dumps(json_conf)
         maus_cpp.globals.birth(maus_conf)
@@ -104,6 +106,9 @@ class Analyser(object):
         if self.config_anal["do_amplitude"]:
             print "Doing amplitude"
             self.analysis_list.append(scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_data_recorder"]:
+            print "Doing data recorder"
+            self.analysis_list.append(scripts.data_recorder.DataRecorder(self.config, self.config_anal, self.data_loader))
 
     def birth_phase(self):
         all_event_count = 0

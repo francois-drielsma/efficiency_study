@@ -2,11 +2,12 @@ import sys
 import numpy
 import bisect
 import time
+import copy
 
 from xboa.hit import Hit
 
 class AmplitudeDataBinless(object):
-    def __init__(self, file_name, bin_edges, mass):
+    def __init__(self, file_name, bin_edges, mass, cov_fixed):
         """
         Initialise the AmplitudeData class for the basic amplitude calculation
         * File name is the name of the (temporary) file to which the amplitude data is written
@@ -31,7 +32,10 @@ class AmplitudeDataBinless(object):
         """
         self.file_name = file_name
         self.mass = mass # for emittance calculation
-        self.min_events = 10 # minimum number of events in the cov calculation
+        self.min_events = 1000 # minimum number of events in the cov calculation
+        self.save_frequency = 100 # frequency with which we save the state
+        self.cov_fixed = cov_fixed
+        self.state_list = []
         self.clear()
 
     def clear(self):
@@ -51,6 +55,7 @@ class AmplitudeDataBinless(object):
         self.mean = numpy.array([0. for i in range(n_var)])
         self.cov = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
         self.cov_inv = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
+        self.state_list = []
         self.emittance = 0.
 
     def append_hits(self, hit_list):
@@ -281,12 +286,25 @@ class AmplitudeDataBinless(object):
                     calculate amplitudes
                     rebin events
                     remove from cov matrix anything in the cut_bin
+        calculate covariance matrix of "ref bin"
+        while number of events in "ref bin" > 10
+            calculate amplitudes in "ref bin"
+            designate highest amplitude in the "ref bin" as "amp cut"
+            remove highest amplitude event from the "ref bin"
+            update covariance matrix
+            loop over "test bin"
+                calculate amplitudes
+                if amplitude > "amp cut", remove event from "test bin" and store the amplitude
+        swap the "ref bin" and "test bin" designation and repeat
         """
         self.get_cov_matrix(ref_sample)
         test_used = [False]*self.n_events[test_sample]
         ref_used = [False]*self.n_events[ref_sample]
         amplitude_list = [None]*self.n_events[test_sample]
         then = time.time()
+        sample_count = 0
+        if self.n_cov_events <= self.min_events:
+            self.min_events = self.n_cov_events - 1
         while self.n_cov_events > self.min_events:
             amplitude_cut = -1
             max_event = -1
@@ -299,10 +317,13 @@ class AmplitudeDataBinless(object):
                     max_event = i
             try:
                 ref_used[max_event] = True
+                sample_count += 1
                 self.remove_from_cov_matrix(numpy.array([self.ps_matrix[ref_sample][max_event]]))
             except Exception:
                 sys.excepthook(*sys.exc_info())
                 break
+            if sample_count % self.save_frequency == 0:
+                self.save_state()
 
             for i in range(self.n_events[test_sample]):
                 if test_used[i]:
@@ -310,7 +331,7 @@ class AmplitudeDataBinless(object):
                 amplitude_list[i] = self.get_amplitude(test_sample, i)
                 if amplitude_list[i] > amplitude_cut:
                     test_used[i] = True # freeze the amplitude
- 
+            
             if time.time() - then > 60:
                 then = time.time()
                 print "    ...", self.n_cov_events, "events remaining"
@@ -318,6 +339,23 @@ class AmplitudeDataBinless(object):
               test_sample, "and", self.n_cov_events, "remaining"
         self.get_data(test_sample, 'r+')  # go into write mode
         self.amplitude[test_sample][:] = numpy.array(amplitude_list, dtype='float32')[:]
+
+    def set_fixed_cov_matrix(self):
+        n_var = 4
+        self.n_cov_events = 0.
+        self.mean = numpy.array([0. for i in range(n_var)])
+        self.cov = numpy.array(self.cov_fixed)
+        self.cov_inv = numpy.linalg.inv(self.cov)
+        self.get_emittance()
+
+    def fractional_amplitude_fixed(self):
+        self.set_fixed_cov_matrix()
+        for sample in [0, 1]:
+            amplitude_list = [None]*self.n_events[sample]
+            for i in range(self.n_events[sample]):
+                amplitude_list[i] = self.get_amplitude(sample, i)
+            self.get_data(sample, 'r+')  # go into write mode
+            self.amplitude[sample][:] = numpy.array(amplitude_list, dtype='float32')[:]
 
     def fractional_amplitude(self):
         """
@@ -328,8 +366,11 @@ class AmplitudeDataBinless(object):
         Returns a dictionary mapping (run, spill, event) tuples to amplitude
         """
         print "Calculating amplitudes with number/sample:", self.n_events
-        self.fractional_amplitude_sample(0, 1)
-        self.fractional_amplitude_sample(1, 0)
+        if self.cov_fixed:
+            self.fractional_amplitude_fixed()
+        else:
+            self.fractional_amplitude_sample(0, 1)
+            self.fractional_amplitude_sample(1, 0)
         amplitude_list = []
         for sample in range(len(self.n_events)):
             runs, spills, events, psvs, amplitudes = self.get_data(sample, 'r')
@@ -339,6 +380,23 @@ class AmplitudeDataBinless(object):
         print "Registered", len(amplitude_dict), "amplitudes"
         return amplitude_dict
 
+    def save_state(self):
+        """
+        Record internal state for plotting/diagnostics etc
+
+        Append to self.state_list a dictionary containing:
+          - emittance
+          - mean
+          - cov
+          - number of events surviving in the reference sample
+        """
+        my_state = {
+            "emittance":copy.deepcopy(self.emittance),
+            "mean":copy.deepcopy(self.mean),
+            "cov":copy.deepcopy(self.cov),
+            "n_events":self.n_cov_events,
+        }
+        self.state_list.append(my_state)
 
 def delete_elements(source_map, elements):
     if len(elements) == 0:

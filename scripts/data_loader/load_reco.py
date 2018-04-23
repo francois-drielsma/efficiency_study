@@ -117,9 +117,70 @@ class LoadReco(object):
               "detector":["tku_sp_", "tkd_sp_"][space_point.get_tracker()],
               "n_channels":space_point.get_channels().GetEntries(),
               "is_used":space_point.is_used(),
+              "channels":[chan.get_channel() for chan in space_point.get_channels()],
+              "npe":[chan.get_npe() for chan in space_point.get_channels()],
             })
             space_points_out[-1]["detector"] += str(space_point.get_station())
         return space_points_out
+
+    def load_rejects(self, pr_track):
+        reject_keys = ["sz_chi2", "xy_chi2", "sz_r", "n_sp", "tracker", ]
+        cut_values = [65., 10., 150., 99, 99]
+        #print "Load rejects\n   ",
+        #for key in reject_keys:
+        #    print key.rjust(8),
+        #print
+        reject_values = [
+            pr_track.get_rejects_sz_chi2(),
+            pr_track.get_rejects_xy_chi2(),
+            pr_track.get_rejects_sz_r(),
+            pr_track.get_rejects_n_sp(),
+            pr_track.get_rejects_tracker(),
+        ]
+        # Complicated bit:
+        # we sort by (sz chi2 cut, xy chi2 cut, sz r cut, sz_chi2, xy_chi2, sz_r)
+        # so that passed events are always first
+
+        # convert -1 flag (for failed to even try to calc chi2/etc) to "infinity"
+        for i, item in enumerate(reject_values):
+            item = [x for x in item]
+            for j, x in enumerate(item):
+                if item[j] < -1e-3:
+                    item[j] = 999
+            reject_values[i] = tuple(item)
+
+        # make list of "was rejected" flags followed by list of actual chi2
+        was_rejected = []
+        for i, item in enumerate(reject_values):
+            # False < True so (not "was rejected" events) < ("was rejected" events) => not rejected events evaluate to lower
+            was_rejected.append(tuple([cut_values[i] < x for x in item]))
+
+        sort_list = was_rejected+reject_values
+        sort_list = zip(*sort_list)
+        n_sp = 5 #pr_track.get_spacepoints_pointers().size()
+        sort_list = [item for item in sort_list if item[8] == n_sp]
+        sort_list = sorted(sort_list)
+        if len(sort_list) > 10000:
+            print reject_keys
+            print cut_values
+            for i, item in enumerate(sort_list):
+                print "REJECTS ", i, item
+            print
+        for i, item in enumerate(sort_list[0:0]):
+            if i > 2:
+                break
+            print "   ",
+            for value in item:
+                if value == False or value == True:
+                    continue
+                print str(round(value, 2)).rjust(8),
+            print
+        sort_list = zip(*sort_list)
+        if len(sort_list) > 0:
+            sort_list = dict([(key, sort_list[i+len(reject_keys)]) for i, key in enumerate(reject_keys)])
+        else:
+            sort_list = dict([(key, []) for i, key in enumerate(reject_keys)])
+        return sort_list
 
     def load_track_points(self, scifi_event):
         track_points_out = []
@@ -127,8 +188,11 @@ class LoadReco(object):
             detector = ["tku_tp", "tkd_tp"][track.tracker()]
             this_track_points = []
             for track_point in track.scifitrackpoints():
-                #print track.tracker(), track_point.station(), track_point.pos().z()
-                if track_point.station() != self.config.tk_station or track_point.plane() != self.config.tk_plane:
+                if track_point.station() != self.config.tk_station:
+                    if track_point.plane() != 2:
+                        continue
+                    detector = detector[:3]+"_"+str(track_point.station())
+                elif track_point.plane() != self.config.tk_plane:
                     continue
                 position = track_point.pos() # maybe global coordinates?
                 momentum = track_point.mom() # maybe global coordinates?
@@ -174,6 +238,8 @@ class LoadReco(object):
                       "hit":{"z":999},
                     })
                     break
+                pr_tracks = [prtk for prtk in scifi_event.helicalprtracks() if prtk.get_tracker() == track.tracker()]
+                #print detector, "with", len(pr_tracks), "helical pr tracks"
                 this_track_points.append({
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
                   "detector":detector,
@@ -182,6 +248,7 @@ class LoadReco(object):
                   "chi2":track.chi2(),
                   "ndf":track.ndf(),
                   "max_r2":-99., # maximum radius squared between this track point and the next one in the same tracker
+                  "rejects":self.load_rejects(track.pr_track_pointer()),
                 })
             this_track_points = sorted(this_track_points)
             this_track_points = self.set_max_r(this_track_points)
@@ -338,11 +405,21 @@ class LoadReco(object):
         return will_cut
 
     def will_cut_on_chi2(self, scifi_event):
-        """Require all tracks in a tracker to have pvalue greater than threshold"""
-        will_cut = [False, False]
+        """Cut if all tracks in a tracker to have chi2 greater than threshold"""
+        will_cut = [0, 0] #-1 passes; 0 no result; 1 fails
+        chi2_cut = self.config_anal["chi2_threshold"]
         for track in scifi_event.scifitracks():
-            will_cut[track.tracker()] = will_cut[track.tracker()] and \
-                                track.chi2()/track.ndf() > self.config_anal["chi2_threshold"]
+            tracker = track.tracker()
+            chi2_df = track.chi2()/track.ndf()
+            if chi2_df > chi2_cut: # this track fails cut
+                if will_cut[tracker] != -1: # no previous track passed cut; so chuck out
+                    will_cut[tracker] = 1
+                else: # a previous track passed cut; so passes
+                    will_cut[tracker] = -1
+            else: # this track passed cut so passes
+                will_cut[tracker] = -1
+        for i in range(2): # will_cut is true if all tracks failed
+            will_cut[i] = will_cut[i] == 1
         return will_cut
 
     detectors = {
@@ -520,6 +597,7 @@ class LoadReco(object):
 
     global_passes = []
     def load_reco_event(self, event, reco_event, spill_number):
+        #print "Spill", spill_number, "Event", reco_event.GetPartEventNumber()
         tof_event = reco_event.GetTOFEvent()
         global_event = reco_event.GetGlobalEvent()
         scifi_event = reco_event.GetSciFiEvent()
@@ -628,6 +706,10 @@ class LoadReco(object):
         event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
+        if tku == None: # BUG - some events are missing the tracks cut
+            event["will_cut"]["scifi_tracks_us"] = True
+        if tkd == None:
+            event["will_cut"]["scifi_tracks_ds"] = True
         event["will_cut"]["delta_tof01"] = self.will_do_delta_tof01_cut(event)
         event["will_cut"]["delta_tof12"] = self.will_do_delta_tof12_cut(event)
         event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)

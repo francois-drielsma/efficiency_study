@@ -1,11 +1,13 @@
 import copy
+import xboa.common
+from xboa.bunch import Bunch
 
 def mc_file_names(datasets):
     file_list = ["/home/cr67/work/reco/mc/"+datasets+"/*_sim.root"]
     return file_list
 
 def rogers_mc_file_names(datasets):
-    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/maus_output.root"]
+    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/maus_reconstruction.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus, do_globals):
@@ -26,6 +28,14 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
+    cov_us = Bunch.build_penn_ellipse(
+                        1., xboa.common.pdg_pid_to_mass[13],
+                        250., 0., (min_p+max_p)/2., 0., 3.e-3, 1. 
+            ).tolist()
+    cov_ds = Bunch.build_penn_ellipse(
+                        1., xboa.common.pdg_pid_to_mass[13],
+                        250., 0., (min_p+max_p)/2., 0., 2.e-3, 1. 
+            ).tolist()
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
             "tof12_cut_low":32., # TOF12 cut lower bound
@@ -53,16 +63,19 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
             "tracker_fiducial_radius":150.,
+            "cov_fixed_us":None, #cov_us,
+            "cov_fixed_ds":None, #cov_ds,
+            "amplitude_algorithm":"binned",
 
             "do_magnet_alignment":False,
             "do_amplitude":True,
             "do_extrapolation":False,
             "do_globals":do_globals,
-            "do_mc":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_mc":False,
+            "do_plots":False,
+            "do_cuts_plots":False,
             "do_tof01_weighting":False,
-            "do_optics":True,
+            "do_optics":False,
             "do_data_recorder":False,
 
         }
@@ -70,13 +83,13 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
 class Config(object):
     # location to which data and plots will be dumped following analysis
     info_file = "geometry_08681/Maus_Information.gdml"
-    will_require_tof1 = True # require at least one TOF1 Space point to even load the data
+    will_require_tof1 = False # require at least one TOF1 Space point to even load the data
     will_require_tof2 = False # require at least one TOF2 Space point to even load the data
     tk_station = 1 # load data from a particular tracker station
     tk_plane = 0
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
-    global_through_cuts = True
+    global_through_cuts = False
     upstream_cuts = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
           "any_cut":None,
           "scifi_space_clusters":False,
@@ -95,16 +108,16 @@ class Config(object):
           "scifi_fiducial_ds":False,
           "pvalue_ds":False,
           "chi2_ds":False,
-          "tof01":True,
+          "tof01":False,
           "tof12":False,
           "p_tot_us":True,
           "p_tot_ds":False,
-          "tof_0_sp":True,
-          "tof_1_sp":True,
+          "tof_0_sp":False,
+          "tof_1_sp":False,
           "tof_2_sp":False,
-          "upstream_aperture_cut":True,
+          "upstream_aperture_cut":False,
           "downstream_aperture_cut":False,
-          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
+          "delta_tof01":False, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "global_through_tof0":global_through_cuts,
           "global_through_tof1":False,
@@ -142,36 +155,40 @@ class Config(object):
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
     cut_report = [[], []]
     cut_report[0]  = ["hline", "all events", "hline",]
-    cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
-    cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
+    cut_report[0] += ["scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
+    cut_report[0] += ["p_tot_us", "hline",]
     if global_through_cuts:
         cut_report[0] += ["global_through_tof0",]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
-    cut_report[0] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
-    cut_report[0] += ["downstream_cut", "hline",]
-    cut_report[0] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report[0] += ["extrapolation_cut", "hline"]
-    cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut",
-                     "hline", "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline", "mc_true_ds_cut", "hline", "downstream_cut"]
+    cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut"]
 
-    data_dir = "output/2017-02"
-    files = "*"
+    data_dir = "output/2017-02-Systematics-6"
     analyses = []
-    analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9971_v2/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None", [27, 32], data_dir, [[135, 145]], [100, 200], True))
 
-    analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9966_v2/"+files, "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-
-    analyses.append(get_analysis("10052_v1/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9970_v2/"+files, "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    run_tuple = ("6", "10051", [27, 31]), ("10", "10052", [27, 30]), ("3", "10069", [27, 32])
+    for emit, run, tof in run_tuple:
+        index = 0
+        for i in range(1, 10):
+            for j in range(1, 10):
+                files = str(i)+str(j)+'?'
+                index += 1
+                analyses.append(get_analysis("systematics/"+run+"_systematics_v2/tku_base/"+files,
+                            "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
+                            tof, data_dir, [[135, 145]], [100, 200], False))
+    for name in [
+      "tku_base",
+      #"tku_pos_plus", "tku_scale_C_plus", "tku_scale_E2_plus",
+      #"tkd_scale_C_plus", "tkd_scale_E2_plus", "tku_density_plus", 
+      #"tku_rot_plus", "tku_scale_E1_plus",
+      #"tkd_density_plus", "tkd_rot_plus", "tkd_scale_E1_plus", "tkd_pos_plus"
+    ]:
+        for emit, run, tof in run_tuple:
+            files = "*"
+            analyses.append(get_analysis("systematics/"+run+"_systematics_v2/"+name+"/"+files,
+                            "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+name, 
+                            tof, data_dir, [[135, 145]], [100, 200], False))
+    print "Planned", len(analyses), "analyses"
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -183,8 +200,8 @@ class Config(object):
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
     number_of_spills = None #100 # if set to an integer, limits the number of spills loaded for each sub-analysis
     # NOTE on memory usage: looks like about 10% + 5-10% per 200 spills with 16 GB RAM
-    preanalysis_number_of_spills = 200 # number of spills to analyse during "pre-analysis"
-    analysis_number_of_spills = 200 # number of spills to analyse during each "analysis" step
+    preanalysis_number_of_spills = 50 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 50 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
 
@@ -277,8 +294,8 @@ class Config(object):
     virtual_detectors += [(500.*i, None, "virtual_"+str(i)) for i in range(51)]
     virtual_detectors += [(z, None, "virtual_"+det) for z, dummy, det in detectors]
     virtual_detectors = sorted(virtual_detectors)
-    for z, dummy, plane in virtual_detectors:
-        print z, plane
+    #for z, dummy, plane in virtual_detectors:
+    #    print z, plane
 
     mc_plots = { # Used for virtual_cuts as well as plots
         "mc_stations" : { # one virtual plane for each tracker view; first must be tracker reference plane

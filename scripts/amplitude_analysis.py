@@ -11,10 +11,11 @@ import xboa.common as common
 from xboa.hit import Hit
 from xboa.bunch import Bunch
 import scripts.chi2_distribution
-#from scripts.amplitude_data import AmplitudeData
+from scripts.amplitude_data_binned import AmplitudeDataBinned
 from scripts.amplitude_data_binless import AmplitudeDataBinless
 from scripts.binomial_confidence_interval import BinomialConfidenceInterval
 from analysis_base import AnalysisBase
+from scripts.analysis.amplitude.plot_amplitude_data import PlotAmplitudeData
 
 #REPHRASE SYSTEMATICS;
 #* efficiency and purity is the migration matrix from mc to reco mc
@@ -32,12 +33,30 @@ class AmplitudeAnalysis(AnalysisBase):
         self.a_dir = tempfile.mkdtemp()
         file_name = self.a_dir+"/amp_data_"
         mu_mass = common.pdg_pid_to_mass[13]
-        self.all_mc_data_us = AmplitudeDataBinless(file_name+"mc_us", self.bin_edge_list, mu_mass)
-        self.reco_mc_data_us = AmplitudeDataBinless(file_name+"reco_mc_us", self.bin_edge_list, mu_mass)
-        self.reco_data_us = AmplitudeDataBinless(file_name+"recon_us", self.bin_edge_list, mu_mass)
-        self.all_mc_data_ds = AmplitudeDataBinless(file_name+"mc_ds", self.bin_edge_list, mu_mass)
-        self.reco_mc_data_ds = AmplitudeDataBinless(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass)
-        self.reco_data_ds = AmplitudeDataBinless(file_name+"recon_ds", self.bin_edge_list, mu_mass)
+        AmplitudeData = self.get_amplitude_algorithm()
+        self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
+        self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
+        self.reco_data_us = AmplitudeData(file_name+"recon_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
+        self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+        self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+        self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+
+    def get_amplitude_algorithm(self):
+        if self.config_anal['amplitude_algorithm'] == 'binned':
+            AmplitudeData = AmplitudeDataBinned
+            self.cov_fixed_us = None
+            self.cov_fixed_ds = None
+        elif self.config_anal['amplitude_algorithm'] == 'binless':
+            AmplitudeData = AmplitudeDataBinless
+            self.cov_fixed_us = None
+            self.cov_fixed_ds = None
+        elif self.config_anal['amplitude_algorithm'] == 'fixed':
+            AmplitudeData = AmplitudeDataBinless
+            self.cov_fixed_us = self.config_anal['cov_fixed_us']
+            self.cov_fixed_ds = self.config_anal['cov_fixed_ds']
+        else:
+            raise ValueError("Did not understand amplitude algorithm "+str(config_anal['amplitude_algorithm']))
+        return AmplitudeData
 
     def birth(self):
         self.set_plot_dir("amplitude")
@@ -51,12 +70,12 @@ class AmplitudeAnalysis(AnalysisBase):
         self.delta_amplitude_calc("reco")
         self.field_uncertainty_calc("all_upstream")
         self.field_uncertainty_calc("all_downstream")
-        if self.config_anal["do_mc"]:
+        if self.config_anal["amplitude_mc"]:
             self.delta_amplitude_calc("all_mc")
             self.delta_amplitude_calc("reco_mc")
             self.systematics_calc("all_upstream")
             self.systematics_calc("all_downstream")
-        if self.config_anal["do_mc"]:
+        if self.config_anal["amplitude_mc"]:
             for target in "all_upstream", "all_downstream":
                 self.systematics_plot(target)
             for suffix in ["reco_mc", "all_mc"]:
@@ -115,6 +134,8 @@ class AmplitudeAnalysis(AnalysisBase):
         data["migration_matrix"] = self.migration_matrix(fractional_amplitude_dict_0, fractional_amplitude_dict_1, False)
         data["upstream_scraped"], data["upstream_not_scraped"] = self.get_delta_pdfs(fractional_amplitude_dict_0, fractional_amplitude_dict_1)
         self.amplitudes[suffix] = data
+        PlotAmplitudeData(data_0, self.plot_dir, "us").plot()
+        PlotAmplitudeData(data_1, self.plot_dir, "ds").plot()
         print "  done amplitude calc                ", datetime.datetime.now()
 
     def get_bin_centre_list(self):
@@ -162,6 +183,14 @@ class AmplitudeAnalysis(AnalysisBase):
             amp_0_bin = bisect.bisect_left(self.bin_edge_list, amplitude)-1
             data["pdf"][amp_0_bin] += 1
         return data
+
+    def plot_amplitude_data(self, amplitude_data, plot_lambda):
+        """
+        Plot 1D histogram of the ellipse together with the ellipses used for the
+        amplitude calculation
+        """
+        pass
+
 
     def migration_matrix(self, fractional_amplitude_dict_0, fractional_amplitude_dict_1, normalise):
         """
@@ -379,26 +408,29 @@ class AmplitudeAnalysis(AnalysisBase):
         for format in ["eps", "png", "root"]:
             canvas.Print(self.plot_dir+title+"."+format)
 
-    def do_migrations(self, target):
-        print "Doing migrations for", target
+    def do_migrations(self, target, systematic):
+        #print "Doing migrations for", target
+        if systematic == None:
+            migrations = self.amplitudes
+        else:
+            migrations = self.amplitudes["systematics"][systematic]
         reco_pdfs = numpy.array(self.amplitudes["reco"][target]["pdf"])
-        print "Reco             ", reco_pdfs
-        reco_mc_matrix = self.amplitudes["crossing_probability"][target]["migration_matrix"]
+        #print "Reco             ", reco_pdfs
+        reco_mc_matrix = migrations["crossing_probability"][target]["migration_matrix"]
         reco_mc_matrix = numpy.transpose(numpy.array(reco_mc_matrix))
         mc_reco_pdfs = numpy.dot(reco_mc_matrix, reco_pdfs)
-        print "Recovered MC Reco", mc_reco_pdfs
-        try:
-            print "Actual MC Reco   ", numpy.array(self.amplitudes["reco_mc"][target]["pdf"])
-        except KeyError:
-            print "<Nothing recorded>"
-        mc_pdfs = mc_reco_pdfs*numpy.array(self.amplitudes["inefficiency"][target]["pdf_ratio"])
-        print "Recovered All MC ", mc_pdfs
-        try:
-            print "Actual all MC    ", numpy.array(self.amplitudes["all_mc"][target]["pdf"])
-        except KeyError:
-            print "<Nothing recorded>"
-        sys_errors = [0. for i in reco_pdfs]
-        return mc_pdfs.tolist(), sys_errors
+        #print "Recovered MC Reco", mc_reco_pdfs
+        #try:
+        #    print "Actual MC Reco   ", numpy.array(self.amplitudes["reco_mc"][target]["pdf"])
+        #except KeyError:
+        #    print "<Nothing recorded>"
+        mc_pdfs = mc_reco_pdfs*numpy.array(migrations["inefficiency"][target]["pdf_ratio"])
+        #print "Recovered All MC ", mc_pdfs
+        #try:
+        #    print "Actual all MC    ", numpy.array(self.amplitudes["all_mc"][target]["pdf"])
+        #except KeyError:
+        #    print "<Nothing recorded>"
+        return mc_pdfs.tolist()
 
     def corrections_and_uncertainties(self, suffix):
         """
@@ -421,16 +453,34 @@ class AmplitudeAnalysis(AnalysisBase):
         data["all_downstream"]["pdf_stats_errors"] = self.stats_errors(migration_matrix, suffix)
         for key in ["all_upstream", "all_downstream"]:
             if suffix == "reco":
-                pdf_list, sys_errors = self.do_migrations(key)
+                pdf_list = self.do_migrations(key, None)
             else:
-                pdf_list, sys_errors = raw_pdf_list_tku, [0. for i in bins]
+                pdf_list = raw_pdf_list_tku
+            sys_error_list = [0 for i in bins]
+            if len(self.amplitudes["systematics"]) > 0:
+                print "Systematic errors"
+                ref_pdf_list = self.do_migrations(key, 0)
+                for i in range(len(self.amplitudes["systematics"][1:])):
+                    i += 1
+                    scale = self.amplitudes["systematics"][i]["scale"]
+                    print " ", i, self.amplitudes["systematics"][i]["source"], "with scale", scale
+                    sys_pdf_list = self.do_migrations(key, i)
+                    print "    err: ",
+                    for j in bins:
+                        err = (sys_pdf_list[j] - ref_pdf_list[j])*scale
+                        print round(err),
+                        sys_error_list[j] = (sys_error_list[j]**2+err**2)**0.5
+                    print "\n    sum: ", [round(err) for err in sys_error_list]
             data[key]["corrected_pdf"] = pdf_list
-            data[key]["pdf_sys_errors"] = sys_errors
+            data[key]["pdf_sys_errors"] = sys_error_list
             data[key]["pdf_tot_errors"] = [0. for i in bins]
             for i in bins:
                 sys = data[key]["pdf_sys_errors"][i]
                 stats = data[key]["pdf_stats_errors"][i]
                 data[key]["pdf_tot_errors"][i] = (sys**2+stats**2)**0.5
+            print "    sys errors:   ", data[key]["pdf_sys_errors"] 
+            print "    stats errors: ", data[key]["pdf_stats_errors"] 
+            print "    total errors: ", data[key]["pdf_tot_errors"] 
         self.amplitudes[suffix] = data
 
     def cdf_data(self, suffix):
@@ -725,10 +775,10 @@ class AmplitudeAnalysis(AnalysisBase):
         """
         Add data to the amplitude calculation (done at death time)
         
-        If do_mc is false, we take 'tku' data from upstream_cut sample and 
-        'tkd' data from downstream_cut sample
+        If amplitude_mc is false, we take 'tku' data from upstream_cut sample 
+        and 'tkd' data from downstream_cut sample
         
-        If do_mc is true, then we build a couple of additional samples
+        If amplitude_mc is true, then we build a couple of additional samples
         1. all_mc is for MC truth of all events that should have been included 
            in the sample (some of which might have been missed by recon; some in
            recon sample maybe should have been excluded)
@@ -744,7 +794,7 @@ class AmplitudeAnalysis(AnalysisBase):
         hits_all_mc_ds = []
         hits_reco_mc_ds= []
 
-        if self.config_anal["do_mc"]:
+        if self.config_anal["amplitude_mc"]:
             station_us = self.config.mc_plots["mc_stations"]["tku"][0]
             station_ds = self.config.mc_plots["mc_stations"]["tkd"][0]
 
@@ -755,7 +805,7 @@ class AmplitudeAnalysis(AnalysisBase):
             if not event['downstream_cut']:
                 hits_reco_ds.append(event['tkd'])
 
-            if self.config_anal["do_mc"]:
+            if self.config_anal["amplitude_mc"]:
                 hit_mc_us, hit_mc_ds = None, None
                 for detector_hit in event["data"]:
                     if detector_hit["detector"] == station_us:
@@ -789,6 +839,8 @@ class AmplitudeAnalysis(AnalysisBase):
     def print_data(self):
         fout = open(self.plot_dir+"/amplitude.json", "w")
         for suffix in self.amplitudes:
+            if type(self.amplitudes[suffix]) != type({}):
+                continue
             print self.amplitudes[suffix].keys()
             try:
                 del self.amplitudes[suffix]["amplitude_dict_upstream"]
@@ -829,25 +881,42 @@ class AmplitudeAnalysis(AnalysisBase):
                   "migration_matrix":diagonal
               },
           }, 
+          "systematics":[],
+          "source":"",
+          "scale":1.,
         }
 
+    def load_one_error(self, file_name, scale):
+        fin = open(file_name)
+        amp_str = fin.read()
+        amplitudes = json.loads(amp_str)
+        amplitudes["source"] = file_name
+        amplitudes["scale"] = scale
+        # we only want to keep the errors; not the actual pdfs
+        del amplitudes["reco"]
+        del amplitudes["all_mc"]
+        del amplitudes["reco_mc"]
+        try:
+            del amplitudes["field_uncertainty"]
+        except KeyError:
+            pass
+        return amplitudes
+
     def load_errors(self):
-        if self.config_anal["amplitude_source"] != None and self.config_anal["do_mc"]:
+        if self.config_anal["amplitude_source"] != None and self.config_anal["amplitude_mc"]:
             raise RuntimeError("Conflicted - do I get errors from mc or from amplitude source?")
         if self.config_anal["amplitude_source"] == None:
             self.empty_data()
             return
-        fin = open(self.config_anal["amplitude_source"])
-        amp_str = fin.read()
-        self.amplitudes = json.loads(amp_str)
-        # we only want to keep the errors; not the actual pdfs
-        del self.amplitudes["reco"]
-        del self.amplitudes["all_mc"]
-        del self.amplitudes["reco_mc"]
-        try:
-            del self.amplitudes["field_uncertainty"]
-        except KeyError:
-            pass
-        print self.amplitudes.keys()
-
+        # base correction factors
+        self.amplitudes = self.load_one_error(self.config_anal["amplitude_source"], 1.)
+        # systematic uncertainties
+        self.amplitudes["systematics"] = []
+        err_src = self.config_anal["amplitude_systematic_reference"]
+        error = self.load_one_error(err_src, None)
+        self.amplitudes["systematics"].append(error)
+        for err_src, scale in self.config_anal["amplitude_systematic_sources"].iteritems():
+            error = self.load_one_error(err_src, scale)
+            self.amplitudes["systematics"].append(error)
+            
     root_objects = []

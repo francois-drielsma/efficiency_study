@@ -10,6 +10,7 @@ class CompareConfig(object):
     def setup(self, beam, run_dir, src_plot_dir, target_plot_dir, will_do_data, will_do_mc):
         self.beam = beam
         self.name = beam.split("_")
+        self.get_experiment_config()
         self.data_caption = ""
         self.mc_caption = ""
         self.cuts_tex = "cut_plots/cuts_summary.tex"
@@ -29,6 +30,18 @@ class CompareConfig(object):
         os.makedirs(plot_dir)
         self.beam_plot_dir = plot_dir
 
+    def get_experiment_config(self):
+        if len(self.name) > 2:
+            self.channel = self.name[0]
+            self.beamline = self.name[1]
+            self.absorber = " ".join(self.name[2:])
+            if self.absorber == "None":
+                self.absorber = "No Absorber"
+        else:
+            self.channel = ""
+            self.beamline = ""
+            self.absorber = ""
+
     def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos):
         hist_name = hist
         if cut != None:
@@ -46,7 +59,7 @@ class CompareConfig(object):
                     "normalised":True,
                 },
                 "rebin":False,
-                "mice_logo":False,
+                "mice_logo":True,
                 "log_y":False,
                 "hist_title":"",
                 "replace_hist":False,
@@ -56,7 +69,7 @@ class CompareConfig(object):
                     "line_color":[1, 1],
                     "marker_style":[20, 20],
                     "draw_order":[1, 0],
-                    "x_range":None,
+                    "x_range":axis_range,
                     "y_range":None,
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
@@ -79,14 +92,13 @@ class CompareConfig(object):
             }
 
     def get_conglomerate_2(self, canvas, hist_name, axis_title, axis_range, normalise, legend_pos):
-        axis_range = None
         if hist_name == None:
             hist_name = canvas
         return {
                 "file_name":canvas,
                 "canvas_name":canvas,
                 "histogram_names":[hist_name],
-                "graph_names":[hist_name],
+                "graph_names":[],
                 "rescale_x":axis_range,
                 "rescale_y":True,
                 "replace_hist":False,
@@ -96,7 +108,7 @@ class CompareConfig(object):
                     "normalised":True,
                 },
                 "rebin":False,
-                "mice_logo":False,
+                "mice_logo":True,
                 "log_y":False,
                 "hist_title":"",
                 "redraw":{
@@ -105,7 +117,7 @@ class CompareConfig(object):
                     "line_color":[1, 1],
                     "marker_style":[20, 20],
                     "draw_order":[1, 0],
-                    "x_range":None,
+                    "x_range":axis_range,
                     "y_range":None,
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
@@ -138,7 +150,7 @@ class CompareConfig(object):
                 "replace_hist":False,
                 "calculate_errors":False,
                 "rebin":False,
-                "mice_logo":False,
+                "mice_logo":True,
                 "log_y":False,
                 "hist_title":"",
                 "redraw":{
@@ -152,7 +164,7 @@ class CompareConfig(object):
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
                 },
-                "legend":None,
+                "legend":False,
                 "defit":False,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
@@ -181,16 +193,16 @@ class CompareConfig(object):
                 "canvas_name":canvas_name,
                 "histogram_names":hist_list,
                 "graph_names":graph_list,
-                "rescale_x":False,
+                "rescale_x":x_range,
                 "rescale_y":y_range,
-                "replace_hist":False,
+                "replace_hist":replace_hist,
                 "normalise":False,
                 "calculate_errors":{
                     "histograms":[0],
                     "normalised":True,
                 },
                 "rebin":False,
-                "mice_logo":False,
+                "mice_logo":True,
                 "log_y":False,
                 "hist_title":"",
                 "redraw":{

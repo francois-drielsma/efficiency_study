@@ -54,7 +54,7 @@ class CutsPlotter(AnalysisBase):
         self.birth_var_1d_cut_list("tku", "scifi_n_planes_with_clusters", wont_cut_list, will_cut_list, [-0.5, 15.5], 16, {}, [])
         # impurity end
 
-        self.birth_var_1d("tku", "max_r", "us cut", ["scifi_fiducial_us"], [0., 200.], 100, {}, [150.])
+        self.birth_var_1d("tku", "max_r", "us cut", ["scifi_fiducial_us"], [0., 300.], 100, {}, [150.])
         delta_tof01_min = self.config_anal["delta_tof01_lower"]
         delta_tof01_max = self.config_anal["delta_tof01_upper"]
         self.birth_var_1d("tof", "delta_tof01", "us cut", ["delta_tof01"], [-10., 5.], 100, {}, [delta_tof01_min, delta_tof01_max])
@@ -69,14 +69,14 @@ class CutsPlotter(AnalysisBase):
             max_r = self.config.upstream_aperture_cut[aperture]
             if not self.config.upstream_cuts["upstream_aperture_cut"] or not self.config_anal["do_globals"]:
                 continue
-            self.birth_var_1d(aperture, "r", "us cut", ["upstream_aperture_cut"], [0., 200.], 100, {}, [max_r])
+            self.birth_var_1d(aperture, "r", "us cut", ["upstream_aperture_cut"], [0., 300.], 100, {}, [max_r])
         p_min = self.config_anal["p_tot_ds_low"]
         p_max = self.config_anal["p_tot_ds_high"]
         delta_p = p_max-p_min
         self.birth_var_1d("tkd", "p", "ds cut", ["p_tot_ds"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
         self.birth_var_1d("tkd", "chi2", "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
         self.birth_var_1d("tkd", "n_tracks", "ds cut", ["scifi_tracks_ds"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
-        self.birth_var_1d("tkd", "max_r", "ds cut", ["scifi_fiducial_ds"], [0., 200.], 100, {}, [150.])
+        self.birth_var_1d("tkd", "max_r", "ds cut", ["scifi_fiducial_ds"], [0., 300.], 100, {}, [150.])
         # compare events with tracks to those without tracks; estimate noise impurity
         # number of clusters in all events in TKD that made a track
         self.birth_var_1d("tkd", "scifi_n_planes_with_clusters", "ds cut", [], [-0.5, 15.5], 16, {}, [])
@@ -395,3 +395,31 @@ class CutsPlotter(AnalysisBase):
         fout.close()
         fout = open(self.plot_dir+"/cuts_summary.tex", "r")
         print fout.read()
+
+    cut_names = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
+          "scifi_tracks_us":"1 track in TKU",
+          "scifi_fiducial_us":"TKU fiducial volume",
+          "chi2_us":"TKU $\chi^2/dof$",
+          "scifi_tracks_ds":"TKD number of tracks",
+          "scifi_fiducial_ds":"TKD fiducial volume",
+          "chi2_ds":"TKD $\chi^2/dof$",
+          "tof01":"$t_{TOF1} - t_{TOF0}$",
+          "p_tot_us":"TKU momentum",
+          "p_tot_ds":"TKD momentum",
+          "tof_0_sp":"1 space point in TOF0",
+          "tof_1_sp":"1 space point in TOF1",
+          "tof_2_sp":"1 space point in TOF2",
+          "upstream_aperture_cut":"Diffuser aperture cut",
+          "downstream_aperture_cut":False,
+          "delta_tof01":"Extrapolated $t_{TOF0}$ - Reconstructed $t_{TOF0}$",
+          "delta_tof12":"Extrapolated $t_{TOF2}$ - Reconstructed $t_{TOF2}$", #extrapolatedtof12 compared to recon tof12
+          "global_through_tof0":"Successful extrapolation to TOF0",
+          "global_through_tof2":"Successful extrapolation to TOF2",
+          "mc_muon_us":"Monte Carlo muon in TKU",
+          "mc_stations_us":"Truth registered in all TKU stations",
+          "mc_scifi_fiducial_us":"Truth stayed within TKU fiducial volume",
+          "mc_muon_ds":"Monte Carlo muon in TKD",
+          "mc_stations_ds":"Truth passed through all TKD stations",
+          "mc_scifi_fiducial_ds":"Truth stayed within TKD fiducial volume",
+    }
+

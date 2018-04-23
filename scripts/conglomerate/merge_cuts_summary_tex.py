@@ -101,6 +101,7 @@ class MergeCutsSummaryTex(object):
 
     def merge_summaries(self, folder, file_name):
         for file_number, summary in enumerate(self.summary_list):
+            print "Merging", summary
             try:
                 fin = open(summary)
             except IOError:

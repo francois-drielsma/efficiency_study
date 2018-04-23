@@ -98,7 +98,13 @@ class LoadAll(object):
                     print "Spill", self.this_daq_event, "Time", round(new_t - self.start_time, 2)
                     old_t = new_t
                     sys.stdout.flush()
-                self.this_tree.GetEntry(self.this_daq_event)
+                try:
+                    self.this_tree.GetEntry(self.this_daq_event)
+                except SystemError: # abort the file
+                    sys.excepthook(*sys.exc_info())
+                    print "Aborting file", self.this_file_name
+                    self.this_daq_event = self.this_tree.GetEntries()
+                    break
                 spill = self.this_data.GetSpill()
                 self.load_one_spill(spill)
                 load_spills_daq_event += 1
@@ -130,6 +136,7 @@ class LoadAll(object):
             except AttributeError:
                 print "Failed to load 'Spill' tree for file", self.this_file_name, "maybe it isnt a MAUS output file?"
                 self.this_tree = None
+                self.next_file()
                 continue
 
     def load_one_spill(self, spill):

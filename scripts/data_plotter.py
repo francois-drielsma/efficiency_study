@@ -58,12 +58,32 @@ class DataPlotter(AnalysisBase):
         self.birth_var_2d("r", "tku", "pt", "tku", [0, 150*1.5], [0, 100*1.5], "all", None, None)
         self.birth_var_2d("pz", "tku", "pt", "tku", [0., 150.], [0, 100*1.5], "all", None, None)
 
-        for detector in "tku", "tkd":
+        my_options = {
+          "sub_dir":"space_points",
+          "fit_1d_cuts":False,
+          "normalise":False,
+          "logy":False,
+        }
+        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
-                for predicate in [self.doublet, self.triplet, self.any_sp, self.used_doublet, self.used_triplet, self.used]:
-                    for cut in ["all"]:
+                for predicate in [self.doublet, self.triplet, self.any_sp,
+                                  self.used_doublet, self.used_triplet, self.used,
+                                  self.not_used, self.not_used_triplet, self.not_used_doublet]:
+                    for cut in ["all", test_cut]:
                         a_detector = detector+"_sp_"+str(station)
-                        self.birth_var_2d("x", a_detector, "y", a_detector, [-150, 150], [-150, 150], cut, None, predicate)
+                        self.birth_var_2d("x", a_detector, "y", a_detector, [-150, 150], [-150, 150], cut, None, predicate, options = my_options)
+                    var = "sp_npe_per_cluster_"+str(station)
+                    self.birth_var_1d(var, detector, None, predicate, min_max=[0., 30.], n_bins=30, options = my_options)
+
+
+        for detector in "tku", "tkd":
+            for real_station in range(0, 6): # station 0 => real hit from any station
+                for noise_station in range(1, 6):
+                    var_1 = "sp_noise_distance_"+str(noise_station)+"-"+str(real_station)
+                    self.birth_var_1d(var_1, detector, None, None, min_max=[0., 300.], n_bins=75, options = my_options)
+                    self.birth_var_1d(var_1, detector, None, self.triplet, min_max=[0., 300.], n_bins=75, options = my_options)
+                    self.birth_var_1d(var_1, detector, None, self.doublet, min_max=[0., 300.], n_bins=75, options = my_options)
+
 
         self.birth_var_2d("x", "tkd", "px", "tkd", [-150, 150], [-100, 100], "ds cut", None, None)
         self.birth_var_2d("y", "tkd", "py", "tkd", [-150, 150], [-100, 100], "ds cut", None, None)
@@ -126,6 +146,20 @@ class DataPlotter(AnalysisBase):
         self.birth_ellipse("tkd", "ds cut")
         self.birth_ellipse("tkd", "all")
 
+        rejects_options = {
+            "fit_1d_cuts":False,
+            "normalise":False,
+            "logy":False,
+            "sub_dir":"rejects",
+        }
+        for tk, cut in ("tku", "us cut"), ("tkd", "ds cut"):
+            self.birth_var_1d("rejects_n_sp", tk, min_max=[-1.5, 5.5], n_bins = 7, options = rejects_options)
+            self.birth_var_1d("rejects_tracker", tk, min_max=[-1.5, 1.5], n_bins = 3, options = rejects_options)
+            self.birth_var_1d("rejects_xy_chi2", tk, min_max=[-2, 20], options = rejects_options)
+            self.birth_var_1d("rejects_sz_r", tk, min_max=[-10, 200], options = rejects_options)
+            self.birth_var_1d("rejects_sz_chi2", tk, min_max=[-1.5, 100.], options = rejects_options)
+            self.birth_var_2d("rejects_sz_chi2", tk, "rejects_sz_r", tk, [-1.5, 100.], [-10, 200], cut, None, None)
+            self.birth_var_2d("rejects_sz_chi2", tk, "rejects_xy_chi2", tk, [-1.5, 100.], [-2, 20], cut, None, None)
 
     def process(self):
         self.run_numbers.update(self.data_loader.run_numbers)
@@ -154,12 +188,24 @@ class DataPlotter(AnalysisBase):
         self.process_var_2d("x", "tku", "y", "tku", "all", None, None)
         self.process_var_2d("r", "tku", "pt", "tku", "all", None, None)
 
-        for detector in "tku", "tkd":
+        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
-                for predicate in [self.doublet, self.triplet, self.any_sp, self.used_doublet, self.used_triplet, self.used]:
-                    for cut in ["all"]:
+                for predicate in [self.doublet, self.triplet, self.any_sp,
+                                  self.used_doublet, self.used_triplet, self.used,
+                                  self.not_used, self.not_used_triplet, self.not_used_doublet]:
+                    for cut in ["all", test_cut]:
                         a_detector = detector+"_sp_"+str(station)
                         self.process_var_2d("x", a_detector, "y", a_detector, cut, None, predicate)
+                    var = "sp_npe_per_cluster_"+str(station)
+                    self.process_var_1d(var, detector, None, predicate)
+
+        for detector in "tku", "tkd":
+            for real_station in range(0, 6): # station 0 => real hit from any station
+                for noise_station in range(1, 6):
+                    var_1 = "sp_noise_distance_"+str(noise_station)+"-"+str(real_station)
+                    self.process_var_1d(var_1, detector, None, None)
+                    self.process_var_1d(var_1, detector, None, self.triplet)
+                    self.process_var_1d(var_1, detector, None, self.doublet)
 
         self.process_var_2d("x", "tkd", "px", "tkd", "ds cut", None, None)
         self.process_var_2d("y", "tkd", "py", "tkd", "ds cut", None, None)
@@ -215,6 +261,15 @@ class DataPlotter(AnalysisBase):
         self.process_ellipse("tku", "all")
         self.process_ellipse("tkd", "ds cut")
         self.process_ellipse("tkd", "all")
+
+        for tk, cut in ("tku", "us cut"), ("tkd", "ds cut"):
+            self.process_var_1d("rejects_n_sp", tk)
+            self.process_var_1d("rejects_tracker", tk)
+            self.process_var_1d("rejects_xy_chi2", tk)
+            self.process_var_1d("rejects_sz_chi2", tk)
+            self.process_var_1d("rejects_sz_r", tk)
+            self.process_var_2d("rejects_sz_chi2", tk, "rejects_sz_r", tk, cut, None, None)
+            self.process_var_2d("rejects_sz_chi2", tk, "rejects_xy_chi2", tk, cut, None, None)
 
     def death(self):
         self.base_death()
@@ -280,10 +335,94 @@ class DataPlotter(AnalysisBase):
             for item in data:
                 hist.Fill(item)
 
+    def get_tracker_space_point_distance(self, tracker, var, event_predicate, hit_predicate):
+        """
+        Return the distances from "unused" to the nearest "used" space point.
+
+        "Unused" means the space point is_used() flag returns NULL, meaning it 
+        was not used in track formation (i.e. it is considered noise)
+        * tracker: "tku" or "tkd"
+        * var: "sp_noise_distance_X-Y" where X and Y are integers between 1 and 
+              5. X corresponds to the unused (noise hit) tracker station; Y
+              corresponds to the used (real hit) tracker station.
+              If Y == 0, then *any* station is allowed for the used space point.
+              We still find the smallest distance.
+        * event_predicate: only include events returning event_predicate(event)
+              true. If None, ignored.
+        * hit_predicate: only include *unused* hits with hit_predicate(hit)
+              true. If None, ignored.
+        """
+        delta_all_list, delta_us_cut_list, delta_ds_cut_list = [], [], []
+        unused_detector = tracker+"_sp_"+var[-3:-2]
+        used_detector = tracker+"_sp_"+var[-1:]
+        n_sp = 0
+        used_hit_predicate = lambda hit: hit["detector"] == used_detector and \
+                                         hit["is_used"]
+        if used_detector == tracker+"_sp_0":
+            used_hit_predicate = lambda hit: tracker+"_sp_" in hit["detector"] and hit["is_used"]
+        unused_hit_predicate = lambda hit: hit["detector"] == unused_detector and \
+                                           not hit["is_used"] and \
+                                           (hit_predicate == None or hit_predicate(hit))
+        for event in self.data_loader.events:
+            if event_predicate != None and not event_predicate(event):
+                continue
+            sp_used_list = [hit["hit"] for hit in event["data"] if used_hit_predicate(hit)]
+            sp_unused_list = [hit["hit"] for hit in event["data"] if unused_hit_predicate(hit)]
+            delta_this_list = []
+            for sp_unused in sp_unused_list:
+                delta = []
+                for sp_used in sp_used_list:
+                    delta.append(((sp_used["x"] - sp_unused["x"])**2 + (sp_used["y"]-sp_unused["y"])**2)**0.5)
+                if len(delta):
+                    delta_this_list.append(min(delta)) # each unused contributes one element
+            if len(delta_this_list) == 0:
+                continue
+            delta_all_list += delta_this_list
+            if not self.will_cut_us(event):
+                delta_us_cut_list += delta_this_list
+            if not self.will_cut_ds(event):
+                delta_ds_cut_list += delta_this_list
+        return delta_us_cut_list, delta_ds_cut_list, delta_all_list
+
+    def get_tracker_space_point_npe(self, tracker, var, event_predicate, hit_predicate):
+        """
+        Return the npe per cluster space points.
+        * tracker: "tku" or "tkd"
+        * var: "sp_light_X" where X is integer between 1 and 5 corresponding to 
+               the tracker station
+        * event_predicate: only include events returning event_predicate(event)
+               true. If None, ignored.
+        * hit_predicate: only include hits with hit_predicate(hit) true. If 
+               None, ignored.
+        """
+        npe_us_cut_list, npe_ds_cut_list, npe_all_list = [], [], []
+        detector = tracker+"_sp_"+var[-1]
+        for event in self.data_loader.events:
+            if event_predicate != None and not event_predicate(event):
+                continue
+            for hit in event["data"]:
+                if detector != hit["detector"]:
+                    continue
+                #print "test",
+                if hit_predicate != None and not hit_predicate(hit):
+                    #print "fail"
+                    continue
+                #print "ok"
+                npe = sum(hit["npe"])/len(hit["npe"])
+                npe_all_list.append(npe)
+                if not self.will_cut_us(event):
+                    npe_us_cut_list.append(npe)
+                if not self.will_cut_ds(event):
+                    npe_ds_cut_list.append(npe)
+        return npe_us_cut_list, npe_ds_cut_list, npe_all_list
+
     def get_tracker_data(self, tracker, var):
         data_all = []
         data_cut_us = []
         data_cut_ds = []
+        if "rejects" in var:
+            rejects_var = var[8:]
+            var = "rejects"
         for event in self.data_loader.events:
             if event[tracker] == None:
                 continue
@@ -293,6 +432,12 @@ class DataPlotter(AnalysisBase):
                 data = detector_hit[var]
                 if var == "chi2":
                     data /= float(detector_hit["ndf"])
+                elif var == "rejects":
+                    data = data[rejects_var]
+                    if len(data) > 1:
+                        data = data[1] # second best chi2
+                    else:
+                        continue
                 data_all.append(data)
                 if not self.will_cut_us(event):
                     if var == "ndf":
@@ -332,8 +477,15 @@ class DataPlotter(AnalysisBase):
     def get_detector_data(self, detector, var, event_predicate, hit_predicate):
         if "SP Res" in var:
             return self.get_data_sp_residuals(detector, var)
+        elif "sp_noise_distance" in var:
+            return self.get_tracker_space_point_distance(detector, var, event_predicate, hit_predicate)
+        elif "sp_npe_per_cluster" in var:
+            return self.get_tracker_space_point_npe(detector, var, event_predicate, hit_predicate)
         elif detector == "tku" or detector == "tkd":
-            return self.get_tracker_hit_data(detector, var, event_predicate)
+            try:
+                return self.get_tracker_hit_data(detector, var, event_predicate)
+            except (KeyError, IndexError):
+                return self.get_tracker_data(detector, var)
         elif var == "delta_tof":
             return self.get_delta_tof_data(detector)
         else:
@@ -564,6 +716,15 @@ class DataPlotter(AnalysisBase):
     def used(self, hit):
         return hit["is_used"]
 
+    def not_used(self, hit):
+        return not hit["is_used"]
+
+    def not_used_triplet(self, hit):
+        return not hit["is_used"] and hit["n_channels"] == 3
+
+    def not_used_doublet(self, hit):
+        return not hit["is_used"] and hit["n_channels"] == 2
+
     def any_sp(self, hit):
         return True
 
@@ -578,7 +739,6 @@ class DataPlotter(AnalysisBase):
 
     def used_doublet(self, hit):
         return hit["n_channels"] == 2 and hit["is_used"]
-
 
     def birth_p_tot_res(self):
         p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", self.has_both_trackers)
@@ -666,7 +826,7 @@ class DataPlotter(AnalysisBase):
             name += "_"+hit_predicate.__name__
         return name
  
-    def birth_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, min_max_1, min_max_2, cut, event_predicate, hit_predicate, n_bins_x=50, n_bins_y=50):       
+    def birth_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, min_max_1, min_max_2, cut, event_predicate, hit_predicate, n_bins_x=50, n_bins_y=50, options = {}):       
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds_1, var_1, event_predicate, hit_predicate)
         data_1 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds_2, var_2, event_predicate, hit_predicate)
@@ -680,6 +840,11 @@ class DataPlotter(AnalysisBase):
                                         min_max_1[0], min_max_1[1],
                                         min_max_2[0], min_max_2[1])
         hist.Draw("COLZ")
+        for key in options.keys():
+            if key not in self.get_plot(name)["config"]:
+                raise KeyError("Did not recignise plot option "+str(key))
+            self.get_plot(name)["config"][key] = options[key]
+
 
     def process_var_2d(self, var_1, us_ds_1, var_2, us_ds_2, cut, event_predicate, hit_predicate):
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds_1, var_1, event_predicate, hit_predicate)
@@ -801,7 +966,6 @@ class DataPlotter(AnalysisBase):
             self.ellipse[tracker+"_"+cut+"_emit_"+axis] = emit
             self.ellipse[tracker+"_"+cut+"_beta_"+axis] = beta
             self.ellipse[tracker+"_"+cut+"_alpha_"+axis] = alpha
-              
 
     def death_ellipse(self, tracker, cut, print_to_screen):
         fout = open(self.plot_dir+"/ellipse_summary.txt", "a+")
@@ -825,15 +989,32 @@ class DataPlotter(AnalysisBase):
             print fout.read()
             fout.close()
 
-
-    def birth_var_1d(self, var, us_ds, event_predicate, hit_predicate, min_max = [None, None], options = {}, n_bins = 50):
-        data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds, var, event_predicate, hit_predicate)
-        if len(data_all) == 0:
-            for det in self.data_loader.detector_list():
-                print "   ", det
-            raise RuntimeError("Failed to find var_1d data for "+var+" "+us_ds)
+    def name_var_1d(self, var, us_ds, event_predicate, hit_predicate):
         name =  us_ds+"_"+var
-        label = us_ds+" "+var+" ["+scripts.utilities.default_units(var)+"]"
+        if event_predicate != None:
+            name += "_"+event_predicate.__name__
+        if hit_predicate != None:
+            name += "_"+hit_predicate.__name__
+        return name
+
+    def label_var_1d(self, name, var):
+        units = scripts.utilities.default_units(var)
+        if units != "":
+            units = " ["+units+"]"
+        label = name.replace("_", " ")+units
+        return label
+
+    def birth_var_1d(self, var, us_ds, event_predicate = None, hit_predicate = None, min_max = [None, None], options = {}, n_bins = 50):
+        data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds, var, event_predicate, hit_predicate)
+        if len(data_cut_ds) == 0:
+            if min_max[0] == None:
+                raise RuntimeError("Failed to find var_1d data for "+var+" "+us_ds+" "+str(hit_predicate))
+          
+            data_cut_ds.append(min_max[0]-1)
+            data_cut_us.append(min_max[0]-1)
+            data_all.append(min_max[0]-1)
+        name = self.name_var_1d(var, us_ds, event_predicate, hit_predicate)
+        label = self.label_var_1d(name, var)
         fit = scripts.utilities.fit_peak_data(data_all)
         mean = fit.GetParameter(1)
         sigma = fit.GetParameter(2)
@@ -861,10 +1042,9 @@ class DataPlotter(AnalysisBase):
                 raise KeyError("Did not recignise plot option "+str(key))
             self.get_plot(name)["config"][key] = options[key]
 
-
-    def process_var_1d(self, var, us_ds, event_predicate, hit_predicate):       
+    def process_var_1d(self, var, us_ds, event_predicate = None, hit_predicate = None):       
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds, var, event_predicate, hit_predicate)
-        name =  us_ds+"_"+var
+        name = self.name_var_1d(var, us_ds, event_predicate, hit_predicate)
         hist_dict = self.get_plot(name)["histograms"]
         for data, key in (data_all, "all"), (data_cut_ds, "ds cut"), (data_cut_us, "us cut"):
             hist_name = name+" "+key

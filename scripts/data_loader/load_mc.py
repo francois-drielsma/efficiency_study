@@ -4,6 +4,15 @@ import xboa.common
 from xboa.hit import Hit
 
 
+def get_tk_station(hit):
+    chan = hit.GetChannelId()
+    tk = chan.GetTrackerNumber()+1
+    plane = chan.GetPlaneNumber()+1
+    st = chan.GetStationNumber()
+    station = tk*100+st*10+plane
+    return station
+
+
 class LoadMC(object):
     def __init__(self, config, config_anal):
         self.config = config
@@ -11,7 +20,8 @@ class LoadMC(object):
 
     def load(self, event, spill, ev_number):
         mc_event_vector = spill.GetMCEvents()
-        if not self.config_anal["do_mc"] or len(mc_event_vector) < ev_number:
+        do_mc = self.config_anal["do_mc"] or self.config_anal["amplitude_mc"] 
+        if not do_mc or len(mc_event_vector) < ev_number:
             for cut in self.virtual_cut_list:
                 event["will_cut"][cut] = False
             return
@@ -24,8 +34,11 @@ class LoadMC(object):
         virtual_vector = mc_event.GetVirtualHits()
         virtual_cuts, virtual_loaded = self.load_virtuals(virtual_vector)
         tof_hit_vector = mc_event.GetTOFHits()
-        tof_cuts, tof_hit_loaded = self.load_tof_mc_hits(tof_hit_vector)
-        temp_event = sorted(primary_loaded+track_loaded+virtual_loaded+tof_hit_loaded, key = lambda tp: tp['hit']['z'])
+        tof_hit_lambda = lambda hit: hit.GetChannelId().GetStation()
+        tof_cuts, tof_hit_loaded = self.load_mc_hits(tof_hit_vector, "mc_tof", tof_hit_lambda)
+        tk_hit_vector = mc_event.GetSciFiHits()
+        tk_cuts, tk_hit_loaded = self.load_mc_hits(tk_hit_vector, "mc_tk", get_tk_station)
+        temp_event = sorted(primary_loaded+track_loaded+virtual_loaded+tof_hit_loaded+tk_hit_loaded, key = lambda tp: tp['hit']['z'])
         event["data"] += temp_event
         for item in primary_cuts, track_cuts, virtual_cuts, tof_cuts:
             for key, value in item.iteritems():
@@ -177,32 +190,33 @@ class LoadMC(object):
             self.virtual_cuts(detector, hit)
         return dict(self.virtual_cuts_tmp), loaded_virtual_vector
 
-    def load_tof_mc_hits(self, tof_mc_vector):
-        loaded_tof_mc_vector = [None]*len(tof_mc_vector)
-        for i, tof_mc_hit in enumerate(tof_mc_vector):
+    def load_mc_hits(self, mc_vector, detector, station_lambda):
+        loaded_mc_vector = [None]*len(mc_vector)
+        for i, mc_hit in enumerate(mc_vector):
             hit = xboa.hit.Hit()
-            hit["x"] = tof_mc_hit.GetPosition().x()
-            hit["y"] = tof_mc_hit.GetPosition().y()
-            hit["z"] = tof_mc_hit.GetPosition().z()
-            hit["px"] = tof_mc_hit.GetMomentum().x()
-            hit["py"] = tof_mc_hit.GetMomentum().y()
-            hit["pz"] = tof_mc_hit.GetMomentum().z()
-            hit["pid"] = tof_mc_hit.GetParticleId()
-            hit["station"] = tof_mc_hit.GetChannelId().GetStation()
-            hit["particle_number"] = tof_mc_hit.GetTrackId()
-            hit["t"] = tof_mc_hit.GetTime()
-            hit["energy"] = tof_mc_hit.GetEnergy()
-            hit["e_dep"] = tof_mc_hit.GetEnergyDeposited()
+            hit["x"] = mc_hit.GetPosition().x()
+            hit["y"] = mc_hit.GetPosition().y()
+            hit["z"] = mc_hit.GetPosition().z()
+            hit["px"] = mc_hit.GetMomentum().x()
+            hit["py"] = mc_hit.GetMomentum().y()
+            hit["pz"] = mc_hit.GetMomentum().z()
+            hit["pid"] = mc_hit.GetParticleId()
+            hit["station"] = station_lambda(mc_hit)
+            hit["particle_number"] = mc_hit.GetTrackId()
+            hit["t"] = mc_hit.GetTime()
+            hit["energy"] = mc_hit.GetEnergy()
+            hit["e_dep"] = mc_hit.GetEnergyDeposited()
             try:
-                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(tof_mc_hit.GetParticleId())]
+                hit["mass"] = xboa.common.pdg_pid_to_mass[abs(mc_hit.GetParticleId())]
             except KeyError:
                 hit["mass"] = (hit["energy"]**2-hit["p"]**2)**0.5
-            loaded_tof_mc = {
+            loaded_mc = {
                 "hit":hit,
-                "detector":"mc_tof_"+str(hit["station"]),
+                "detector":detector+"_"+str(hit["station"]),
             }
-            loaded_tof_mc_vector[i] = loaded_tof_mc
-        return {}, loaded_tof_mc_vector
+            loaded_mc_vector[i] = loaded_mc
+        #print "Loaded", [mc["detector"] for mc in loaded_mc_vector]
+        return {}, loaded_mc_vector
 
     virtual_cut_list = ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us",
                         "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds"]

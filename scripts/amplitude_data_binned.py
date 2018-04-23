@@ -1,16 +1,18 @@
 import sys
 import numpy
 import bisect
+import copy
 
 from xboa.hit import Hit
 
-class AmplitudeData(object):
-    def __init__(self, file_name, bin_edges, mass):
+class AmplitudeDataBinned(object):
+    def __init__(self, file_name, bin_edges, mass, cov_fixed):
         """
         Initialise the AmplitudeData class for the basic amplitude calculation
         * File name is the name of the (temporary) file to which the amplitude data is written
         * bin_edges is a list of bin edges for grouping the amplitude data; must have a regular bin step size
         * mass is the particle mass used for calculating emittance
+        * cov_fixed is not used
 
         Internally, we store using numpy.memmap (which is a buffered file-based 
         array thingy). We have several memmaps for each bin:
@@ -37,6 +39,7 @@ class AmplitudeData(object):
                 raise ValueError("Bin spacing is too small for bin "+str(i))
         self.mass = mass # for emittance calculation
         self.clear()
+        self.state_list = []
 
     def __del__(self):
         pass
@@ -157,7 +160,7 @@ class AmplitudeData(object):
                 self.cov[j][i] = self.cov[i][j]
 
     def get_rebins(self, bin):
-        emittance = self.get_emittance()
+        self.emittance = self.get_emittance()
         self.cov_inv = numpy.linalg.inv(self.cov)
         rebins = [[] for i in range(self.n_bins)]
         for i, event in enumerate((self.retrieve(bin))):
@@ -166,7 +169,6 @@ class AmplitudeData(object):
             amplitude = numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
             try:
                 new_bin = bisect.bisect_right(self.bins, amplitude)-1
-                print amplitude, bin, new_bin, self.bins[new_bin], self.bins[new_bin+1]
             except ValueError:
                 print "Error calculating amplitude for bin", bin, "event", i, \
                        "data", event[0], event[1], event[2], event[3], "amplitude", amplitude, \
@@ -175,7 +177,6 @@ class AmplitudeData(object):
                 raise
             if new_bin != bin:
                 rebins[new_bin].append(i)
-        print
         return rebins
 
     def get_emittance(self):
@@ -250,6 +251,7 @@ class AmplitudeData(object):
                     self.apply_rebins(bin, rebins, cut_bin)
                     this_will_rebin = sum([len(a_rebin_list) for a_rebin_list in rebins])
                     will_rebin = will_rebin or this_will_rebin
+            self.save_state()
             print "After binning ... Amplitude list is now length", len(self.amplitude_list)
         print "Generating dictionary from", len(self.amplitude_list), "events"
         amplitude_dict = {}
@@ -262,6 +264,24 @@ class AmplitudeData(object):
                 index += 1
         print "fractional_amplitude length", len(amplitude_dict)
         return amplitude_dict
+
+    def save_state(self):
+        """
+        Record internal state for plotting/diagnostics etc
+
+        Append to self.state_list a dictionary containing:
+          - emittance
+          - mean
+          - cov
+          - number of events surviving in the reference sample
+        """
+        my_state = {
+            "emittance":copy.deepcopy(self.emittance),
+            "mean":copy.deepcopy(self.mean),
+            "cov":copy.deepcopy(self.cov),
+            "n_events":self.n_cov_events,
+        }
+        self.state_list.append(my_state)
 
 def delete_elements(source_map, elements):
     if len(elements) == 0:
