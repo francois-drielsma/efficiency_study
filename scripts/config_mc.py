@@ -1,11 +1,7 @@
 import copy
 
-def mc_file_names(datasets):
-    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/*_sim.root"]
-    return file_list
-
 def rogers_mc_file_names(datasets):
-    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/maus_output.root"]
+    file_list = ["/work/ast/cr67/mc/"+datasets+"/maus_output.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus, do_globals):
@@ -45,10 +41,28 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":None,
+            "amplitude_source":"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_systematic_reference":"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":0.2,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
+                #"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":0.2,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
+            },
+            "cov_fixed_us":None, #cov_us,
+            "cov_fixed_ds":None, #cov_ds,
+            "amplitude_algorithm":"binless",
+
             "field_uncertainty":0.02,
             "amplitude_chi2":False,
-            "amplitude_mc":True,
+            "amplitude_mc":False,
             "weight_tof01_source":"output/2017-02_mc_weighting/plots_3-140-empty/tof01_weights",
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
@@ -57,12 +71,12 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_magnet_alignment":False,
             "do_amplitude":True,
             "do_extrapolation":False,
-            "do_globals":do_globals,
-            "do_mc":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_globals":False, #do_globals,
+            "do_mc":False, #True,
+            "do_plots":False, #True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
-            "do_optics":True,
+            "do_optics":False, #True,
             "do_data_recorder":False,
 
         }
@@ -155,21 +169,21 @@ class Config(object):
     cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut",
                      "hline", "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline", "mc_true_ds_cut", "hline", "downstream_cut"]
 
-    data_dir = "output/2017-02"
-    files = "*"
+    data_dir = "output/2017-02-binless"
+    files = "?"
     analyses = []
     analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9971_v2/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9971_v1/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH", [27, 32], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None", [27, 32], data_dir, [[135, 145]], [100, 200], True))
 
     analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9966_v2/"+files, "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH", [27, 31], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None", [27, 31], data_dir, [[135, 145]], [100, 200], True))
 
     analyses.append(get_analysis("10052_v1/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9970_v2/"+files, "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH", [27, 30], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None", [27, 30], data_dir, [[135, 145]], [100, 200], True))
     amplitude_bin_width = 5

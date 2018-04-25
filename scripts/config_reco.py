@@ -8,7 +8,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     file_list = []
     for run in run_number_list:
         run = str(run).rjust(5, '0')
-        a_file = "/home/cr67/work/reco/"+maus+"/"+run+"/"+run+"_recon"
+        a_file = "/work/ast/cr67/reco/"+maus+"/"+run+"/"+run+"_recon"
         if not do_globals:
             a_file += ".root"
         else:
@@ -23,7 +23,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
     if amplitude_source == True:
-        amplitude_source = data_dir+"/plots_Simulated_"+name.replace(" ", "_")+"/amplitude/amplitude.json"
+        amplitude_source = "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json"
     elif amplitude_source == False or amplitude_source == None:
         amplitude_source = None
     return {
@@ -46,18 +46,19 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_source":amplitude_source,
-            "amplitude_systematic_reference":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_systematic_reference":"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
             "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
-                #"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-3/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
+                #"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-3/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
             },
             "field_uncertainty":0.02,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
@@ -69,6 +70,9 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "weight_tof01_target":plot_dir+"tof01_weights",
             "weight_tof01_mode":"build_distribution",
             "tracker_fiducial_radius":150.,
+            "cov_fixed_us":None, #cov_us,
+            "cov_fixed_ds":None, #cov_ds,
+            "amplitude_algorithm":"binless",
 
             "do_magnet_alignment":False,
             "do_extrapolation":False,
@@ -165,7 +169,7 @@ class Config(object):
     cut_report[1] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-Test-8/" # to which data is written
+    data_dir = "output/2017-02-binless-3/" # to which data is written
     src_dir = "MAUS-Test-4-npe"
     correct_amplitude = True
     analyses = []
@@ -195,9 +199,9 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = 1000 # if set to an integer, limits the number of spills loaded for each sub-analysis
-    preanalysis_number_of_spills = 1000 # number of spills to analyse during "pre-analysis"
-    analysis_number_of_spills = 1000 # number of spills to analyse during each "analysis" step
+    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
+    preanalysis_number_of_spills = 500 # number of spills to analyse during "pre-analysis"
+    analysis_number_of_spills = 500 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     tof0_offset = 0.

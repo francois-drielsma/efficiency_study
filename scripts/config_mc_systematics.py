@@ -7,7 +7,7 @@ def mc_file_names(datasets):
     return file_list
 
 def rogers_mc_file_names(datasets):
-    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/maus_reconstruction.root"]
+    file_list = ["/work/ast/cr67/"+datasets+"/maus_reconstruction.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus, do_globals):
@@ -163,29 +163,28 @@ class Config(object):
     cut_report[0] += ["upstream_cut", "hline",]
     cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut"]
 
-    data_dir = "output/2017-02-Systematics-6"
+    data_dir = "output/2017-02-Systematics-3"
     analyses = []
 
-    run_tuple = ("6", "10051", [27, 31]), ("10", "10052", [27, 30]), ("3", "10069", [27, 32])
-    for emit, run, tof in run_tuple:
-        index = 0
-        for i in range(1, 10):
-            for j in range(1, 10):
-                files = str(i)+str(j)+'?'
-                index += 1
-                analyses.append(get_analysis("systematics/"+run+"_systematics_v2/tku_base/"+files,
-                            "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
-                            tof, data_dir, [[135, 145]], [100, 200], False))
+    run_tuple = ("6", "10051", [27, 31]), # ("10", "10052", [27, 30]), #("3", "10069", [27, 32]) ,
+    #for emit, run, tof in run_tuple:
+    #    index = 0
+    #    for i in range(10):
+    #        files = '*'+str(i)
+    #        index += 1
+    #        analyses.append(get_analysis(run+"_systematics_v3/tku_base/"+files,
+    #                    "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
+    #                    tof, data_dir, [[135, 145]], [100, 200], False))
     for name in [
-      "tku_base",
-      #"tku_pos_plus", "tku_scale_C_plus", "tku_scale_E2_plus",
-      #"tkd_scale_C_plus", "tkd_scale_E2_plus", "tku_density_plus", 
-      #"tku_rot_plus", "tku_scale_E1_plus",
+      #"tku_base",
+      #"tku_pos_plus", "tku_rot_plus", 
+      #"tku_scale_C_plus", "tku_scale_E1_plus", "tku_scale_E2_plus",
+      "tkd_scale_C_plus", #"tkd_scale_E2_plus", "tku_density_plus", 
       #"tkd_density_plus", "tkd_rot_plus", "tkd_scale_E1_plus", "tkd_pos_plus"
     ]:
         for emit, run, tof in run_tuple:
             files = "*"
-            analyses.append(get_analysis("systematics/"+run+"_systematics_v2/"+name+"/"+files,
+            analyses.append(get_analysis(run+"_systematics_v4/"+name+"/"+files,
                             "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+name, 
                             tof, data_dir, [[135, 145]], [100, 200], False))
     print "Planned", len(analyses), "analyses"

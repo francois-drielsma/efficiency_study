@@ -5,81 +5,46 @@ import os
 import shutil
 import subprocess
 import time
-import analysis_base # check that the path is correct
-import xboa.common
+import run # check that the path is correct
 
-def is_scarf():
-    uname = subprocess.check_output(['uname', '-a'])
-    return 'scarf.rl.ac.uk' in uname
-
-def generate_analysis(unique_id, cards_list):
-    unique_id = str(unique_id)
-    log_name = "logs/analysis_"+unique_id+".log"
-    log_file = open(log_name, 'w')
+def run_analysis(jobs, cards_list, logs):
+    if run.Run.is_scarf():
+        n_procs = 40
+    else:
+        n_procs = 3
+    config = {
+        'jobs':jobs,
+        'n_procs':n_procs,
+        'extra_args':[],
+        'delta_t':60,
+        'max_t':60*60*24,
+        'logs':logs,
+    }
     for cards in cards_list:
-        print "\nRunning", cards, unique_id
-        run = ['python', 'calculate_emittance.py', cards, unique_id]
-        subproc = subprocess.Popen(run, stdout=log_file, stderr=subprocess.STDOUT)
-        yield subproc
-        print "\nFinished", cards, unique_id
+        print "\nRunning", len(jobs), "with cards", cards_list
+        analysis_pool = run.Run(config)
+        analysis_pool.prefix = cards
+        analysis_pool.run_many()
 
-def poll_local(processes):
-    _processes_update = []
-    for generator, proc in processes:
-        if proc == None or proc.returncode != None:
-            #process needs to be started
-            try:
-                proc = generator.next()
-                # running the next set of cards; keep it in the job list
-                _processes_update.append((generator, proc))
-                sys.stdout.write('x')
-            except StopIteration:
-                # no more analysis to run now; give up and make way for another job
-                sys.stdout.write('x')
-                pass
-        else:
-            proc.poll()
-            _processes_update.append((generator, proc))
-            sys.stdout.write('.')
-    return _processes_update
+def main_mc_analysis():
+    job_list = range(12)
+    cards_list = ["scripts/config_mc.py",] #] # "scripts/config_mc.py", 
+    logs = 'logs/mc-logs'
+    run_analysis(job_list, cards_list, logs)
 
-def poll_bjobs():
-    global SCRIPT_NAME
-    output = subprocess.check_output(['bjobs', '-prw'])
-    count = 0
-    for line in output.split('\n'):
-        if SCRIPT_NAME in line or 'analysis.py' in line:
-            count += 1
-    return count
-
-def main(jobs, number_of_concurrent_processes, cards_list):
-    print 'Running', len(jobs), 'jobs on scarf?', is_scarf()
-    timer = 0
-    time_step = 10
-    processes = []
-    bjobs = 0
-    while len(processes) > 0 or len(jobs) > 0:
-        # refill the process list with new jobs
-        while len(processes) < number_of_concurrent_processes and len(jobs) > 0:
-            job = jobs.pop(0)
-            processes.append((generate_analysis(job, cards_list), None))
-        # remove any processes that have finished
-        print timer,
-        processes = poll_local(processes)
-        print len(jobs)+len(processes)
-        timer += time_step
-        time.sleep(time_step)
-    unique_id = 0
-    print "\nFinished ... press <cr> to end"
+def main_reco_analysis():
+    job_list = range(12)
+    cards_list = ["scripts/config_reco.py",] #] # "scripts/config_mc.py", 
+    logs = 'logs/reco-logs'
+    run_analysis(job_list, cards_list, logs)
+        
+def main_systematics_analysis():
+    job_list = range(1)
+    cards_list = ["scripts/config_mc_systematics.py",] #
+    logs = 'logs/systematics-logs'
+    run_analysis(job_list, cards_list, logs)
 
 if __name__ == "__main__":
-    if is_scarf():
-        n_procs = min(len(jobs), 100)
-    else:
-        n_procs = 4
-    #job_list = [4, 5, 6, 7] #range(12)
-    #cards_list = ["scripts/config_reco.py",] #] # "scripts/config_mc.py", 
-    job_list = range(0, 300)
-    cards_list = ["scripts/config_mc_systematics.py",] #
-    main(job_list, n_procs, cards_list)
-
+    #main_mc_analysis()
+    #main_systematics_analysis()
+    main_reco_analysis()

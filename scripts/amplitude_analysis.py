@@ -40,6 +40,8 @@ class AmplitudeAnalysis(AnalysisBase):
         self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+        self.us_color = ROOT.kOrange+4
+        self.ds_color = ROOT.kGreen+3
 
     def get_amplitude_algorithm(self):
         if self.config_anal['amplitude_algorithm'] == 'binned':
@@ -473,14 +475,9 @@ class AmplitudeAnalysis(AnalysisBase):
                     print "\n    sum: ", [round(err) for err in sys_error_list]
             data[key]["corrected_pdf"] = pdf_list
             data[key]["pdf_sys_errors"] = sys_error_list
-            data[key]["pdf_tot_errors"] = [0. for i in bins]
-            for i in bins:
-                sys = data[key]["pdf_sys_errors"][i]
-                stats = data[key]["pdf_stats_errors"][i]
-                data[key]["pdf_tot_errors"][i] = (sys**2+stats**2)**0.5
             print "    sys errors:   ", data[key]["pdf_sys_errors"] 
-            print "    stats errors: ", data[key]["pdf_stats_errors"] 
-            print "    total errors: ", data[key]["pdf_tot_errors"] 
+            print "    stats errors: ", data[key]["pdf_stats_errors"]
+            print "    pdf:          ", pdf_list
         self.amplitudes[suffix] = data
 
     def cdf_data(self, suffix):
@@ -494,18 +491,22 @@ class AmplitudeAnalysis(AnalysisBase):
         data = self.amplitudes[suffix]
         for key in ["all_upstream", "all_downstream"]:
             pdf_list = data[key]["corrected_pdf"]
-            err_list = data[key]["pdf_tot_errors"]
+            stats_err_list = data[key]["pdf_stats_errors"]
+            sys_err_list = data[key]["pdf_sys_errors"]
             bins = range(len(pdf_list))
 
             cdf_list = [sum(pdf_list[:i+1]) for i in bins]
-            cdf_list_errs = [0. for i in bins]
+            cdf_list_stats_errs = [0. for i in bins]
+            cdf_list_sys_errs = [0. for i in bins]
             for i in bins:
-                err_sq = [err**2 for err in err_list[:i+1]]
-                cdf_list_errs[i] = sum(err_sq)**0.5
+                stats_err_sq = [err**2 for err in stats_err_list[:i+1]]
+                sys_err_sq = [err**2 for err in sys_err_list[:i+1]]
+                cdf_list_stats_errs[i] = sum(stats_err_sq)**0.5
+                cdf_list_sys_errs[i] = sum(sys_err_sq)**0.5
 
             data[key]["corrected_cdf"] = cdf_list
-            data[key]["cdf_tot_errors"] = cdf_list_errs
-
+            data[key]["cdf_stats_errors"] = cdf_list_stats_errs
+            data[key]["cdf_sys_errors"] = cdf_list_sys_errs
 
     def ratio_data(self, suffix):
         """
@@ -517,38 +518,50 @@ class AmplitudeAnalysis(AnalysisBase):
         """
         data = self.amplitudes[suffix]
         data["ratio"] = {}
-        for key, err_key in ("corrected_pdf", "pdf_tot_errors"), ("corrected_cdf", "cdf_tot_errors"):
+        for key, stats_err_key, sys_err_key in [("corrected_pdf", "pdf_stats_errors", "pdf_sys_errors",),
+                                                ("corrected_cdf", "cdf_stats_errors", "cdf_sys_errors",)]:
             pdf_list_tku = data["all_upstream"][key]
             pdf_list_tkd = data["all_downstream"][key]
             bins = range(len(pdf_list_tku))
 
-            err_list_tku = [0. for i in bins]
-            err_list_tkd = [0. for i in bins]
             ratio_pdf = [1. for i in bins]
             for i in bins:
                 if pdf_list_tku[i] > 0.5:
-                    err_list_tku[i] = data["all_upstream"][err_key][i]/pdf_list_tku[i]
                     ratio_pdf[i] = pdf_list_tkd[i]/pdf_list_tku[i]
-                if pdf_list_tkd[i] > 0.5:
-                    err_list_tkd[i] = data["all_downstream"][err_key][i]/pdf_list_tkd[i]
-
             data["ratio"][key] = ratio_pdf
-            data["ratio"][err_key] = [(err_list_tku[i]**2+err_list_tkd[i]**2)*ratio_pdf[i] for i in bins]
+
+            for err_key in stats_err_key, sys_err_key:
+                err_list_tku = [0. for i in bins]
+                err_list_tkd = [0. for i in bins]
+                data["ratio"][err_key] = [0. for i in bins]
+                for i in bins:
+                    if pdf_list_tku[i] > 0.5:
+                        err_list_tku[i] = data["all_upstream"][err_key][i]/pdf_list_tku[i]
+                    if pdf_list_tkd[i] > 0.5:
+                        err_list_tkd[i] = data["all_downstream"][err_key][i]/pdf_list_tkd[i]
+                    data["ratio"][err_key][i] = (err_list_tku[i]**2+err_list_tkd[i]**2)**0.5*ratio_pdf[i]
+                    print key, err_key
+                    print "   ", err_list_tku[i], data["all_upstream"][err_key][i], pdf_list_tku[i]
+                    print "   ", err_list_tkd[i], data["all_downstream"][err_key][i], pdf_list_tkd[i]
+                    print data["ratio"][err_key][i], data["ratio"][key][i]
+
         self.amplitudes[suffix] = data
 
-    def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, name="Graph"):
+    def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, fill=None, name="Graph"):
         graph = ROOT.TGraphAsymmErrors(len(points)-1)
-        if errors == None:
-            errors = [0. for i in points]
         for i, low_edge in enumerate(self.bin_edge_list[:-1]):
             high_edge = self.bin_edge_list[i+1]
             centre = (low_edge+high_edge)/2.
             graph.SetPoint(i, centre, points[i]/norm)
-            graph.SetPointError(i, centre-low_edge, high_edge-centre, errors[i]/norm, errors[i]/norm)
+            if errors != None:
+                graph.SetPointError(i, centre-low_edge, high_edge-centre, errors[i]/norm, errors[i]/norm)
         if style != None:
             graph.SetMarkerStyle(style)
         if color != None:
             graph.SetMarkerColor(color)
+        if fill != None:
+            graph.SetFillColor(fill)
+            graph.SetFillStyle(3001);
         graph.SetName(name)
         self.root_objects.append(graph)
         return graph
@@ -613,34 +626,45 @@ class AmplitudeAnalysis(AnalysisBase):
         canvas = common.make_root_canvas(name)
         canvas.SetName(name)
         raw_upstream_graph = self.get_asymm_error_graph(us_data["pdf"],
-                                                    style=20, color=ROOT.kBlue, name="Raw upstream")
+                                                    style=24, color=self.us_color, name="Raw upstream")
         raw_downstream_graph = self.get_asymm_error_graph(ds_data["pdf"],
-                                                    style=22, color=ROOT.kRed, name="Raw downstream")
+                                                    style=26, color=self.ds_color, name="Raw downstream")
         scraped_graph = self.get_asymm_error_graph(data["upstream_scraped"]["pdf"],
-                                                    style=21, color=ROOT.kViolet+2, name="Raw scraped") # 25 for not raw
+                                                    style=25, color=ROOT.kViolet+2, name="Raw scraped") # 25 for not raw
         
         if suffix == "reco":
-            upstream_graph = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                        us_data["pdf_tot_errors"],
-                                                        style=24, color=ROOT.kBlue, name = "Upstream")
-            downstream_graph = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                          ds_data["pdf_tot_errors"],
-                                                        style=26, color=ROOT.kRed, name = "Downstream")
-            graph_list = [upstream_graph, downstream_graph, scraped_graph, raw_upstream_graph, raw_downstream_graph]
+            upstream_graph_stats = self.get_asymm_error_graph(us_data["corrected_pdf"],
+                                                        us_data["pdf_stats_errors"],
+                                                        style=20, color=self.us_color, name = "Upstream")
+            upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
+                                                        us_data["pdf_sys_errors"],
+                                                        fill=self.us_color, name = "Upstream")
+            downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
+                                                          ds_data["pdf_stats_errors"],
+                                                        style=22, color=self.ds_color, name = "Downstream")
+            downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
+                                                          ds_data["pdf_sys_errors"],
+                                                        fill=self.ds_color, name = "Downstream")
+            print "Plotting us sys", us_data["pdf_sys_errors"]
+            print "Plotting ds sys", ds_data["pdf_sys_errors"]
+            graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
+            draw_list = ["2", "2", "p", "p", "p", "p", "p"]
         else:
             graph_list = [scraped_graph, raw_upstream_graph, raw_downstream_graph]
+            draw_list = ["p", "p", "p"]
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number")
         hist.Draw()
-        for graph in graph_list:
-            graph.Draw("SAMEP")
+        same = "SAME "
+        for i, graph in enumerate(graph_list):
+            graph.Draw(same+draw_list[i])
         self.text_box(graph_list)
 
         if self.config_anal["amplitude_chi2"]:
             upstream_chi2 = self.chi2_graph(suffix, "all_upstream")
-            upstream_chi2.SetLineColor(ROOT.kBlue+2) 
+            upstream_chi2.SetLineColor(self.us_color) 
             upstream_chi2.Draw("SAMEL")
             downstream_chi2 = self.chi2_graph(suffix, "all_downstream")
-            downstream_chi2.SetLineColor(ROOT.kRed+2)
+            downstream_chi2.SetLineColor(self.ds_color)
             downstream_chi2.Draw("SAMEL")
 
         canvas.Update()
@@ -656,17 +680,24 @@ class AmplitudeAnalysis(AnalysisBase):
         canvas.SetName(name)
 
         upstream_graph = self.get_asymm_error_graph(us_data["corrected_cdf"],
-                                                    us_data["cdf_tot_errors"],
-                                                    style=24, color=ROOT.kBlue, name = "Upstream CDF")
+                                                    us_data["cdf_stats_errors"],
+                                                    style=24, color=self.us_color, name = "Upstream CDF")
         downstream_graph = self.get_asymm_error_graph(ds_data["corrected_cdf"],
-                                                      ds_data["cdf_tot_errors"],
-                                                    style=26, color=ROOT.kRed, name = "Downstream CDF")
-        graph_list = [upstream_graph, downstream_graph]
+                                                      ds_data["cdf_stats_errors"],
+                                                    style=26, color=self.ds_color, name = "Downstream CDF")
+        upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_cdf"],
+                                                    us_data["cdf_sys_errors"],
+                                                    fill=self.us_color, name = "Upstream")
+        downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_cdf"],
+                                                      ds_data["cdf_sys_errors"],
+                                                    fill=self.ds_color, name = "Downstream")
+        graph_list = [upstream_graph, downstream_graph, upstream_graph_sys, downstream_graph_sys]
+        draw_list = ["p", "p", "2", "2"]
 
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Cumulative Number")
         hist.Draw()
-        for graph in graph_list:
-            graph.Draw("SAMEP")
+        for i, graph in enumerate(graph_list):
+            graph.Draw("SAME "+draw_list[i])
         self.text_box(graph_list)
 
         canvas.Update()
@@ -680,15 +711,22 @@ class AmplitudeAnalysis(AnalysisBase):
         canvas = common.make_root_canvas(name)
         canvas.SetName(name)
 
-        cdf_graph = self.get_asymm_error_graph(data["corrected_cdf"],
-                                               data["cdf_tot_errors"],
-                                               style=24, color=ROOT.kBlue, name = "CDF Ratio")
-        graph_list = [cdf_graph]
-
+        cdf_graph_stats = self.get_asymm_error_graph(data["corrected_cdf"],
+                                               data["cdf_stats_errors"],
+                                               style=20, name = "CDF Ratio")
+        cdf_graph_sys = self.get_asymm_error_graph(data["corrected_cdf"],
+                                               data["cdf_sys_errors"], fill=ROOT.kGray, name = "CDF Ratio")
+        print "CDF"
+        print data["corrected_cdf"]
+        print data["cdf_stats_errors"]
+        print data["cdf_sys_errors"]
+        graph_list = [cdf_graph_stats, cdf_graph_sys]
+        draw_list = ["p", "2"]
+        
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Cumulative Number Ratio")
         hist.Draw()
-        for graph in graph_list:
-            graph.Draw("SAMEP")
+        for i, graph in enumerate(graph_list):
+            graph.Draw("SAME "+draw_list[i])
         self.text_box(graph_list)
 
         canvas.Update()
@@ -702,17 +740,25 @@ class AmplitudeAnalysis(AnalysisBase):
         canvas = common.make_root_canvas(name)
         canvas.SetName(name)
 
-        pdf_graph = self.get_asymm_error_graph(data["corrected_pdf"],
-                                               data["pdf_tot_errors"],
-                                               style=24, color=ROOT.kBlue, name = "PDF Ratio")
-        graph_list = [pdf_graph]
+        pdf_graph_stats = self.get_asymm_error_graph(data["corrected_pdf"],
+                                               data["pdf_stats_errors"],
+                                               style=20, name = "PDF Ratio")
+        pdf_graph_sys = self.get_asymm_error_graph(data["corrected_pdf"],
+                                               data["pdf_sys_errors"], fill=ROOT.kGray, name = "PDF Ratio")
+        graph_list = [pdf_graph_stats, pdf_graph_sys]
+        draw_list = ["p", "2"]
 
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number Ratio")
         hist.Draw()
-        for graph in graph_list:
-            graph.Draw("SAMEP")
+        for i, graph in enumerate(graph_list):
+            graph.Draw("SAME "+draw_list[i])
         self.text_box(graph_list)
+        print "PDF"
+        print data["corrected_pdf"]
+        print data["pdf_stats_errors"]
+        print data["pdf_sys_errors"]
 
+        
         canvas.Update()
         for a_format in ["eps", "pdf", "root", "png"]:
             canvas.Print(self.plot_dir+canvas.GetName()+"."+a_format)

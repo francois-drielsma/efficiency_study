@@ -43,6 +43,7 @@ class ConglomerateOne(object):
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
+            print name
             for hist_name in self.options["histogram_names"]:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
@@ -64,12 +65,13 @@ class ConglomerateOne(object):
         graph_types = [type(ROOT.TGraph()), type(ROOT.TGraphAsymmErrors())]
         graph_name_list = copy.deepcopy(self.options["graph_names"])
         graph_name_list = [name.replace(" ", "_").lower() for name in graph_name_list]
-        for an_object in pad.GetListOfPrimitives():
+        canvas_objects = [an_object for an_object in pad.GetListOfPrimitives()]
+        for an_object in canvas_objects:
             name = str(an_object.GetName()).replace(" ", "_").lower()
             for graph_name in graph_name_list:
                 if graph_name in name:
                     if type(an_object) not in graph_types:
-                        print name, "matches", graph_name, "but type", type(an_object), "not a graph"
+                        print name, "matches", graph_name, "but type", type(an_object), "not a graph - skipping"
                         continue
                     graph_list.append(an_object)
                     graph_name_list.remove(graph_name)
@@ -78,6 +80,9 @@ class ConglomerateOne(object):
             print "Did not find graphs", graph_name_list, "from:"
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
+        print "Found graphs"
+        for an_object in graph_list:
+            print "   ", an_object.GetName(), type(an_object)
         return graph_list
 
     def get_canvas(self, file_name):
@@ -276,7 +281,7 @@ class ConglomerateOne(object):
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
-        text_box.AddText("Internal Only")
+        text_box.AddText("MICE Preliminary")
         text_box.Draw()
         self.root_objects.append(text_box)
         text_box = ROOT.TPaveText(0.55, 0.15, 0.9, 0.3, "NDC")
@@ -360,22 +365,31 @@ class ConglomerateOne(object):
             self.graph_list += self.get_graph_list(old_canvas)
         if len(self.hist_list) == 0:
             print "Error - failed to find plots for", self.options["file_name"]
-        #print "Found", len(hist_list), "histograms"
-        #for hist in hist_list:
-        #    print "   ", hist.GetName()
-        self.canvas = ROOT.TCanvas(self.options["canvas_name"]+"_"+self.uid(), self.options["canvas_name"], 1400, 1000)
+        print "Found", len(self.hist_list), "histograms"
+        for hist in self.hist_list:
+            print "   ", hist.GetName()
+        print "Found", len(self.graph_list), "graphs"
+        for graph in self.graph_list:
+            print "   ", graph.GetName()
+        print "Building canvas"
+        self.canvas = ROOT.TCanvas(self.options["canvas_name"]+"_"+self.uid(), self.options["canvas_name"], 0, 0, 100, 100)
+        print "Done canvas a"
         self.canvas.Draw()
         self.root_objects.append(self.canvas)
+        print "Done canvas"
         self.pad = ROOT.TPad(self.options["file_name"]+"-pad", "pad", 0.10, 0.05, 0.97, 1.0)
         self.pad.Draw()
         self.pad.cd()
+        print "Done pad"
         try:
             self.murgle_histograms(self.canvas, self.hist_list, self.graph_list)
+            print "Murgled"
         except Exception:
             print "Failed with dir path", self.dir_path
             print "       and file list", file_list
             raise
         self.write_plots(self.canvas, self.pad, self.hist_list, self.graph_list)
+        print "Done"
 
     dir_path = []
     root_objects = []
