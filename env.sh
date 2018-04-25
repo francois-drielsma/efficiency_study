@@ -1,2 +1,2 @@
-source ~/MAUS/maus-merge/env.sh
-export PYTHONPATH=${PYTHONPATH}:"/home/cr67/work/2016-11-18_emittance-analysis/amplitude/scripts"
+source ~/MAUS/maus-rogers_2018-01-30/env.sh
+export PYTHONPATH=${PYTHONPATH}:"/home/astg/scarf148/work/amplitude/scripts"

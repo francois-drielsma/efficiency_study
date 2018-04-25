@@ -39,12 +39,12 @@ class CompareCutsConfig(CompareConfig):
             self.get_conglomerate_2("global_through_virtual_diffuser_us_r_9_0", None, "Radius at diffuser (downstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tkd_n_tracks_13_0", None, "Number of tracks in TKD", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tkd_chi2_13_0", None, "#chi^{2}/D.o.F. in TKD", None, True, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("tkd_max_r_13_0", None, "Maximum radius in TKD [mm]", [0., 300.], True, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("tkd_p_13_0", None, "Momentum in TKD [MeV/c]", None, True, [0.5, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_2("tkd_max_r_13_0", None, "Maximum radius in TKD stations [mm]", [0., 300.], True, [0.5, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_2("tkd_p_13_0", None, "Momentum at TKD Reference Plane [MeV/c]", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tku_chi2_9_0", None, "#chi^{2}/D.o.F. in TKU", None, True, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("tku_max_r_9_0", None, "Maximum radius in TKU [mm]", None, True, [0.5, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_2("tku_max_r_9_0", None, "Maximum radius in TKU stations [mm]", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tku_n_tracks_8_0", None, "Number of tracks in TKU", None, True, [0.5, 0.5, 0.9, 0.9]), # disable two cuts
-            self.get_conglomerate_2("tku_p_9_0", None, "Momentum in TKU [MeV/c]", [100., 220.], True, [0.5, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_2("tku_p_9_0", None, "Momentum at TKU Reference Plane [MeV/c]", [100., 220.], True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tof_tof0_n_sp_9_0", None, "Number of space points in TOF0", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tof_tof1_n_sp_9_0", None, "Number of space points in TOF1", None, True, [0.5, 0.5, 0.9, 0.9]),
             self.get_conglomerate_2("tof_tof01_9_0", None, "Time between TOF0 and TOF1 [ns]", [28., 33.], True, [0.5, 0.5, 0.9, 0.9]),
@@ -151,24 +151,35 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
         self.setup(beam, target_dir, "amplitude/", "compare_amplitude_data/", True, False)
 
         self.conglomerate_list = [
-            self.get_conglomerate_3("migration_matrix", "migration_matrix", None, None),
-            self.get_conglomerate_3("amplitude_delta_reco_hist", "delta_amplitude_hist", None, None),
+            #self.get_conglomerate_3("migration_matrix", "migration_matrix", None, None),
+            #self.get_conglomerate_3("amplitude_delta_reco_hist", "delta_amplitude_hist", None, None),
             #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
             #                            "Number",
             #                            "amplitude_pdf_reco", ["Upstream_hist"],
             #                           ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
-            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
-                                        "Number",
-                                        "amplitude_pdf_reco", ["Upstream_hist"],
-                                        ["Upstream", "Downstream"], x_range=[1., 65.]),
+            #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
+            #                            "Number",
+            #                            "amplitude_pdf_reco", ["Upstream_hist"],
+            #                            ["Upstream", "Downstream"], x_range=[1., 65.]),
             #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
             #                            "Number",
             #                            "amplitude_pdf_reco", ["Upstream_hist"],
             #                            ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
-            self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
-                                        "Cumulative density",
-                                        "amplitude_cdf_reco", ["Upstream CDF_hist"],
-                                        ["Upstream_CDF", "Downstream_CDF"], x_range=[1., 65.]),
+            #self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
+            #                            "Cumulative density",
+            #                            "amplitude_cdf_reco", ["Upstream CDF_hist"],
+            #                            ["Upstream_CDF", "Downstream_CDF"], x_range=[1., 65.]),
+            #self.get_conglomerate_graph("pdf_ratio*", "Reconstructed Amplitude [mm]",
+            #                            "#frac{Number out}{Number in}",
+            #                            "pdf_ratio", ["PDF Ratio_hist", "PDF Ratio_hist"],
+            #                            ["PDF_Ratio"], x_range = [0.01, 110.], y_range = [0.601, 1.399], replace_hist = True,
+            #                            graph_marker_style=[20, 26], graph_marker_color=[1, ROOT.kRed]),
+
+            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed Amplitude [mm]",
+                                        "#frac{Cumulative number out}{Cumulative number in}",
+                                        "cdf_ratio", ["CDF_Ratio_hist"],
+                                        ["CDF_Ratio", "CDF_Ratio"], x_range = [0.01, 59.9], y_range = [0.801, 1.399], replace_hist = True,
+                                        graph_marker_style=[20, 20], graph_marker_color=[1, 1]),
         ]
 
 class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
@@ -246,16 +257,16 @@ def main(batch_level = 0):
     my_dir_list = [["2017-2.7_6-140_lH2_full"]]
     config_list = [CompareData1DConfig]#,CompareCutsConfig] # , CompareOpticsConfig, CompareData2DConfig]
     #config_list += [CompareAmplitudeConfigData, CompareAmplitudeConfigBoth]#, CompareAmplitudeConfigMC]
-    target_dir = "output/2017-02/"
-    batch_level = 10
-    hide_root = False
+    target_dir = "output/2017-02-binless-3/"
+    batch_level = 20
+    hide_root = True
     do_cuts_summary = False
     if batch_level < 10 and hide_root:
         ROOT.gErrorIgnoreLevel = 6000
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
     my_dir_list = [
-        ["2017-2.7_6-140_None", "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
-        ["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty", 
+        ["2017-2.7_6-140_None"]#, "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
+        #["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty", 
     ]
     config_list = [CompareAmplitudeConfigData]#, CompareAmplitudeConfigMC, CompareAmplitudeConfigBoth]
     #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
