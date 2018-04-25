@@ -110,7 +110,6 @@ class ConglomerateOne(object):
         x_range = self.options["rescale_x"]
         for hist in hist_list:
             hist.GetXaxis().SetRangeUser(x_range[0], x_range[1])
-        print "RESCALED", x_range
 
     def replace_hist(self, canvas, hist_list, graph_list):
         if not self.options["replace_hist"]:
@@ -181,10 +180,10 @@ class ConglomerateOne(object):
             hist.GetYaxis().SetTitle("")
         canvas.cd()
         if self.options["axis_title"]["x"] != None:
-            x_text_box = ROOT.TPaveText(0.10, 0.02, 0.97, 0.04, "NDC")
+            x_text_box = ROOT.TPaveText(0.10, 0.02, 0.97, 0.035, "NDC")
             x_text_box.SetFillColor(0)
             x_text_box.SetBorderSize(0)
-            x_text_box.SetTextSize(0.05)
+            x_text_box.SetTextSize(0.035)
             x_text_box.SetTextAlign(22)
             x_text_box.AddText(self.options["axis_title"]["x"])
             x_text_box.Draw()
@@ -192,7 +191,7 @@ class ConglomerateOne(object):
         if self.options["axis_title"]["y"] != None:
             y_text_box = ROOT.TPaveText(0.015, 0.10, 0.04, 0.97, "NDC")
             y_text_box = ROOT.TLatex(0.05, 0.5, self.options["axis_title"]["y"])
-            y_text_box.SetTextSize(0.05)
+            y_text_box.SetTextSize(0.035)
             y_text_box.SetTextAlign(22)
             y_text_box.SetTextAngle(90)
             y_text_box.Draw()
@@ -271,15 +270,15 @@ class ConglomerateOne(object):
     def mice_logo(self, canvas, hist_list, graph_list):
         if not self.options["mice_logo"]:
             return
-        text_box = ROOT.TPaveText(0.55, 0.3, 0.9, 0.4, "NDC")
+        text_box = ROOT.TPaveText(0.55, 0.3, 0.89, 0.4, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
-        text_box.AddText("Internal Only")
+        text_box.AddText("MICE Preliminary")
         text_box.Draw()
         self.root_objects.append(text_box)
-        text_box = ROOT.TPaveText(0.55, 0.15, 0.9, 0.3, "NDC")
+        text_box = ROOT.TPaveText(0.55, 0.15, 0.89, 0.3, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.03)

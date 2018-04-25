@@ -42,17 +42,20 @@ class CompareConfig(object):
             self.beamline = ""
             self.absorber = ""
 
-    def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos):
+    def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos, rescale_y = True):
         hist_name = hist
         if cut != None:
             hist_name = hist+" "+cut
+        y_range = None
+        if type(rescale_y) == type([]):
+            y_range = rescale_y
         return {
                 "file_name":canvas,
                 "canvas_name":canvas,
                 "histogram_names":[hist_name],
                 "graph_names":[],
                 "rescale_x":axis_range,
-                "rescale_y":True,
+                "rescale_y":rescale_y,
                 "normalise":normalise,
                 "calculate_errors":{
                     "histograms":[0],
@@ -70,7 +73,7 @@ class CompareConfig(object):
                     "marker_style":[20, 20],
                     "draw_order":[1, 0],
                     "x_range":axis_range,
-                    "y_range":None,
+                    "y_range":y_range,
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
 

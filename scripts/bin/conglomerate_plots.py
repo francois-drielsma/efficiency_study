@@ -68,19 +68,19 @@ class CompareData1DConfig(CompareConfig):
         self.setup(beam, target_dir, "data_plots/", "compare_data/", True, True)
 
         self.conglomerate_list = [
-            self.get_conglomerate_1("tof0_slab_dt", "tof0_slab_dt", "us_cut", "Slab dt for TOF0 [ns]", [-2, 2], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tof1_slab_dt", "tof1_slab_dt", "us_cut", "Slab dt for TOF1 [ns]", [-2, 2], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tof2_slab_dt", "tof2_slab_dt", "ds_cut", "Slab dt for TOF2 [ns]", [-2, 2], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tku_x",  "tku_x",  "us_cut", "x in TKU [mm]",        [-149, 300], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tku_y",  "tku_y",  "us_cut", "y in TKU [mm]",        [-149, 300], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tku_px", "tku_px", "us_cut", "p_{x} in TKU [MeV/c]", [-95, 200], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tku_py", "tku_py", "us_cut", "p_{y} in TKU [MeV/c]", [-95, 200], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tku_p", "tku_p", "us_cut", "p in TKU [MeV/c]",       [132, 160], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tkd_x",  "tkd_x",  "ds_cut", "x in TKD [mm]",        [-149, 300], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tkd_y",  "tkd_y",  "ds_cut", "y in TKD [mm]",        [-149, 300], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tkd_px", "tkd_px", "ds_cut", "p_{x} in TKD [MeV/c]", [-95, 200], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tkd_py", "tkd_py", "ds_cut", "p_{y} in TKD [MeV/c]", [-95, 200], False, [0.55, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_1("tkd_p", "tkd_p", "ds_cut", "p in TKD [MeV/c]",       [89, 200], False, [0.55, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_1("tof0_slab_dt", "tof0_slab_dt", "us_cut", "Slab dt for TOF0 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tof1_slab_dt", "tof1_slab_dt", "us_cut", "Slab dt for TOF1 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tof2_slab_dt", "tof2_slab_dt", "ds_cut", "Slab dt for TOF2 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tku_x",  "tku_x",  "us_cut", "x at TKU Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tku_y",  "tku_y",  "us_cut", "y at TKU Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tku_px", "tku_px", "us_cut", "p_{x} at TKU Reference Plane [MeV/c]", [-120, 200], False, [0.55, 0.7, 0.9, 0.9], rescale_y = [0., 0.15]),
+            self.get_conglomerate_1("tku_py", "tku_py", "us_cut", "p_{y} at TKU Reference Plane [MeV/c]", [-120, 200], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tku_p", "tku_p", "us_cut", "p at TKU Reference Plane [MeV/c]",       [89, 200], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tkd_x",  "tkd_x",  "ds_cut", "x at TKD Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tkd_y",  "tkd_y",  "ds_cut", "y at TKD Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tkd_px", "tkd_px", "ds_cut", "p_{x} at TKD Reference Plane [MeV/c]", [-120, 200], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tkd_py", "tkd_py", "ds_cut", "p_{y} at TKD Reference Plane [MeV/c]", [-120, 200], False, [0.55, 0.7, 0.9, 0.9]),
+            self.get_conglomerate_1("tkd_p", "tkd_p", "ds_cut", "p at TKD Reference Plane [MeV/c]",       [89, 200], False, [0.55, 0.7, 0.9, 0.9]),
         ]
 
 
@@ -228,8 +228,9 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         if batch_level > 1:
             ROOT.gROOT.SetBatch(False)
         try:
-            merge = ConglomerateMerge(conglomerate_list)
-            merge.merge_all(rows, cols)
+            if len(config_list) > 1:
+                merge = ConglomerateMerge(conglomerate_list)
+                merge.merge_all(rows, cols)
         except Exception:
             sys.excepthook(*sys.exc_info())
         print "Failed:"
@@ -243,7 +244,7 @@ def main(batch_level = 0):
     """
     ROOT.gROOT.SetBatch(True)
     my_dir_list = [["2017-2.7_6-140_lH2_full"]]
-    config_list = [CompareCutsConfig] #CompareData1DConfig]#, , CompareOpticsConfig, CompareData2DConfig]
+    config_list = [CompareData1DConfig]#,CompareCutsConfig] # , CompareOpticsConfig, CompareData2DConfig]
     #config_list += [CompareAmplitudeConfigData, CompareAmplitudeConfigBoth]#, CompareAmplitudeConfigMC]
     target_dir = "output/2017-02/"
     batch_level = 10
@@ -251,13 +252,13 @@ def main(batch_level = 0):
     do_cuts_summary = False
     if batch_level < 10 and hide_root:
         ROOT.gErrorIgnoreLevel = 6000
-    #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
+    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
     my_dir_list = [
         ["2017-2.7_6-140_None", "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
         ["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty", 
     ]
     config_list = [CompareAmplitudeConfigData]#, CompareAmplitudeConfigMC, CompareAmplitudeConfigBoth]
-    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
+    #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
 
 if __name__ == "__main__":
     main()
