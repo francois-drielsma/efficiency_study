@@ -1,6 +1,7 @@
 import glob
 import os
 import copy
+import json
 import ROOT
 
 
@@ -43,7 +44,6 @@ class ConglomerateOne(object):
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
-            print name
             for hist_name in self.options["histogram_names"]:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
@@ -80,9 +80,6 @@ class ConglomerateOne(object):
             print "Did not find graphs", graph_name_list, "from:"
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
-        print "Found graphs"
-        for an_object in graph_list:
-            print "   ", an_object.GetName(), type(an_object)
         return graph_list
 
     def get_canvas(self, file_name):
@@ -185,23 +182,43 @@ class ConglomerateOne(object):
             hist.GetYaxis().SetTitle("")
         canvas.cd()
         if self.options["axis_title"]["x"] != None:
-            x_text_box = ROOT.TPaveText(0.10, 0.02, 0.97, 0.035, "NDC")
+            x_text_box = ROOT.TPaveText(0.10, 0.02, 0.97, 0.1, "NDC")
             x_text_box.SetFillColor(0)
             x_text_box.SetBorderSize(0)
             x_text_box.SetTextSize(0.035)
-            x_text_box.SetTextAlign(22)
+            x_text_box.SetTextAlign(21)
             x_text_box.AddText(self.options["axis_title"]["x"])
             x_text_box.Draw()
             self.x_axis = x_text_box
         if self.options["axis_title"]["y"] != None:
-            y_text_box = ROOT.TPaveText(0.015, 0.10, 0.04, 0.97, "NDC")
-            y_text_box = ROOT.TLatex(0.05, 0.5, self.options["axis_title"]["y"])
+            y_text_box = ROOT.TLatex(0.07, 0.5, self.options["axis_title"]["y"])
             y_text_box.SetTextSize(0.035)
-            y_text_box.SetTextAlign(22)
+            y_text_box.SetTextAlign(21)
             y_text_box.SetTextAngle(90)
             y_text_box.Draw()
             self.y_axis = y_text_box
 
+    def do_an_extra_line(self, x_values, y_values, style_def):
+        graph = ROOT.TGraph(2)
+        graph.SetPoint(0, x_values[0], y_values[0])
+        graph.SetPoint(1, x_values[1], y_values[1])
+        graph.SetLineColor(style_def["line_color"])
+        graph.SetLineStyle(style_def["line_style"])
+        graph.Draw("SAME")
+        self.root_objects.append(graph)
+        print "Did an extra line with ", x_values, " and ", y_values
+        return graph
+        
+    def extra_lines(self, canvas, hist_list, graph_list):
+        if not self.options["extra_lines"]:
+            return
+        for item in self.options["extra_lines"]["horizontals"]:
+            y_values = [item["y_value"], item["y_value"]]
+            x_min = min([hist.GetXaxis().GetXmin() for hist in hist_list])
+            x_max = max([hist.GetXaxis().GetXmax() for hist in hist_list])
+            graph = self.do_an_extra_line([x_min, x_max], y_values, item)
+            graph_list.append(graph)
+            
     unique_id = 0
     @classmethod
     def uid(cls):
@@ -244,9 +261,13 @@ class ConglomerateOne(object):
             graph_draw = {
                 "marker_style":None,
                 "marker_color":None,
-                "draw_option":["p"]*len(graph_list)
+                "draw_option":["p"]*len(graph_list),
+                "draw_order":None,
             }
-        for i, graph in enumerate(graph_list):
+        if graph_draw["draw_order"] == None:
+            graph_draw["draw_order"] = range(len(graph_list))
+        for i in graph_draw["draw_order"]:
+            graph = graph_list[i]
             graph.SetName(graph.GetName()+"_"+self.uid())
             if graph_draw["marker_style"] != None:
                 graph.SetMarkerStyle(graph_draw["marker_style"][i])
@@ -321,7 +342,7 @@ class ConglomerateOne(object):
             canvas.Print(name+"."+fmt)
 
     def murgle_many(self, canvas, hist_list, graph_list):
-        self.label_size = 0.1
+        self.label_size = 0.08
         #self.rebin(canvas, hist_list, graph_list)
         #self.normalise(canvas, hist_list, graph_list)
         #self.defit(canvas, hist_list, graph_list)
@@ -331,6 +352,7 @@ class ConglomerateOne(object):
         #self.hist_title(canvas, hist_list, graph_list)
         #self.log_y(canvas, hist_list, graph_list)
         self.redraw(canvas, hist_list, graph_list)
+        self.extra_lines(canvas, hist_list, graph_list)
         #self.mice_logo(canvas, hist_list, graph_list)
         self.do_legend(canvas, hist_list, graph_list)
         #self.axis_title(canvas, hist_list, graph_list)
@@ -347,6 +369,7 @@ class ConglomerateOne(object):
         self.hist_title(canvas, hist_list, graph_list)
         self.log_y(canvas, hist_list, graph_list)
         self.redraw(canvas, hist_list, graph_list)
+        self.extra_lines(canvas, hist_list, graph_list)
         self.mice_logo(canvas, hist_list, graph_list)
         self.do_legend(canvas, hist_list, graph_list)
         self.axis_title(canvas, hist_list, graph_list)
@@ -364,22 +387,18 @@ class ConglomerateOne(object):
             self.graph_list += self.get_graph_list(old_canvas)
         if len(self.hist_list) == 0:
             print "Error - failed to find plots for", self.options["file_name"]
-        print "Found", len(self.hist_list), "histograms"
-        for hist in self.hist_list:
-            print "   ", hist.GetName()
-        print "Found", len(self.graph_list), "graphs"
-        for graph in self.graph_list:
-            print "   ", graph.GetName()
-        print "Building canvas"
-        self.canvas = ROOT.TCanvas(self.options["canvas_name"]+"_"+self.uid(), self.options["canvas_name"], 0, 0, 100, 100)
-        print "Done canvas a"
+        #print "Found", len(self.hist_list), "histograms"
+        #for hist in self.hist_list:
+        #    print "   ", hist.GetName()
+        #print "Found", len(self.graph_list), "graphs"
+        #for graph in self.graph_list:
+        #    print "   ", graph.GetName()
+        self.canvas = ROOT.TCanvas(self.options["canvas_name"]+"_"+self.uid(), self.options["canvas_name"], 0, 0, 1400, 1000)
         self.canvas.Draw()
         self.root_objects.append(self.canvas)
-        print "Done canvas"
         self.pad = ROOT.TPad(self.options["file_name"]+"-pad", "pad", 0.10, 0.05, 0.97, 1.0)
         self.pad.Draw()
         self.pad.cd()
-        print "Done pad"
         try:
             self.murgle_histograms(self.canvas, self.hist_list, self.graph_list)
             print "Murgled"

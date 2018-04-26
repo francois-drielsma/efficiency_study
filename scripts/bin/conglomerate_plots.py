@@ -13,7 +13,7 @@ from conglomerate.merge_cuts_summary_tex import MergeCutsSummaryTex
 
 
 class MCConfig(CompareConfig):
-    def __init__(self, mc_version):
+    def __init__(self, mc_version, top_labels, right_labels):
         self.conglomerate_list = [
             self.get_conglomerate_1("tku_p", "tku_p", "all", [80., 200.], False),
             self.get_conglomerate_1("tof01", "tof01", "all", [24., 40.,], True),
@@ -32,7 +32,7 @@ class MCConfig(CompareConfig):
         ]
 
 class CompareCutsConfig(CompareConfig):
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "cut_plots/", "compare_cuts/", True, True)
         self.conglomerate_list = [
             self.get_conglomerate_2("global_through_virtual_diffuser_ds_r_9_0", None, "Radius at diffuser (upstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9]),
@@ -64,7 +64,7 @@ in this note."""
         self.mc_caption = "Simulated sample selection"
 
 class CompareData1DConfig(CompareConfig):
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "data_plots/", "compare_data/", True, True)
 
         self.conglomerate_list = [
@@ -85,7 +85,7 @@ class CompareData1DConfig(CompareConfig):
 
 
 class CompareData2DConfig(CompareConfig):
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "data_plots/", "compare_data/", True, False)
 
         self.conglomerate_list = [
@@ -95,7 +95,7 @@ class CompareData2DConfig(CompareConfig):
 
 
 class CompareOpticsConfig(CompareConfig):
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "optics_plots/", "compare_optics/", True, False)
 
         self.conglomerate_list = [
@@ -109,7 +109,7 @@ class CompareOpticsConfig(CompareConfig):
 
 
 class CompareGlobalsConfig(CompareConfig):
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "global_plots/", "compare_globals/", True, False)
 
         self.conglomerate_list = [
@@ -132,7 +132,7 @@ class CompareGlobalsConfig(CompareConfig):
             item["rebin"] = 4
 
 class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "amplitude/", "compare_amplitude_mc/", False, True)
 
         self.conglomerate_list = [
@@ -147,39 +147,51 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
         ]
 
 class CompareAmplitudeConfigData(CompareConfig): # data plots
-    def __init__(self, beam, target_dir):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "amplitude/", "compare_amplitude_data/", True, False)
+        ratio_modifiers = {
+            "extra_lines":{
+                "horizontals":[
+                    {"y_value":1., "line_color":1, "line_style":2},
+                ],
+            },
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            }
+        }
 
         self.conglomerate_list = [
-            #self.get_conglomerate_3("migration_matrix", "migration_matrix", None, None),
-            #self.get_conglomerate_3("amplitude_delta_reco_hist", "delta_amplitude_hist", None, None),
-            #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
-            #                            "Number",
-            #                            "amplitude_pdf_reco", ["Upstream_hist"],
-            #                           ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
-            #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
-            #                            "Number",
-            #                            "amplitude_pdf_reco", ["Upstream_hist"],
-            #                            ["Upstream", "Downstream"], x_range=[1., 65.]),
-            #self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
-            #                            "Number",
-            #                            "amplitude_pdf_reco", ["Upstream_hist"],
-            #                            ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
-            #self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
-            #                            "Cumulative density",
-            #                            "amplitude_cdf_reco", ["Upstream CDF_hist"],
-            #                            ["Upstream_CDF", "Downstream_CDF"], x_range=[1., 65.]),
-            #self.get_conglomerate_graph("pdf_ratio*", "Reconstructed Amplitude [mm]",
-            #                            "#frac{Number out}{Number in}",
-            #                            "pdf_ratio", ["PDF Ratio_hist", "PDF Ratio_hist"],
-            #                            ["PDF_Ratio"], x_range = [0.01, 110.], y_range = [0.601, 1.399], replace_hist = True,
-            #                            graph_marker_style=[20, 26], graph_marker_color=[1, ROOT.kRed]),
-
-            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed Amplitude [mm]",
-                                        "#frac{Cumulative number out}{Cumulative number in}",
-                                        "cdf_ratio", ["CDF_Ratio_hist"],
-                                        ["CDF_Ratio", "CDF_Ratio"], x_range = [0.01, 59.9], y_range = [0.801, 1.399], replace_hist = True,
-                                        graph_marker_style=[20, 20], graph_marker_color=[1, 1]),
+#            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed amplitude [mm]",
+#                                        "Number",
+#                                        "amplitude_pdf_reco", ["Upstream_hist"],
+#                                       ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
+            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
+                                        "Number",
+                                        "amplitude_pdf_reco", ["Upstream_hist"],
+                                        ["Upstream", "Upstream", "Downstream", "Downstream"], x_range=[1., 65.], replace_hist = True, y_range = [0., 5000],
+                                        graph_draw_option = ["2", "p", "p", "2"], graph_marker_style=[20, 20, 24, 24],
+                                        graph_marker_color=[ROOT.kOrange+2, ROOT.kOrange+2, ROOT.kGreen+2, ROOT.kGreen+2],
+                                        graph_draw_order=[0, 1, 2, 3], modifiers=ratio_modifiers),
+#            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
+#                                        "Number",
+#                                        "amplitude_pdf_reco", ["Upstream_hist"],
+#                                        ["Upstream", "Downstream", "Raw scraped", "Raw upstream", "Raw downstream"]),
+#            self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
+#                                        "Cumulative density",
+#                                        "amplitude_cdf_reco", ["Upstream CDF_hist"],
+#                                        ["Upstream_CDF", "Downstream_CDF"], x_range=[1., 65.]),
+#
+#            self.get_conglomerate_graph("pdf_ratio*", "Reconstructed amplitude [mm]",
+#                                        "P_{Amp}",
+#                                        "pdf_ratio", ["PDF_Ratio_hist"],
+#                                        ["PDF_Ratio", "PDF_Ratio"], x_range = [0.01, 59.9], y_range = [0.501, 2.499], replace_hist = True,
+#                                        graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[1, 1], graph_draw_order=[1,0], modifiers=ratio_modifiers),
+#            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
+#                                        "R_{Amp}",
+#                                        "cdf_ratio", ["CDF_Ratio_hist"],
+#                                        ["CDF_Ratio", "CDF_Ratio"], x_range = [0.01, 59.9], y_range = [0.801, 1.599], replace_hist = True,
+#                                        graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[1, 1], graph_draw_order=[1,0], modifiers=ratio_modifiers),
         ]
 
 class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
@@ -193,7 +205,7 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                                         ["PDF_Ratio"], x_range = [0.01, 110.], y_range = [0.601, 1.399], replace_hist = True,
                                         graph_marker_style=[20, 26], graph_marker_color=[1, ROOT.kRed]),
 
-            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
                                         "#frac{Cumulative number out}{Cumulative number in}",
                                         "cdf_ratio", ["CDF Ratio_hist"],
                                         ["CDF_Ratio"], x_range = [0.01, 59.9], y_range = [0.601, 1.399], replace_hist = True,
@@ -212,7 +224,7 @@ def cuts_summary(dir_list, target_dir):
     data_cuts_summary.merge_summaries(target_dir+"/cuts_summary/data/", "data_cuts_summary.tex")
     mc_cuts_summary.merge_summaries(target_dir+"/cuts_summary/mc/", "mc_cuts_summary.tex")
 
-def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, target_dir):
+def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, target_dir, top_labels, right_labels):
     rows = len(dir_lists)
     cols = min([len(sub_list) for sub_list in dir_lists])
     dir_list = []
@@ -225,10 +237,10 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         conglomerate_list = []
         print "Doing", ConfigClass.__name__
         for beam in dir_list:
-            if batch_level > 5:
-                ROOT.gROOT.SetBatch(False)
+            #if batch_level > 5:
+                #ROOT.gROOT.SetBatch(False)
             try:
-                config = ConfigClass(beam, target_dir)
+                config = ConfigClass(beam, target_dir, top_labels, right_labels)
                 cong = ConglomerateContainer(config)
                 cong.conglomerate()
                 conglomerate_list.append(cong)
@@ -239,7 +251,7 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         if batch_level > 1:
             ROOT.gROOT.SetBatch(False)
         try:
-            if len(config_list) > 1:
+            if len(dir_lists) > 1:
                 merge = ConglomerateMerge(conglomerate_list)
                 merge.merge_all(rows, cols)
         except Exception:
@@ -258,18 +270,20 @@ def main(batch_level = 0):
     config_list = [CompareData1DConfig]#,CompareCutsConfig] # , CompareOpticsConfig, CompareData2DConfig]
     #config_list += [CompareAmplitudeConfigData, CompareAmplitudeConfigBoth]#, CompareAmplitudeConfigMC]
     target_dir = "output/2017-02-binless-3/"
-    batch_level = 20
-    hide_root = True
+    batch_level = 0
+    hide_root_errors = False
     do_cuts_summary = False
-    if batch_level < 10 and hide_root:
+    if batch_level < 10 and hide_root_errors:
         ROOT.gErrorIgnoreLevel = 6000
-    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
-    my_dir_list = [
-        ["2017-2.7_6-140_None"]#, "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
-        #["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty", 
-    ]
-    config_list = [CompareAmplitudeConfigData]#, CompareAmplitudeConfigMC, CompareAmplitudeConfigBoth]
     #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
+    my_dir_list = [
+        ["2017-2.7_6-140_None", "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
+        ["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty", 
+    ]
+    top_labels = ["No absorber", "LH2", "LiH"]
+    right_labels = ["6-140", "10-140"]
+    config_list = [CompareAmplitudeConfigData]#, CompareAmplitudeConfigMC, CompareAmplitudeConfigBoth]
+    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
 
 if __name__ == "__main__":
     main()

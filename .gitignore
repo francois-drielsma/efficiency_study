@@ -5,3 +5,4 @@ geometry_*
 iteration*
 nohup.out
 logs
+env.sh

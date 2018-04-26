@@ -78,6 +78,8 @@ class CompareConfig(object):
                     "ignore_more_histograms":False,
 
                 },
+                "extra_lines":False,
+                "extra_labels":False,
                 "legend":{
                     "text":["data", "simulation"],
                     "draw_option":["p e1", "f l"],
@@ -125,6 +127,8 @@ class CompareConfig(object):
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
                 },
+                "extra_lines":False,
+                "extra_labels":False,
                 "legend":{
                     "text":["Recon data", "Recon sim"],
                     "draw_option":["p e1", "f l"],
@@ -168,6 +172,8 @@ class CompareConfig(object):
                     "ignore_more_histograms":False,
                 },
                 "legend":False,
+                "extra_lines":False,
+                "extra_labels":False,
                 "defit":False,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
@@ -179,9 +185,32 @@ class CompareConfig(object):
                 },
             }
 
+    def recursive_modify_dict(self, target_config, source_config):
+        for key, value in source_config.iteritems():
+            if key not in target_config:
+                target_config[key] = value
+            elif type(target_config[key]) != type(value):
+                target_config[key] = value
+            elif type(target_config[key]) == type({}):
+                self.recursive_modify_dict(target_config[key], value)
+            elif type(target_config[key]) == type([]):
+                self.recursive_modify_list(target_config[key], value)
+
+    def recursive_modify_list(self, target_config, source_config):
+        for i, value in enumerate(source_config):
+            if i >= len(target_config):
+                target_config.append(value)
+            elif type(target_config[i]) != type(value):
+                target_config[i] = value
+            elif type(target_config[key]) == type({}):
+                self.recursive_modify_dict(target_config[key], value)
+            elif type(target_config[key]) == type([]):
+                self.recursive_modify_list(target_config[key], value)
+                   
     def get_conglomerate_graph(self, file_name, x_axis_title, y_axis_title, canvas_name = None, 
                                hist_list = None, graph_list = None, x_range = None, y_range = None, replace_hist = False,
-                               graph_draw_option = None, graph_marker_style = None, graph_marker_color = None, ):
+                               graph_draw_option = None, graph_marker_style = None, graph_marker_color = None, graph_draw_order = None,
+                               modifiers = {}):
         if canvas_name == None:
             canvas_name = file_name
         if hist_list == None:
@@ -191,7 +220,7 @@ class CompareConfig(object):
         if graph_draw_option == None:
             graph_draw_option = ["p"]*len(graph_list)*len(self.conglomerate_dir)
         
-        return {
+        my_config = {
                 "file_name":file_name,
                 "canvas_name":canvas_name,
                 "histogram_names":hist_list,
@@ -208,6 +237,8 @@ class CompareConfig(object):
                 "mice_logo":True,
                 "log_y":False,
                 "hist_title":"",
+                "extra_lines":False,
+                "extra_labels":False,
                 "redraw":{
                     "draw_option":[""],
                     "fill_color":[1],
@@ -221,9 +252,11 @@ class CompareConfig(object):
                         "draw_option":graph_draw_option,
                         "marker_style":graph_marker_style,
                         "marker_color":graph_marker_color,
+                        "draw_order":graph_draw_order,
                     }
                 },
                 "legend":False,
+                "extra_lines":False,
                 "defit":True,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
@@ -234,3 +267,5 @@ class CompareConfig(object):
                     "y":y_axis_title,
                 },
             }
+        self.recursive_modify_dict(my_config, modifiers)
+        return my_config
