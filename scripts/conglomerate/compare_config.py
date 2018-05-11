@@ -42,21 +42,22 @@ class CompareConfig(object):
             self.beamline = ""
             self.absorber = ""
 
-    def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos, rescale_y = True):
+    def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos, rescale_y = True, modifiers = {}):
         hist_name = hist
         if cut != None:
             hist_name = hist+" "+cut
         y_range = None
         if type(rescale_y) == type([]):
             y_range = rescale_y
-        return {
+        my_config = {
                 "file_name":canvas,
                 "canvas_name":canvas,
                 "histogram_names":[hist_name],
                 "graph_names":[],
                 "rescale_x":axis_range,
                 "rescale_y":rescale_y,
-                "normalise":normalise,
+                "normalise_hist":normalise,
+                "normalise_graph":False,
                 "calculate_errors":{
                     "histograms":[0],
                     "normalised":True,
@@ -95,11 +96,13 @@ class CompareConfig(object):
                     "y":None,
                 },
             }
+        self.recursive_modify_dict(my_config, modifiers)
+        return my_config
 
-    def get_conglomerate_2(self, canvas, hist_name, axis_title, axis_range, normalise, legend_pos):
+    def get_conglomerate_2(self, canvas, hist_name, axis_title, axis_range, normalise, legend_pos, modifiers = {}):
         if hist_name == None:
             hist_name = canvas
-        return {
+        my_config = {
                 "file_name":canvas,
                 "canvas_name":canvas,
                 "histogram_names":[hist_name],
@@ -107,7 +110,8 @@ class CompareConfig(object):
                 "rescale_x":axis_range,
                 "rescale_y":True,
                 "replace_hist":False,
-                "normalise":normalise,
+                "normalise_hist":normalise,
+                "normalise_graph":False,
                 "calculate_errors":{
                     "histograms":[0],
                     "normalised":True,
@@ -130,7 +134,7 @@ class CompareConfig(object):
                 "extra_lines":False,
                 "extra_labels":False,
                 "legend":{
-                    "text":["Recon data", "Recon sim"],
+                    "text":["data", "simulation"],
                     "draw_option":["p e1", "f l"],
                     "pos":legend_pos,
                 },
@@ -144,6 +148,8 @@ class CompareConfig(object):
                     "y":None,
                 },
             }
+        self.recursive_modify_dict(my_config, modifiers)
+        return my_config
 
     def get_conglomerate_3(self, canvas, hist_name, x_axis_title, y_axis_title):
         return {
@@ -153,7 +159,8 @@ class CompareConfig(object):
                 "graph_names":[],
                 "rescale_x":False,
                 "rescale_y":False,
-                "normalise":False,
+                "normalise_hist":False,
+                "normalise_graph":False,
                 "replace_hist":False,
                 "calculate_errors":False,
                 "rebin":False,
@@ -195,6 +202,8 @@ class CompareConfig(object):
                 self.recursive_modify_dict(target_config[key], value)
             elif type(target_config[key]) == type([]):
                 self.recursive_modify_list(target_config[key], value)
+            else:
+                target_config[key] = value
 
     def recursive_modify_list(self, target_config, source_config):
         for i, value in enumerate(source_config):
@@ -202,10 +211,12 @@ class CompareConfig(object):
                 target_config.append(value)
             elif type(target_config[i]) != type(value):
                 target_config[i] = value
-            elif type(target_config[key]) == type({}):
-                self.recursive_modify_dict(target_config[key], value)
-            elif type(target_config[key]) == type([]):
-                self.recursive_modify_list(target_config[key], value)
+            elif type(target_config[i]) == type({}):
+                self.recursive_modify_dict(target_config[i], value)
+            elif type(target_config[i]) == type([]):
+                self.recursive_modify_list(target_config[i], value)
+            else:
+                target_config[i] = value
                    
     def get_conglomerate_graph(self, file_name, x_axis_title, y_axis_title, canvas_name = None, 
                                hist_list = None, graph_list = None, x_range = None, y_range = None, replace_hist = False,
@@ -228,7 +239,8 @@ class CompareConfig(object):
                 "rescale_x":x_range,
                 "rescale_y":y_range,
                 "replace_hist":replace_hist,
-                "normalise":False,
+                "normalise_hist":False,
+                "normalise_graph":False,
                 "calculate_errors":{
                     "histograms":[0],
                     "normalised":True,
@@ -252,6 +264,7 @@ class CompareConfig(object):
                         "draw_option":graph_draw_option,
                         "marker_style":graph_marker_style,
                         "marker_color":graph_marker_color,
+                        "fill_color":None,
                         "draw_order":graph_draw_order,
                     }
                 },

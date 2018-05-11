@@ -6,10 +6,10 @@ import copy
 import math
 import numpy
 
-import cdb_tof_triggers_lookup
+import utilities.cdb_tof_triggers_lookup
 import ROOT
 from xboa.bunch import Bunch
-import scripts.utilities
+import utilities.utilities as utilities
 
 from analysis_base import AnalysisBase
 
@@ -32,8 +32,8 @@ class DataPlotter(AnalysisBase):
     def birth(self):
         self.set_plot_dir("data_plots")
         self.run_numbers.update(self.data_loader.run_numbers)
-        self.birth_tof("tof01", 22, 47)
-        self.birth_tof("tof12", 25, 50)
+        self.birth_tof("tof01", -5, 25)
+        self.birth_tof("tof12", -5, 25)
         self.birth_tof_slabs()
         self.birth_tof_dt("tof0")
         self.birth_tof_dt("tof1")
@@ -287,9 +287,9 @@ class DataPlotter(AnalysisBase):
         self.death_var_2d("x", "tkd", "y", "tkd", "ds cut", True)
         self.death_var_2d("x", "tkd", "y", "tkd", "all", True)
 
-        self.death_tof("tof01", 25.1, 25.7)
+        self.death_tof("tof01", -0.4, 0.4)
         dtof2 = self.config.tof2_offset
-        self.death_tof("tof12", 27.938-0.401+dtof2, 27.938+0.301+dtof2)
+        self.death_tof("tof12", -0.4, 0.4)
 
         self.print_plots()
 
@@ -791,7 +791,7 @@ class DataPlotter(AnalysisBase):
 
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(detector_1, var_1, event_predicate, hit_predicate)
         data = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
-        lab_2 = detector_1+" "+var_1+" ["+scripts.utilities.default_units(var_1)+"]"
+        lab_2 = detector_1+" "+var_1+" ["+utilities.default_units(var_1)+"]"
         name = "p_res vs "+detector_1+" "+var_1+" "+cut
         hist = self.make_root_histogram(name, name,
                                         dp, lab_1, 100,
@@ -832,8 +832,8 @@ class DataPlotter(AnalysisBase):
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds_2, var_2, event_predicate, hit_predicate)
         data_2 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
         name = self.name_var_2d(var_1, us_ds_1, var_2, us_ds_2, cut, event_predicate, hit_predicate)
-        lab_1 = us_ds_1+" "+var_1+" ["+scripts.utilities.default_units(var_1)+"]"
-        lab_2 = us_ds_2+" "+var_2+" ["+scripts.utilities.default_units(var_2)+"]"
+        lab_1 = us_ds_1+" "+var_1+" ["+utilities.default_units(var_1)+"]"
+        lab_2 = us_ds_2+" "+var_2+" ["+utilities.default_units(var_2)+"]"
         hist = self.make_root_histogram(name, name,
                                         data_1, lab_1, n_bins_x,
                                         data_2, lab_2, n_bins_y, [],
@@ -998,7 +998,7 @@ class DataPlotter(AnalysisBase):
         return name
 
     def label_var_1d(self, name, var):
-        units = scripts.utilities.default_units(var)
+        units = utilities.default_units(var)
         if units != "":
             units = " ["+units+"]"
         label = name.replace("_", " ")+units
@@ -1015,7 +1015,7 @@ class DataPlotter(AnalysisBase):
             data_all.append(min_max[0]-1)
         name = self.name_var_1d(var, us_ds, event_predicate, hit_predicate)
         label = self.label_var_1d(name, var)
-        fit = scripts.utilities.fit_peak_data(data_all)
+        fit = utilities.fit_peak_data(data_all)
         mean = fit.GetParameter(1)
         sigma = fit.GetParameter(2)
         xmin, xmax = round(mean-sigma*5, 1), round(mean+sigma*5, 1)
@@ -1103,7 +1103,7 @@ class DataPlotter(AnalysisBase):
         run_numbers = [run for run in self.run_numbers if run != 0]
         wiki_summary += " "+str(sorted(run_numbers))+" |"
         try:
-            cdb_dict = cdb_tof_triggers_lookup.parse_one_setting(self.run_numbers)
+            cdb_dict = utilities.cdb_tof_triggers_lookup.parse_one_setting(self.run_numbers)
             cdb_dict["time"] = str(cdb_dict["time"][0])+" hrs "+str(cdb_dict["time"][1])+" mins"
             cdb_keys = ["bl", "channel", "lmc1234", "tof1_triggers", "tof2_triggers", "time"]
             for key in cdb_keys:

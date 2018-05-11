@@ -52,7 +52,6 @@ class ConglomerateMerge(object):
         legend.Draw()
 
     def do_mice_logo(self, do_isis):
-        print "DOING MICE LOGO"
         y_min=0.895
         if do_isis:
             y_min = 0.8
@@ -90,6 +89,8 @@ class ConglomerateMerge(object):
 
     def extra_labels(self, cong_list):
         extra_labels = cong_list[0].conglomerations[0].options["extra_labels"]
+        if not extra_labels:
+            return
         left_m = 0.128
         right_m = 0.12
         x_step = (1.0-left_m-right_m)/self.cols
@@ -157,7 +158,7 @@ class ConglomerateMerge(object):
             source_y_axis.Draw()
         self.extra_labels(self.conglomerate_list)
         merge_canvas.Update()
-        for fmt in ["png", "root", "eps", "pdf"]:
+        for fmt in ["root", "pdf", "png",]:
             merge_canvas.Print(target_dir+"/"+canvas_name+"."+fmt)
         self.merge_list.append(merge_dict)
         

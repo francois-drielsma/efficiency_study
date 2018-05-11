@@ -61,7 +61,7 @@ class Run(object):
         unique_id = str(unique_id)
         log_name = self.logs+"/analysis_"+unique_id+".log"
         cards = self.prefix
-        run = ['python', 'calculate_emittance.py', cards, unique_id]+self.extra_args
+        run = ['python', 'scripts/bin/run_one_analysis.py', cards, unique_id]+self.extra_args
         bsub_name = ""
         if self.is_scarf():
             bsub = ['bsub',

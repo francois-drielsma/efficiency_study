@@ -16,29 +16,29 @@ import maus_cpp.field
 import maus_cpp.polynomial_map
 import libxml2
 
-import scripts.data_loader.load_all
-import scripts.amplitude_analysis
-import scripts.data_loader
-import scripts.mc_plotter
-import scripts.data_plotter
-import scripts.cuts_plotter
-import scripts.amplitude_analysis
-import scripts.globals_plotter
-import scripts.optics_plotter
-import scripts.data_recorder
-import scripts.utilities
-import scripts.root_style
+import data_loader
+import data_loader.load_all
+import mice_analysis.amplitude_analysis
+import mice_analysis.mc_plotter
+import mice_analysis.data_plotter
+import mice_analysis.cuts_plotter
+import mice_analysis.amplitude_analysis
+import mice_analysis.globals_plotter
+import mice_analysis.optics_plotter
+import mice_analysis.data_recorder
+import utilities.root_style
 
 config_file = None
 
 class Analyser(object):
     def __init__(self):
         config_mod = sys.argv[1].replace(".py", "")
+        config_mod = config_mod.replace("scripts/", "")
         config_mod = config_mod.replace("/", ".")
         print "Using configuration module", config_mod
         config_file = importlib.import_module(config_mod)
-        scripts.root_style.setup_gstyle()
-        scripts.root_style.set_root_verbosity()
+        utilities.root_style.setup_gstyle()
+        utilities.root_style.set_root_verbosity()
         ROOT.gROOT.SetBatch(True)
         self.config = config_file.Config()
         self.config_anal = None
@@ -85,30 +85,30 @@ class Analyser(object):
         shutil.copy(config_file_name, self.config_anal["plot_dir"])
 
     def init_phase(self):
-        self.data_loader = scripts.data_loader.load_all.LoadAll(self.config, self.config_anal)
+        self.data_loader = data_loader.load_all.LoadAll(self.config, self.config_anal)
         self.data_loader.get_file_list()
         self.analysis_list = [] # force kill any analysis scripts in case death(...) did not happen in previous round
         if self.config_anal["do_mc"]:
             print "Doing mc"
-            self.analysis_list.append(scripts.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_plots"]:
             print "Doing plots"
-            self.analysis_list.append(scripts.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_cuts_plots"]:
             print "Doing cuts plots"
-            self.analysis_list.append(scripts.cuts_plotter.CutsPlotter(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.cuts_plotter.CutsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_globals"]:
             print "Doing globals"
-            self.analysis_list.append(scripts.globals_plotter.GlobalsPlotter(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.globals_plotter.GlobalsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_optics"]:
             print "Doing optics"
-            self.analysis_list.append(scripts.optics_plotter.OpticsPlotter(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.optics_plotter.OpticsPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_amplitude"]:
             print "Doing amplitude"
-            self.analysis_list.append(scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_data_recorder"]:
             print "Doing data recorder"
-            self.analysis_list.append(scripts.data_recorder.DataRecorder(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.data_recorder.DataRecorder(self.config, self.config_anal, self.data_loader))
 
     def birth_phase(self):
         all_event_count = 0

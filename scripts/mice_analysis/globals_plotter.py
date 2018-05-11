@@ -6,10 +6,10 @@ import copy
 import math
 import numpy
 
-import cdb_tof_triggers_lookup
+import utilities.cdb_tof_triggers_lookup as cdb_tof_triggers_lookup
+import utilities.utilities as utilities
 import ROOT
 from xboa.bunch import Bunch
-import scripts.utilities
 
 from analysis_base import AnalysisBase
 
@@ -273,11 +273,11 @@ class GlobalsPlotter(AnalysisBase):
 
     def birth_residuals_1d(self, detector, var, prefix, xmin= None, xmax = None, nbins = None):
         res_us_cut, res_ds_cut, res_ex_cut, res_all = self.get_residual_data(detector, var, prefix)
-        units = xboa.hit.Hit.default_units()[var]
+        units = utilities.default_units(var)
         if units != "":
             units = " ["+units+"]"
 
-        fit = scripts.utilities.fit_peak_data(res_all)
+        fit = utilities.fit_peak_data(res_all)
         mean = fit.GetParameter(1)
         sigma = fit.GetParameter(2)
         if xmin == None:

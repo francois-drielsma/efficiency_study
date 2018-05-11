@@ -10,12 +10,14 @@ import ROOT
 import xboa.common as common
 from xboa.hit import Hit
 from xboa.bunch import Bunch
-import scripts.chi2_distribution
-from scripts.amplitude_data_binned import AmplitudeDataBinned
-from scripts.amplitude_data_binless import AmplitudeDataBinless
-from scripts.binomial_confidence_interval import BinomialConfidenceInterval
-from analysis_base import AnalysisBase
-from scripts.analysis.amplitude.plot_amplitude_data import PlotAmplitudeData
+
+import utilities.chi2_distribution
+from utilities.binomial_confidence_interval import BinomialConfidenceInterval
+
+from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
+from mice_analysis.amplitude.amplitude_data_binless import AmplitudeDataBinless
+from mice_analysis.analysis_base import AnalysisBase
+from mice_analysis.amplitude.plot_amplitude_data import PlotAmplitudeData
 
 #REPHRASE SYSTEMATICS;
 #* efficiency and purity is the migration matrix from mc to reco mc
@@ -402,7 +404,7 @@ class AmplitudeAnalysis(AnalysisBase):
                 matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
         self.root_objects.append(matrix_hist)
         canvas = common.make_root_canvas(title)
-        canvas.SetFrameFillColor(scripts.utilities.get_frame_fill())
+        canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
         matrix_hist.SetTitle(self.config_anal['name'])
         matrix_hist.SetStats(False)
         matrix_hist.Draw("COLZ")
@@ -591,7 +593,7 @@ class AmplitudeAnalysis(AnalysisBase):
         integral = sum(pdf_list_tku)#*(bin_centre_list[1]-bin_centre_list[0])
         max_bin = max(pdf_list_tku)
         emittance = sum(weighted_integral)/integral/4.
-        dummy, graph = scripts.chi2_distribution.chi2_graph(emittance, max_bin, 100, 0., 100.)
+        dummy, graph = utilities.chi2_distribution.chi2_graph(emittance, max_bin, 100, 0., 100.)
         return graph
 
     def text_box(self, graph_list):
@@ -635,16 +637,20 @@ class AmplitudeAnalysis(AnalysisBase):
         if suffix == "reco":
             upstream_graph_stats = self.get_asymm_error_graph(us_data["corrected_pdf"],
                                                         us_data["pdf_stats_errors"],
-                                                        style=20, color=self.us_color, name = "Upstream")
+                                                        style=20, color=self.us_color,
+                                                        name = "Upstream stats")
             upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
                                                         us_data["pdf_sys_errors"],
-                                                        fill=self.us_color, name = "Upstream")
+                                                        fill=self.us_color,
+                                                        name = "Upstream sys")
             downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
                                                           ds_data["pdf_stats_errors"],
-                                                        style=22, color=self.ds_color, name = "Downstream")
+                                                        style=22, color=self.ds_color,
+                                                        name = "Downstream stats")
             downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
                                                           ds_data["pdf_sys_errors"],
-                                                        fill=self.ds_color, name = "Downstream")
+                                                        fill=self.ds_color,
+                                                        name = "Downstream sys")
             print "Plotting us sys", us_data["pdf_sys_errors"]
             print "Plotting ds sys", ds_data["pdf_sys_errors"]
             graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
@@ -681,16 +687,19 @@ class AmplitudeAnalysis(AnalysisBase):
 
         upstream_graph = self.get_asymm_error_graph(us_data["corrected_cdf"],
                                                     us_data["cdf_stats_errors"],
-                                                    style=24, color=self.us_color, name = "Upstream CDF")
+                                                    style=24, color=self.us_color,
+                                                    name = "Upstream CDF stats")
         downstream_graph = self.get_asymm_error_graph(ds_data["corrected_cdf"],
                                                       ds_data["cdf_stats_errors"],
-                                                    style=26, color=self.ds_color, name = "Downstream CDF")
+                                                    style=26, color=self.ds_color,
+                                                    name = "Downstream CDF stats")
         upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_cdf"],
                                                     us_data["cdf_sys_errors"],
-                                                    fill=self.us_color, name = "Upstream")
+                                                    fill=self.us_color,
+                                                    name = "Upstream CDF sys")
         downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_cdf"],
                                                       ds_data["cdf_sys_errors"],
-                                                    fill=self.ds_color, name = "Downstream")
+                                                    fill=self.ds_color, name = "Downstream CDF sys")
         graph_list = [upstream_graph, downstream_graph, upstream_graph_sys, downstream_graph_sys]
         draw_list = ["p", "p", "2", "2"]
 
@@ -713,9 +722,10 @@ class AmplitudeAnalysis(AnalysisBase):
 
         cdf_graph_stats = self.get_asymm_error_graph(data["corrected_cdf"],
                                                data["cdf_stats_errors"],
-                                               style=20, name = "CDF Ratio")
+                                               style=20, name = "CDF Ratio stats")
         cdf_graph_sys = self.get_asymm_error_graph(data["corrected_cdf"],
-                                               data["cdf_sys_errors"], fill=ROOT.kGray, name = "CDF Ratio")
+                                               data["cdf_sys_errors"], fill=ROOT.kGray, 
+                                               name = "CDF Ratio sys")
         print "CDF"
         print data["corrected_cdf"]
         print data["cdf_stats_errors"]
@@ -742,9 +752,10 @@ class AmplitudeAnalysis(AnalysisBase):
 
         pdf_graph_stats = self.get_asymm_error_graph(data["corrected_pdf"],
                                                data["pdf_stats_errors"],
-                                               style=20, name = "PDF Ratio")
+                                               style=20, name = "PDF Ratio stats")
         pdf_graph_sys = self.get_asymm_error_graph(data["corrected_pdf"],
-                                               data["pdf_sys_errors"], fill=ROOT.kGray, name = "PDF Ratio")
+                                               data["pdf_sys_errors"], fill=ROOT.kGray,
+                                               name = "PDF Ratio sys")
         graph_list = [pdf_graph_stats, pdf_graph_sys]
         draw_list = ["p", "2"]
 
@@ -801,7 +812,7 @@ class AmplitudeAnalysis(AnalysisBase):
 
         canvas = common.make_root_canvas("delta_amplitude_hist")
         canvas.Draw()
-        canvas.SetFrameFillColor(scripts.utilities.get_frame_fill())
+        canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
         hist = common.make_root_histogram("delta amplitude hist",
                                           amp_list_us, suffix_label+" US Amplitude [mm]", 100,
                                           amp_list_delta, suffix_label+" US Amplitude - DS Amplitude [mm]", 100,

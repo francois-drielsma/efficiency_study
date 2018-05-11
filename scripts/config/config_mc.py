@@ -41,20 +41,20 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
-            "amplitude_systematic_reference":"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_source":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
+            "amplitude_systematic_reference":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
             "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
-                #"output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics-2/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
+                #"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
+                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
             },
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
@@ -71,12 +71,12 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_magnet_alignment":False,
             "do_amplitude":True,
             "do_extrapolation":False,
-            "do_globals":False, #do_globals,
-            "do_mc":False, #True,
-            "do_plots":False, #True,
-            "do_cuts_plots":False, #True,
+            "do_globals":do_globals,
+            "do_mc":True,
+            "do_plots":True,
+            "do_cuts_plots":True,
             "do_tof01_weighting":False,
-            "do_optics":False, #True,
+            "do_optics":True,
             "do_data_recorder":False,
 
         }
@@ -169,8 +169,8 @@ class Config(object):
     cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut",
                      "hline", "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline", "mc_true_ds_cut", "hline", "downstream_cut"]
 
-    data_dir = "output/2017-02-binless"
-    files = "?"
+    data_dir = "output/2017-02"
+    files = "*"
     analyses = []
     analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
     analyses.append(get_analysis("9971_v1/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
@@ -300,7 +300,8 @@ class Config(object):
             "tkd":["mc_virtual_tkd_tp", "mc_virtual_tkd_2", "mc_virtual_tkd_3", "mc_virtual_tkd_4", "mc_virtual_tkd_5",],
         }
     }
-
+    bz_tku = 3e-3
+    bz_tkd = 2e-3
     z_afc = 16955.74
     # z position of apertures (z, maximum radius, name)
     # Notes from Jason: 209.6 to fixed flange

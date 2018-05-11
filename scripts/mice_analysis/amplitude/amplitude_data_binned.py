@@ -164,7 +164,7 @@ class AmplitudeDataBinned(object):
         self.cov_inv = numpy.linalg.inv(self.cov)
         rebins = [[] for i in range(self.n_bins)]
         for i, event in enumerate((self.retrieve(bin))):
-            psv = event[3]
+            psv = [ui - self.mean[i] for i, ui in enumerate(event[3])]
             psv_t = numpy.transpose(psv)
             amplitude = numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
             try:
@@ -187,7 +187,7 @@ class AmplitudeDataBinned(object):
         new_list = [None]*spills.shape[0]
         emittance = self.get_emittance()
         for i in range(spills.shape[0]):
-            psv = psvs[i]
+            psv = [ui - self.mean[i] for i, ui in enumerate(psvs[i])]
             psv_t = numpy.transpose(psv)
             amplitude = emittance*numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
             new_list[i] = ((runs[i], spills[i], events[i]), amplitude)

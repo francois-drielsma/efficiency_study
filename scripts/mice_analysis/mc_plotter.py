@@ -4,10 +4,10 @@ import copy
 import numpy
 import sys
 
-import cdb_tof_triggers_lookup
+import utilities.cdb_tof_triggers_lookup
 import ROOT
 from xboa.bunch import Bunch
-import scripts.utilities
+import utilities.utilities
 
 from analysis_base import AnalysisBase
 
@@ -161,7 +161,7 @@ class MCPlotter(AnalysisBase):
         for i, key in enumerate(sorted(track_final.keys())):
             var_list = track_final[key]
             name = slice_variable+" = "+str(key)
-            label = plot_variable+" at "+detector+" ["+scripts.utilities.default_units(plot_variable)+"]"
+            label = plot_variable+" at "+detector+" ["+utilities.utilities.default_units(plot_variable)+"]"
             hist = self.make_root_histogram(canvas_name, name, var_list, label, 100, [], '', 0, [], xmin, xmax)
             hist.SetMarkerStyle(24)
             if key in color_dict:
@@ -226,8 +226,8 @@ class MCPlotter(AnalysisBase):
             x_list = track_final[pid][0]
             y_list = track_final[pid][1]
             name = slice_variable+" = "+str(pid)
-            label_1 = plot_variable_1+" ["+scripts.utilities.default_units(plot_variable_1)+"]"
-            label_2 = plot_variable_2+" ["+scripts.utilities.default_units(plot_variable_2)+"]"
+            label_1 = plot_variable_1+" ["+utilities.utilities.default_units(plot_variable_1)+"]"
+            label_2 = plot_variable_2+" ["+utilities.utilities.default_units(plot_variable_2)+"]"
             hist, graph = self.make_root_graph(canvas_name, name,
               x_list, label_1, y_list, label_2, True,
               xmin, xmax, ymin, ymax)
@@ -250,19 +250,19 @@ class MCPlotter(AnalysisBase):
             data = self.residual_dict[var]
             canvas = xboa.common.make_root_canvas("MC residual "+var)
             canvas.Draw()
-            xmin, xmax = scripts.utilities.fractional_axis_range(data, 0.95)
+            xmin, xmax = utilities.utilities.fractional_axis_range(data, 0.95)
             hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, xmin=xmin, xmax=xmax)
             hist.Draw()
-            fit = scripts.utilities.fit_peak(hist, nsigma=8)
+            fit = utilities.utilities.fit_peak(hist, nsigma=8)
             mean = fit.GetParameter(1)
             sigma = fit.GetParameter(2)
             xmin, xmax = mean-5*sigma, mean+5*sigma
             self.axis_min_max[var] = (xmin, xmax)
             hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, xmin=xmin, xmax=xmax)
             hist.Draw()
-            fit = scripts.utilities.fit_peak(hist, nsigma=1)
+            fit = utilities.utilities.fit_peak(hist, nsigma=1)
 
-            text_box = scripts.utilities.get_text_box(self.config, self.config_anal, data, fit)
+            text_box = utilities.utilities.get_text_box(self.config, self.config_anal, data, fit)
             canvas.Update()
             for format in ["png", "eps", "root"]:
                 canvas.Print(self.plot_dir+"/mc_residual_"+suffix+"_"+var+"."+format)
@@ -304,11 +304,11 @@ class MCPlotter(AnalysisBase):
                 data = residual_dict[var]
                 if len(data) == 0:
                     raise RuntimeError("Failed to find residual data for "+var+" "+detector+" "+virtual_station)
-                xmin, xmax = scripts.utilities.fractional_axis_range(data, 0.95)
+                xmin, xmax = utilities.utilities.fractional_axis_range(data, 0.95)
                 dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
                 hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()
-                fit = scripts.utilities.fit_peak(hist, nsigma=8)
+                fit = utilities.utilities.fit_peak(hist, nsigma=8)
                 mean = fit.GetParameter(1)
                 sigma = fit.GetParameter(2)
                 xmin, xmax = mean-5*sigma, mean+5*sigma
@@ -322,8 +322,8 @@ class MCPlotter(AnalysisBase):
             self.plots[name]["canvas"].cd()
             for hist_name in self.plots[name]["histograms"]:
                 hist = self.plots[name]["histograms"][hist_name]
-                fit = scripts.utilities.fit_peak(hist, nsigma=1)
-                text_box = scripts.utilities.get_text_box(self.config, self.config_anal, None, fit, hist)
+                fit = utilities.utilities.fit_peak(hist, nsigma=1)
+                text_box = utilities.utilities.get_text_box(self.config, self.config_anal, None, fit, hist)
 
     @staticmethod
     def do_mc_plots(config, config_anal, data_loader):

@@ -28,11 +28,11 @@ def material_to_colour(material):
         return ROOT.kYellow
     if material in ("Fe"): # "kill volumes"
         return 1
-    if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10", "TUFNOL"):
+    if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
         return 8
     if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON"):
         return 2
-    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "RenCast6400"):
+    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "RenCast6400", "TUFNOL"):
         return 4
     print "UNRECOGNISED MATERIAL", material
     return 1
@@ -98,8 +98,8 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
         canvas.Print("plots/"+name+"."+format)
 
 def get_z_tk(config_mod):
-    config = importlib.import_module("config_reco").Config
-    z_list = [(det[0], det[2]) for det in config.detectors if "tku" in det[2] or "tkd" in det[2]]
+    config = importlib.import_module("config.config_reco").Config
+    z_list = [(det[0], det[2]) for det in config.detectors if "tku" in det[2]]# or "tkd" in det[2]]
     print "Found tracker detectors at", z_list
     return z_list
 
@@ -108,7 +108,7 @@ def plot_trackers():
     initialise_maus()
     old_time = time.time()
     for z_tk, name in z_tk_list[4:5]:
-        plot_materials(-1.5, 1.5, 0.01, z_tk-3., z_tk+3., 0.01, name = name)
+        plot_materials(200, 200, 0.01, z_tk-2000., z_tk-1100., 0.01, name = name)
     print "Plotting took", time.time() - old_time, "seconds"
     print "Found the following materials", MATERIAL_LIST 
 

@@ -6,8 +6,8 @@ import bisect
 import xboa.common
 from xboa.hit import Hit
 
-import utilities
-
+import utilities.utilities
+import utilities.r_max
 
 class LoadReco(object):
     def __init__(self, config, config_anal):
@@ -228,6 +228,7 @@ class LoadReco(object):
                   "pz":momentum.z(),
                   "pid":-13,
                   "mass":xboa.common.pdg_pid_to_mass[13],
+                  "charge":1.,
                 }
                 try:
                     self.nan_check(tp_dict.values())
@@ -251,7 +252,7 @@ class LoadReco(object):
                   "rejects":self.load_rejects(track.pr_track_pointer()),
                 })
             this_track_points = sorted(this_track_points)
-            this_track_points = self.set_max_r(this_track_points)
+            this_track_points = self.set_max_r_alt(this_track_points)
             track_points_out += this_track_points
         track_points_out = sorted(track_points_out, key = lambda tp: tp["hit"]["z"])
         return track_points_out
@@ -270,6 +271,15 @@ class LoadReco(object):
             track_point_list[i]["max_r2"] = tp["hit"]["x"]**2 + tp["hit"]["y"]**2
         return track_point_list
         
+    def set_max_r_alt(self, track_point_list):
+        if len(track_point_list) == 0:
+            return track_point_list
+        detector = track_point_list[0]["detector"]
+        detector = detector[:3]
+        bz = {"tku":self.config.bz_tku, "tkd":self.config.bz_tkd}[detector]
+        utilities.r_max.get_r_max(track_point_list, bz)
+        return track_point_list
+
     def will_cut_on_scifi_fiducial(self, track_point_list):
         max_r2 = [-111., -111.]
         for tp in track_point_list:
@@ -478,8 +488,8 @@ class LoadReco(object):
         return my_det
 
     def get_global_prefix(self, track):
-        tku_pos = utilities.detector_position("tku_tp", self.config)
-        tkd_pos = utilities.detector_position("tkd_tp", self.config)
+        tku_pos = utilities.utilities.detector_position("tku_tp", self.config)
+        tkd_pos = utilities.utilities.detector_position("tkd_tp", self.config)
         has_us, has_ds = False, False
         for track_point in track.GetTrackPoints():
             pos = track_point.get_position()
@@ -494,7 +504,7 @@ class LoadReco(object):
         return None # not useful for this analysis
 
     def get_global_prefix_alt(self, track):
-        tku_pos = utilities.detector_position("tku_tp", self.config)
+        tku_pos = utilities.utilities.detector_position("tku_tp", self.config)
         has_us = False
         has_ds = False
         print "    global prefix alt",

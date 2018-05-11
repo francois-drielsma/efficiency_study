@@ -66,20 +66,21 @@ class ConglomerateOne(object):
         graph_name_list = copy.deepcopy(self.options["graph_names"])
         graph_name_list = [name.replace(" ", "_").lower() for name in graph_name_list]
         canvas_objects = [an_object for an_object in pad.GetListOfPrimitives()]
-        for an_object in canvas_objects:
-            name = str(an_object.GetName()).replace(" ", "_").lower()
-            for graph_name in graph_name_list:
+        for graph_name in graph_name_list:
+            for an_object in canvas_objects:
+                name = str(an_object.GetName()).replace(" ", "_").lower()
                 if graph_name in name:
                     if type(an_object) not in graph_types:
                         print name, "matches", graph_name, "but type", type(an_object), "not a graph - skipping"
                         continue
                     graph_list.append(an_object)
-                    graph_name_list.remove(graph_name)
+                    canvas_objects.remove(an_object)
                     break # we can only add each object once
-        if len(graph_name_list) != 0:
+        if len(graph_name_list) != len(graph_list):
             print "Did not find graphs", graph_name_list, "from:"
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
+        # graph list should be in specified order
         return graph_list
 
     def get_canvas(self, file_name):
@@ -156,8 +157,8 @@ class ConglomerateOne(object):
                     err = err/hist.GetEntries()**0.5
                 hist.SetBinError(index, err)
 
-    def normalise(self, canvas, hist_list, graph_list):
-        if not self.options["normalise"]:
+    def normalise_hist(self, canvas, hist_list, graph_list):
+        if not self.options["normalise_hist"]:
             return
         for hist in hist_list:
             try:
@@ -167,6 +168,29 @@ class ConglomerateOne(object):
             if n_entries == 0:
                 continue
             hist.Scale(1./n_entries)
+
+    @classmethod
+    def graph_max_y(cls, graph):
+        y_buff = graph.GetY()
+        y_buff.SetSize(graph.GetN())
+        max_y = max([y for y in y_buff])
+        return max_y
+
+    def normalise_graph(self, canvas, hist_list, graph_list):
+        if not self.options["normalise_graph"]:
+            return
+        max_y = self.graph_max_y(graph_list[0])
+        for graph in graph_list[1:]:
+            max_y = max(self.graph_max_y(graph), max_y)
+        for graph in graph_list:
+            ey_low = graph.GetEYlow()
+            ey_high = graph.GetEYhigh()
+            x = graph.GetX()
+            y = graph.GetY()
+            for i in range(graph.GetN()):
+                graph.SetPoint(i, x[i], y[i]/max_y)
+                graph.SetPointEYhigh(i, ey_high[i]/max_y)
+                graph.SetPointEYlow(i, ey_low[i]/max_y)
 
     def rebin(self, canvas, hist_list, graph_list):
         if not self.options["rebin"]:
@@ -204,6 +228,7 @@ class ConglomerateOne(object):
         graph.SetPoint(1, x_values[1], y_values[1])
         graph.SetLineColor(style_def["line_color"])
         graph.SetLineStyle(style_def["line_style"])
+        graph.SetLineWidth(style_def["line_width"])
         graph.Draw("SAME")
         self.root_objects.append(graph)
         print "Did an extra line with ", x_values, " and ", y_values
@@ -217,6 +242,12 @@ class ConglomerateOne(object):
             x_min = min([hist.GetXaxis().GetXmin() for hist in hist_list])
             x_max = max([hist.GetXaxis().GetXmax() for hist in hist_list])
             graph = self.do_an_extra_line([x_min, x_max], y_values, item)
+            graph_list.append(graph)
+        for item in self.options["extra_lines"]["verticals"]:
+            x_values = [item["x_value"], item["x_value"]]
+            y_min = min([hist.GetYaxis().GetXmin() for hist in hist_list])
+            y_max = max([hist.GetYaxis().GetXmax() for hist in hist_list])
+            graph = self.do_an_extra_line(x_values, [y_min, y_max], item)
             graph_list.append(graph)
             
     unique_id = 0
@@ -263,6 +294,7 @@ class ConglomerateOne(object):
                 "marker_color":None,
                 "draw_option":["p"]*len(graph_list),
                 "draw_order":None,
+                "fill_color":None,
             }
         if graph_draw["draw_order"] == None:
             graph_draw["draw_order"] = range(len(graph_list))
@@ -273,6 +305,10 @@ class ConglomerateOne(object):
                 graph.SetMarkerStyle(graph_draw["marker_style"][i])
             if graph_draw["marker_color"] != None:
                 graph.SetMarkerColor(graph_draw["marker_color"][i])
+            if graph_draw["fill_color"] != None:
+                graph.SetFillColor(graph_draw["fill_color"][i])
+            elif graph_draw["marker_color"] != None:
+                graph.SetFillColor(graph_draw["marker_color"][i])
             graph.Draw("SAME "+graph_draw["draw_option"][i])
 
     def do_legend(self, canvas, hist_list, graph_list):
@@ -360,7 +396,8 @@ class ConglomerateOne(object):
     def murgle_histograms(self, canvas, hist_list, graph_list):
         self.label_size = 0.05
         self.rebin(canvas, hist_list, graph_list)
-        self.normalise(canvas, hist_list, graph_list)
+        self.normalise_hist(canvas, hist_list, graph_list)
+        self.normalise_graph(canvas, hist_list, graph_list)
         self.defit(canvas, hist_list, graph_list)
         self.replace_hist(canvas, hist_list, graph_list)
         self.rescale_x(canvas, hist_list, graph_list)
@@ -387,12 +424,12 @@ class ConglomerateOne(object):
             self.graph_list += self.get_graph_list(old_canvas)
         if len(self.hist_list) == 0:
             print "Error - failed to find plots for", self.options["file_name"]
-        #print "Found", len(self.hist_list), "histograms"
-        #for hist in self.hist_list:
-        #    print "   ", hist.GetName()
-        #print "Found", len(self.graph_list), "graphs"
-        #for graph in self.graph_list:
-        #    print "   ", graph.GetName()
+        print "Found", len(self.hist_list), "histograms"
+        for hist in self.hist_list:
+            print "   ", hist.GetName()
+        print "Found", len(self.graph_list), "graphs"
+        for graph in self.graph_list:
+            print "   ", graph.GetName()
         self.canvas = ROOT.TCanvas(self.options["canvas_name"]+"_"+self.uid(), self.options["canvas_name"], 0, 0, 1400, 1000)
         self.canvas.Draw()
         self.root_objects.append(self.canvas)

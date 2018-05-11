@@ -9,7 +9,7 @@ import libMausCpp
 import xboa.common
 from xboa.hit import Hit
 
-import utilities
+import utilities.utilities
 # Fix tracker cuts!
 from load_mc import LoadMC
 from load_reco import LoadReco

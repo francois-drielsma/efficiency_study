@@ -6,10 +6,10 @@ import copy
 import math
 import numpy
 
-import cdb_tof_triggers_lookup
 import ROOT
 from xboa.bunch import Bunch
-import scripts.utilities
+import utilities.utilities
+import utilities.cdb_tof_triggers_lookup
 
 from analysis_base import AnalysisBase
 

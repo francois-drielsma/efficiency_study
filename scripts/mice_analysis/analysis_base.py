@@ -3,7 +3,7 @@ import ROOT
 
 import xboa
 
-import scripts.utilities
+import utilities.utilities
 
 class AnalysisBase(object):
     def __init__(self, config, config_anal, data_loader):
@@ -47,7 +47,7 @@ class AnalysisBase(object):
     def make_root_histogram(self, name, *args):
         my_plot = self.get_plot(name)
         if len(args[4]) > 0: # 2d hist
-            frame_color = scripts.utilities.get_frame_fill()
+            frame_color = utilities.utilities.get_frame_fill()
             my_plot["canvas"].SetFrameFillColor(frame_color)
         hist = xboa.common.make_root_histogram(*args)
         my_plot["histograms"][args[0]] = hist
@@ -177,7 +177,7 @@ class AnalysisBase(object):
             for i, key in enumerate(["all", "us cut", "ds cut", "ex cut"]):
                 if key in hist_name:
                     hist_list[i] = hist_dict[hist_name]
-                    fit_list[i] = scripts.utilities.fit_peak(hist_list[i], 2, "Q", "SAME")
+                    fit_list[i] = utilities.utilities.fit_peak(hist_list[i], 2, "Q", "SAME")
                     fit_list[i].SetLineColor(hist_list[i].GetLineColor())
                     xmin, xmax = hist_list[i].GetXaxis().GetXmin(), hist_list[i].GetXaxis().GetXmax()
                     hist_list[i].GetXaxis().SetRangeUser(xmin, xmax + (xmax-xmin))
@@ -194,7 +194,7 @@ class AnalysisBase(object):
 
     def set_background_fill(self, plot_name):
         canvas = self.plots[plot_name]["pad"]
-        canvas.SetFrameFillColor(scripts.utilities.get_frame_fill())
+        canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
 
 
     def get_text_box(self, fit_list, hist_list):

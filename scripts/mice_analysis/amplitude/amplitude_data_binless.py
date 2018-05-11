@@ -202,6 +202,7 @@ class AmplitudeDataBinless(object):
                 self.cov[i][j] -= self.mean[i]*self.mean[j]
                 self.cov[j][i] = self.cov[i][j]
         print "... found", self.n_cov_events, "events"
+        sys.stdout.flush()
         self.cov_inv = numpy.linalg.inv(self.cov)
         self.get_emittance()
 
@@ -262,7 +263,7 @@ class AmplitudeDataBinless(object):
         Uses the self.cov_inv to calculate amplitude (as calculated in
         *_cov_matrix functions)
         """
-        psv = self.ps_matrix[sample][i]
+        psv = [uj-self.mean[j] for j, uj in enumerate(self.ps_matrix[sample][i])]
         psv_t = numpy.transpose(psv)
         amplitude = self.emittance*numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
         return amplitude
@@ -335,6 +336,7 @@ class AmplitudeDataBinless(object):
             if time.time() - then > 60:
                 then = time.time()
                 print "    ...", self.n_cov_events, "events remaining"
+                sys.stdout.flush()
         print "Finished sample execution with ref", ref_sample, "test", \
               test_sample, "and", self.n_cov_events, "remaining"
         self.get_data(test_sample, 'r+')  # go into write mode
