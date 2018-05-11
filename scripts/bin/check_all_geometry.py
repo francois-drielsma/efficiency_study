@@ -5,13 +5,13 @@ import sys
 
 def geometry_file(run):
     run_str = str(run).rjust(5, "0")
-    geometry_dir = "/home/cr67/work/reco/geometry/new_geometry/geometry_"+run_str
+    geometry_dir = "/home/cr67/work/reco/geometry/geometry_"+run_str
     os.symlink(geometry_dir, "geometry_"+run_str)
     geometry_name = geometry_dir+"/ParentGeometryFile.dat"
     return geometry_name
 
 def scripts():
-    return "/home/cr67/work/2016-11-18_emittance-analysis/amplitude/scripts/"
+    return "/home/cr67/work/2016-11-18_emittance-analysis/amplitude/scripts/bin/"
 
 LOG = None
 def log_file():
@@ -40,7 +40,6 @@ def check(run):
     if pid.returncode != 0:
         raise RuntimeError("Failed on fields with return code "+str(pid.returncode))
     print "    ...done fields"
-    return
     pid = subprocess.Popen(["python", scripts()+"check_geometry.py",
                             "--simulation_geometry_filename", geometry_name],
                             stdout=log, stderr=subprocess.STDOUT)
@@ -51,7 +50,7 @@ def check(run):
 
 def main():
     log_file()
-    for run in [9969, 10070, 10448, 10487]: #range(10444, 10448)+range(10483, 10487):
+    for run in [9962, 10064, 10445, 10484]: #range(10444, 10448)+range(10483, 10487):
         here = os.getcwd()
         os.chdir(dir_hack(run))
         try:

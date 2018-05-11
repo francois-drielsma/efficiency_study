@@ -1,6 +1,7 @@
 import time
 import importlib
 import sys
+import math
 
 import ROOT
 
@@ -30,31 +31,42 @@ def material_to_colour(material):
         return 1
     if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
         return 8
-    if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON"):
+    if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON", "TAM1000"):
         return 2
     if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "RenCast6400", "TUFNOL"):
         return 4
     print "UNRECOGNISED MATERIAL", material
     return 1
 
+PRINT_VOLUMES = True
+THETA = math.pi/4.
 def get_materials(radius, z_start, z_end, z_step):
-    x = radius
+    global PRINT_VOLUMES, THETA
+    x = radius*math.cos(THETA)
+    y = radius*math.sin(THETA)
     material = None
+    volume = None
     material_start = []
     n_steps = int((z_end-z_start)/z_step)
     for i in range(n_steps):
         z = z_step*i+z_start
-        maus_cpp.material.set_position(x, 0., z)
+        maus_cpp.material.set_position(x, y, z)
         material_data = maus_cpp.material.get_material_data()
         new_material = material_data['name']
+        new_volume = material_data['volume']
         if new_material != material:
             material = new_material
-            material_start.append({"x":x, "z":z, "material":material})
+            material_start.append({"x":x, "y":y, "z":z, "material":material})
+        if PRINT_VOLUMES and new_volume != volume:
+            volume = new_volume
+            print (volume+" "+material+" "+str(round(z, 1))+"  "),
+    if PRINT_VOLUMES:
+        print
     return material_start
 
 ROOT_GRAPHS = []
 def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
-    global ROOT_GRAPHS
+    global ROOT_GRAPHS, PRINT_VOLUMES
     if name == "" or name == None:
         name = "materials"
     canvas = xboa.common.make_root_canvas(name)
@@ -65,7 +77,7 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
     hist.SetStats(False)
     hist.Draw()
     ROOT_GRAPHS.append(hist)
-    for i in range(n_steps):
+    for i in range(n_steps): # radial steps
         r = r_step*i+r_start
         materials = get_materials(r, z_start,z_end, z_step)
         print "At radius", r, "found", len(materials), "materials using", len(ROOT_GRAPHS), "root objects"
@@ -74,13 +86,17 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
             if colour == None:
                 continue
             z_min = material["z"]
-            radius = material["x"]
+            if abs(r) > 1e-9:
+                radius = (material["x"]**2+material["y"]**2)**0.5*r/abs(r)
+            else:
+                radius = 0.
             if i+1 >= len(materials):
                 z_max = z_end+1
             else:
                 z_max = materials[i+1]["z"]
             if i == 0:
                 z_min -= 1
+            print material["material"], round(z_min), round(z_max), colour, "   ",
             graph = ROOT.TGraph(2)
             graph.SetPoint(0, z_min, radius)
             graph.SetPoint(1, z_max, radius)
@@ -92,23 +108,26 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
             ROOT_GRAPHS.append(graph)
             if i % 10 == 0:
                 canvas.Update()
+    print
 
     canvas.Update()
     for format in "png", "eps", "root":
         canvas.Print("plots/"+name+"."+format)
 
-def get_z_tk(config_mod):
+def get_z_tk():
     config = importlib.import_module("config.config_reco").Config
-    z_list = [(det[0], det[2]) for det in config.detectors if "tku" in det[2]]# or "tkd" in det[2]]
+    z_list = [(det[0], det[2]) for det in config.detectors if "tku_tp" in det[2] or "tkd_tp" in det[2]]
     print "Found tracker detectors at", z_list
     return z_list
 
 def plot_trackers():
-    z_tk_list = get_z_tk("scripts/config_reco.py")
     initialise_maus()
     old_time = time.time()
-    for z_tk, name in z_tk_list[4:5]:
-        plot_materials(200, 200, 0.01, z_tk-2000., z_tk-1100., 0.01, name = name)
+    plot_materials(-200.1, 200.1, 1., 13000, 20000., 1., name = "geometry")
+    tk_list = get_z_tk()
+    print tk_list
+    for name, z_tk in tk_list:
+        plot_materials(-2.1, 2.1, 0.01, z_tk-2., z_tk+2, 0.1, name = name)
     print "Plotting took", time.time() - old_time, "seconds"
     print "Found the following materials", MATERIAL_LIST 
 

@@ -32,8 +32,6 @@ import maus_cpp.globals as maus_globals # MAUS C++ calls
 import maus_cpp.field as field # MAUS field map calls
 import xboa.common  # xboa post-processor library
 
-import trim_coils
-
 Z_OFFSET = 0. #(15068.0+18756.0)/2.
 
 def initialise_maus():
@@ -47,9 +45,9 @@ def plot_hps(z_list, different_markers):
     hp_z_positions = {
         "hp_77":14104.+ssu_offset,
         "hp_79":14429.+ssu_offset,
-        "hp_67":15286.+ssu_offset,
         "hp_65":14429.+ssu_offset,
-        "hp_66":18625.+ssd_offset,
+        #"hp_67":15286.+ssu_offset,
+        #"hp_66":18625.+ssd_offset,
         "hp_72":19482.+ssd_offset,
         "hp_73":19807.+ssd_offset,
         "hp_80":19482.+ssd_offset,
@@ -57,9 +55,9 @@ def plot_hps(z_list, different_markers):
     hp_btot = {
         "hp_77":3.0717,
         "hp_79":3.0361,
-        "hp_67":3.2280,
+        #"hp_67":3.2280,
         "hp_65":3.0379,
-        "hp_66":2.3315,
+        #"hp_66":2.3315,
         "hp_72":2.1196,
         "hp_73":-1e9, #3.0571025,
         "hp_80":-1e9, #3.012287,
@@ -188,7 +186,7 @@ def plot_z_range(z_list, b_min_max, name):
     graph_list += plot_hps(z_list, False)
     plot_tracker_stations(z_list, btot_list)
     text_box(graph_list)
-    for format in ["root", "eps", "png"]:
+    for format in ["root", "eps", "png", "pdf"]:
         canvas.Print(name+"."+format)
 
 def main():
