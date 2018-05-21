@@ -338,19 +338,21 @@ def main(batch_level = 0):
     """
     ROOT.gROOT.SetBatch(True)
     #config_list += [CompareAmplitudeConfigData, CompareAmplitudeConfigBoth]#, CompareAmplitudeConfigMC]
-    target_dir = "output/2017-02/"
+    target_dir = "output/2017-02-bkp/"
     batch_level = 0
     hide_root_errors = True
-    do_cuts_summary = False #True
+    do_cuts_summary = True
     if batch_level < 10 and hide_root_errors:
         ROOT.gErrorIgnoreLevel = 6000
     #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
     my_dir_list = [
-        ["2017-2.7_6-140_None", "2017-2.7_6-140_lH2_full", "2017-2.7_6-140_LiH",], #"2017-2.7_6-140_lH2_empty", 
-        ["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH",], #"2017-2.7_10-140_lH2_empty",
+        ["2017-2.7_3-140_None",  "2017-2.7_3-140_lH2_empty",  "2017-2.7_3-140_lH2_full",  "2017-2.7_3-140_LiH"], 
+        ["2017-2.7_4-140_None",  "2017-2.7_4-140_lH2_empty",  "2017-2.7_4-140_lH2_full",  "2017-2.7_4-140_LiH"], 
+        ["2017-2.7_6-140_None",  "2017-2.7_6-140_lH2_empty",  "2017-2.7_6-140_lH2_full",  "2017-2.7_6-140_LiH"], 
+        ["2017-2.7_10-140_None", "2017-2.7_10-140_lH2_empty", "2017-2.7_10-140_lH2_full", "2017-2.7_10-140_LiH"],
     ]
-    top_labels = ["No absorber", "LH2", "LiH"]
-    right_labels = ["6-140", "10-140"]
+    top_labels = ["No absorber", "Empty LH2", "Full LH2", "LiH"]
+    right_labels = ["3-140", "4-140", "6-140", "10-140"]
     config_list = [CompareData1DConfig, CompareCutsConfig, CompareOpticsConfig, CompareData2DConfig]
     config_list += [CompareAmplitudeConfigBoth, CompareAmplitudeConfigMC, CompareAmplitudeConfigData]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)

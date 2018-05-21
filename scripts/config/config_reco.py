@@ -17,21 +17,33 @@ def reco_file_names(run_number_list, maus, do_globals):
     print file_list
     return file_list
 
+def get_amplitude_source(emittance, tk, name):
+    if emittance == False or emittance == None:
+        return None
+    amplitude_source = "output/2017-02-Systematics/plots_Simulated_2017-2.7_"
+    amplitude_source += str(emittance)+"-140_lH2_empty_Systematics_"+tk+"_"
+    amplitude_source += name+"/amplitude/amplitude.json"
+    return amplitude_source
+
+
 def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitude_source, p_bins, tkd_cut, do_globals):
     plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
-    if amplitude_source == True:
-        amplitude_source = "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json"
-    elif amplitude_source == False or amplitude_source == None:
-        amplitude_source = None
+    amp_systematic_sources = {}
+    for tracker in ["tku", "tkd"]:
+        for variable in ["pos_plus", "rot_plus", "scale_E1_plus", "scale_C_plus", "scale_E2_plus"]:
+            this_source = get_amplitude_source(amplitude_source, tracker, variable)
+            if this_source != None:
+                amp_systematic_sources[this_source] = 1.
+
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
             "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
-            "delta_tof01_upper":1.5, # Delta TOF01 cut upper bound 
+            "delta_tof01_upper":+1.5, # Delta TOF01 cut upper bound 
             "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
             "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
@@ -45,21 +57,9 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":amplitude_source,
-            "amplitude_systematic_reference":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
-            "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
-                #"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":0.2,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
-            },
+            "amplitude_source":get_amplitude_source(amplitude_source, "tku", "base"),
+            "amplitude_systematic_reference":get_amplitude_source(amplitude_source, "tku", "base"),
+            "amplitude_systematic_sources":amp_systematic_sources,
             "field_uncertainty":0.02,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":"test", #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
@@ -78,12 +78,12 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "do_extrapolation":False,
             "do_globals":do_globals,
             "do_mc":False,
-            "do_amplitude":False, #True,
+            "do_amplitude":True,
             "do_plots":True,
             "do_cuts_plots":True,
             "do_tof01_weighting":False,
-            "do_optics":False, #True,
-            "do_data_recorder":False, #True,
+            "do_optics":True,
+            "do_data_recorder":True,
     }
 
 
@@ -169,29 +169,30 @@ class Config(object):
     cut_report[1] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-Test/" # to which data is written
+    data_dir = "output/2017-02/" # to which data is written
     src_dir = "MAUS-Test-4-npe"
     correct_amplitude = True
     analyses = []
-    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [27, 32], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
+    # BUG need to fix the systematics "emittance"
+    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
 
-    #analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    #analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    #analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    #analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [27, 31], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [27, 30], src_dir, data_dir, correct_amplitude, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True))
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -201,14 +202,14 @@ class Config(object):
     global_max_step_size = 100. # for extrapolation, set the extrapolation step size
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
-    number_of_spills = 100 # if set to an integer, limits the number of spills loaded for each sub-analysis
+    number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
     preanalysis_number_of_spills = 100 # number of spills to analyse during "pre-analysis"
     analysis_number_of_spills = 100 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"
     tof0_offset = 25.4
     tof1_offset = 0.
-    tof2_offset = 27.384 - 27.793 + 27.938
+    tof2_offset = 27.384 - 27.793 - 27.938
     #z_tof2 - ztof1 = 21139.4-12929.6 = 8209.800000000001
     #dt_tof2 = 8209.8/299.8 = 27.384256170780517
     #compare with position of the electron peak dt_tof2 = 27.793

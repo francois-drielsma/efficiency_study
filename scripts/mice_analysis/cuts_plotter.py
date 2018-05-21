@@ -38,7 +38,7 @@ class CutsPlotter(AnalysisBase):
         tof01_min = self.config_anal["tof01_cut_low"]
         tof01_max = self.config_anal["tof01_cut_high"]
         self.birth_cut_correlations()
-        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [26., 33.], 100, {}, [tof01_min, tof01_max])
+        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [0., 8.], 160, {}, [tof01_min, tof01_max])
         self.birth_var_1d("tof", "tof0_n_sp", "us cut", ["tof_0_sp"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tof", "tof1_n_sp", "us cut", ["tof_1_sp"], [0.5, 4.5], 4, {}, [0.5, 1.5])
         self.birth_var_1d("tku", "n_tracks", "us cut", ["scifi_tracks_us", "global_through_tof0"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
@@ -59,11 +59,9 @@ class CutsPlotter(AnalysisBase):
         delta_tof01_max = self.config_anal["delta_tof01_upper"]
         self.birth_var_1d("tof", "delta_tof01", "us cut", ["delta_tof01"], [-10., 5.], 100, {}, [delta_tof01_min, delta_tof01_max])
 
-        p_min = self.config_anal["p_tot_ds_low"]
-        p_max = self.config_anal["p_tot_ds_high"]
-        delta_p = p_max-p_min
-
-        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
+        p_min = min([min(a_bin) for a_bin in self.config_anal["p_bins"]])
+        p_max = max([max(a_bin) for a_bin in self.config_anal["p_bins"]])
+        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-35., p_max+35.], 100, {}, [p_min, p_max])
         chi2_max = self.config_anal["chi2_threshold"]
         self.birth_var_1d("tku", "chi2", "us cut", ["chi2_us"], [0., chi2_max*2], 100, {}, [chi2_max])
         diff = "global_through_virtual_diffuser"
@@ -72,6 +70,9 @@ class CutsPlotter(AnalysisBase):
             if not self.config.upstream_cuts["upstream_aperture_cut"] or not self.config_anal["do_globals"]:
                 continue
             self.birth_var_1d(aperture, "r", "us cut", ["upstream_aperture_cut"], [0., 300.], 100, {}, [max_r])
+        p_min = self.config_anal["p_tot_ds_low"]
+        p_max = self.config_anal["p_tot_ds_high"]
+        delta_p = p_max-p_min
         self.birth_var_1d("tkd", "p", "ds cut", ["p_tot_ds"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
         self.birth_var_1d("tkd", "chi2", "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
         self.birth_var_1d("tkd", "n_tracks", "ds cut", ["scifi_tracks_ds"], [-0.5, 4.5], 5, {}, [0.5, 1.5])

@@ -74,7 +74,7 @@ class ConglomerateMerge(object):
         if j != 0:
             for hist in cong.hist_list:
                 hist.GetYaxis().SetLabelOffset(100)
-                hist.GetYaxis().SetRangeUser(0, 100000)
+                #hist.GetYaxis().SetRangeUser(0, 100000)
 
         cong.label_size = 0.1
         cong.murgle_many(pad, cong.hist_list, cong.graph_list)
@@ -92,10 +92,12 @@ class ConglomerateMerge(object):
         if not extra_labels:
             return
         left_m = 0.128
-        right_m = 0.12
+        right_m = 0.1
+        top_m = 0.1
+        bottom_m = 0.1
         x_step = (1.0-left_m-right_m)/self.cols
         for i, item in enumerate(extra_labels["top"]):
-            text_box = ROOT.TPaveText(left_m+x_step*i, 0.87, left_m+x_step*(i+1), 0.95, "NDC")
+            text_box = ROOT.TPaveText(left_m+x_step*i, 1.0-top_m, left_m+x_step*(i+1), 1.0, "NDC")
             text_box.SetTextSize(0.04)
             text_box.SetFillColor(0)
             text_box.SetBorderSize(0)
@@ -103,8 +105,6 @@ class ConglomerateMerge(object):
             text_box.AddText(item)
             text_box.Draw()
             self.root_objects.append(text_box)
-        top_m = 0.14
-        bottom_m = 0.14
         y_step = (1.0-top_m-bottom_m)/self.rows
         for i, item in enumerate(extra_labels["right"]):
             text_box = ROOT.TPaveText(1.0-right_m, 1.0-top_m-y_step*(i+1),

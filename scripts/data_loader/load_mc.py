@@ -17,6 +17,7 @@ class LoadMC(object):
     def __init__(self, config, config_anal):
         self.config = config
         self.config_anal = config_anal
+        self.virtual_dict = {}
 
     def load(self, event, spill, ev_number):
         mc_event_vector = spill.GetMCEvents()
@@ -132,7 +133,9 @@ class LoadMC(object):
         else:
             det_pos, dummy, det_name = det_list[detector-1]
         my_det = "mc_"+det_name
-        #self.global_set.add(my_det)
+        #if my_det not in self.virtual_dict:
+        #    self.virtual_dict[my_det] = []
+        #self.virtual_dict[my_det].append(z_pos)
         return my_det
 
     def virtual_cuts(self, detector, hit):

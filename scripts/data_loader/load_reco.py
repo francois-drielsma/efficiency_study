@@ -679,6 +679,8 @@ class LoadReco(object):
         global_tof0 = None
         global_tof1 = None
         global_tof2 = None
+        electron_tof01 = utilities.utilities.electron_tof("tof0", "tof1", self.config)
+        electron_tof12 = utilities.utilities.electron_tof("tof1", "tof2", self.config)
         for point in event["data"]:
             if point["detector"] == "tku_tp":
                 tku = point["hit"]
@@ -705,11 +707,11 @@ class LoadReco(object):
         except TypeError:
             event["tof01"] = None
         try:
-            event["delta_tof12"] = (global_tof2 - global_tof1) - (tof2 - tof1)
+            event["delta_tof12"] = (global_tof2 - global_tof1) - (tof2 - tof1) - electron_tof12
         except TypeError:
             event["delta_tof12"] = None
         try:
-            event["delta_tof01"] = (global_tof1 - global_tof0) - (tof1 - tof0)
+            event["delta_tof01"] = (global_tof1 - global_tof0) - (tof1 - tof0) - electron_tof01
         except TypeError:
             event["delta_tof01"] = None
         event["apertures_us"] = [] # list of apertures that the event hit upstream of tku

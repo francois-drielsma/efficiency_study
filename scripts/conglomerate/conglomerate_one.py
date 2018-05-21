@@ -261,6 +261,7 @@ class ConglomerateOne(object):
         draw_option = ["" for hist in hist_list]
         draw_order = [i for i, hist in enumerate(hist_list)]
         if redraw:
+            print "Will redraw", redraw["x_range"], redraw["y_range"]
             if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
                 print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
                 raise RuntimeError("Failed to find all histograms for redraw")
@@ -383,7 +384,7 @@ class ConglomerateOne(object):
         #self.normalise(canvas, hist_list, graph_list)
         #self.defit(canvas, hist_list, graph_list)
         #self.rescale_x(canvas, hist_list, graph_list)
-        #self.rescale_y(canvas, hist_list, graph_list)
+        self.rescale_y(canvas, hist_list, graph_list)
         #self.calculate_errors(canvas, hist_list, graph_list)
         #self.hist_title(canvas, hist_list, graph_list)
         #self.log_y(canvas, hist_list, graph_list)

@@ -26,8 +26,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
-            "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
-            "delta_tof01_upper":1.5, # Delta TOF01 cut upper bound 
+            "delta_tof01_lower":-1.0, # Delta TOF01 cut lower bound 
+            "delta_tof01_upper":+1.5, # Delta TOF01 cut upper bound 
             "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
             "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
@@ -172,20 +172,25 @@ class Config(object):
     data_dir = "output/2017-02"
     files = "*"
     analyses = []
-    analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9971_v1/"+files, "Simulated 2017-2.7 3-140 lH2 full", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH", [27, 32], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None", [27, 32], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("9971_v1/"+files,  "Simulated 2017-2.7 3-140 lH2 full",  [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH",       [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None",      [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH", [27, 31], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None", [27, 31], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10064_v1/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("9962_v1/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10484_v1/"+files, "Simulated 2017-2.7 4-140 LiH",       [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10445_v1/"+files, "Simulated 2017-2.7 4-140 None",      [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis("10052_v1/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH", [27, 30], data_dir, [[135, 145]], [100, 200], True))
-    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None", [27, 30], data_dir, [[135, 145]], [100, 200], True))
+    analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full",   [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH",       [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None",      [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
+
+    analyses.append(get_analysis("10052_v3/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full",   [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH",       [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None",      [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -212,9 +217,9 @@ class Config(object):
         "resolution":1.,
     }
 
-    tof0_offset = 0.18
+    tof0_offset = 0.18+25.4
     tof1_offset = 0.
-    tof2_offset = 0.
+    tof2_offset = -27.938
 
     # z position of central absorber (used for offsetting
     z_apertures = 0.

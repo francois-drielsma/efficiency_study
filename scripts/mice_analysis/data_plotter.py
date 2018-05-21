@@ -32,7 +32,7 @@ class DataPlotter(AnalysisBase):
     def birth(self):
         self.set_plot_dir("data_plots")
         self.run_numbers.update(self.data_loader.run_numbers)
-        self.birth_tof("tof01", -5, 25)
+        self.birth_tof("tof01", -5, 15)
         self.birth_tof("tof12", -5, 25)
         self.birth_tof_slabs()
         self.birth_tof_dt("tof0")
@@ -64,7 +64,7 @@ class DataPlotter(AnalysisBase):
           "normalise":False,
           "logy":False,
         }
-        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
+        for detector, test_cut in []:#("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
                 for predicate in [self.doublet, self.triplet, self.any_sp,
                                   self.used_doublet, self.used_triplet, self.used,
@@ -131,6 +131,10 @@ class DataPlotter(AnalysisBase):
             self.birth_var_2d("delta_tof", "tof01", "pt", "tku", [-0.6, 1.4], [0, 100.], "us cut", None, None)
             self.birth_var_2d("delta_tof", "tof01", "r", "tku", [-0.6, 1.4], [0, 100.], "us cut", None, None)
 
+            self.birth_var_2d("t", "global_through_virtual_tku_tp", "t", "global_through_virtual_tof1", [50., 60.], [40., 50.], "us cut", None, None)
+            self.birth_var_2d("t", "global_through_virtual_tku_tp", "t", "global_through_virtual_tof0", [50., 60.], [ 10., 20.], "us cut", self.has_through_tof0, None)
+
+
         self.birth_var_1d("x", "tkd", None, None, min_max=[-150., 300.], n_bins=75)
         self.birth_var_1d("px", "tkd", None, None, min_max=[-150., 300.], n_bins=75)
         self.birth_var_1d("y", "tkd", None, None, min_max=[-150., 300.], n_bins=75)
@@ -188,7 +192,7 @@ class DataPlotter(AnalysisBase):
         self.process_var_2d("x", "tku", "y", "tku", "all", None, None)
         self.process_var_2d("r", "tku", "pt", "tku", "all", None, None)
 
-        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
+        for detector, test_cut in []: #("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
                 for predicate in [self.doublet, self.triplet, self.any_sp,
                                   self.used_doublet, self.used_triplet, self.used,
@@ -256,6 +260,9 @@ class DataPlotter(AnalysisBase):
             self.process_var_2d("delta_tof", "tof01", "pt", "tku", "us cut", None, None)
             self.process_var_2d("delta_tof", "tof01", "r", "tku", "us cut", None, None)
             self.process_var_1d("delta_tof", "tof01", None, None)
+
+            self.process_var_2d("t", "global_through_virtual_tku_tp", "t", "global_through_virtual_tof1", "us cut", None, None)
+            self.process_var_2d("t", "global_through_virtual_tku_tp", "t", "global_through_virtual_tof0", "us cut", self.has_through_tof0, None)
 
         self.process_ellipse("tku", "us cut")
         self.process_ellipse("tku", "all")
@@ -740,6 +747,9 @@ class DataPlotter(AnalysisBase):
     def used_doublet(self, hit):
         return hit["n_channels"] == 2 and hit["is_used"]
 
+    def has_through_tof0(self, event):
+        return "global_through_virtual_tof0" in [ev["detector"] for ev in event["data"]]
+
     def birth_p_tot_res(self):
         p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", self.has_both_trackers)
         p_tkd_cut_us, p_tkd_cut_ds, p_tkd_all = self.get_tracker_hit_data("tkd", "p", self.has_both_trackers)
@@ -831,6 +841,9 @@ class DataPlotter(AnalysisBase):
         data_1 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
         data_cut_us, data_cut_ds, data_all = self.get_detector_data(us_ds_2, var_2, event_predicate, hit_predicate)
         data_2 = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
+        if len(data_1) == 0 or len(data_2) == 0 or len(data_1) != len(data_2):
+            print "Warning plotting", var_1, us_ds_1, "against", var_2, us_ds_2, "with sample", cut
+            print "    Found", len(data_1), "events in sample 1 and", len(data_2), "events in sample 2" 
         name = self.name_var_2d(var_1, us_ds_1, var_2, us_ds_2, cut, event_predicate, hit_predicate)
         lab_1 = us_ds_1+" "+var_1+" ["+utilities.default_units(var_1)+"]"
         lab_2 = us_ds_2+" "+var_2+" ["+utilities.default_units(var_2)+"]"
