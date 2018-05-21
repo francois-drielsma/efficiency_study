@@ -19,16 +19,22 @@ Quick start
 
 The basic execution of the analysis is done by a command like:
 
-python calculate_emittance.py scripts/config_reco.py 0
-       ^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^ ^
-       main program           configuration file     specify which data set in
-                                                     the config file to edit
+python scripts/bin/run_one_analysis.py scripts/config/config_reco.py 0
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^
+       main program                    configuration file            specify which data set in
+                                                                     the config file to analyse
 
 The config file defines all of the run control variables, file locations, cut
 parameters etc. It is possible to run several analyses in parallel by doing
 
-python run_analysis.py
+python scripts/bin/run_many_analyses.py
 
-Edit the "run_analysis.py" script to control which analyses to run. There is one
-more top-level script, "move_to_paper.bash" which copies files across to the
-"emittance paper" location (specified in the bash file)
+Edit the "run_many_analyses.py" script to control which analyses to run. 
+
+I often show tableaux of several plots from different analyses in a single 
+canvas. This is done using the script
+
+python scripts/bin/conglomerate_plots.py
+
+There is one more top-level script, "move_to_paper.bash" which copies files 
+across to the "emittance paper" location (specified in the bash file)
