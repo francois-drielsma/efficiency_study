@@ -24,6 +24,13 @@ def detector_position(detector, config):
             return test_detector[0]
     raise KeyError("Could not find detector "+str(detector)+" in config")
 
+def electron_tof(detector_1, detector_2, config):
+    z_1 = detector_position(detector_1, config)
+    z_2 = detector_position(detector_2, config)
+    c_light = xboa.common.constants['c_light']
+    electron_tof = (z_2-z_1)/c_light
+    return electron_tof
+
 def fractional_axis_range(data, fraction):
     data = sorted(data)
     data_len = len(data)

@@ -27,7 +27,7 @@ def setup_gstyle():
     ROOT.gStyle.SetPadBottomMargin(0.15)
     ROOT.gStyle.SetPadLeftMargin(0.15)
     ROOT.gStyle.SetPadRightMargin(0.15)
-    ROOT.gStyle.SetHistLineWidth(3)
+    ROOT.gStyle.SetHistLineWidth(1)
     for axis in "X", "Y":
         ROOT.gStyle.SetNdivisions(505, axis)
         ROOT.gStyle.SetLabelSize(0.04, axis)

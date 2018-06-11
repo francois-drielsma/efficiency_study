@@ -5,6 +5,7 @@ import bisect
 
 import ROOT
 import libMausCpp
+import numpy
 
 import xboa.common
 from xboa.hit import Hit
@@ -122,6 +123,9 @@ class LoadAll(object):
         self.this_tree = None
         self.update_cuts()
         # return True if there are more events
+        #virt_data = [(numpy.mean(self.mc_loader.virtual_dict[key]), numpy.std(self.mc_loader.virtual_dict[key]), key) for key in self.mc_loader.virtual_dict.keys()]
+        #for data in sorted(virt_data):
+        #    print data[2], data[0], data[1]
         return self.this_file_name != ""
 
     def load_new_file(self):

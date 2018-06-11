@@ -57,7 +57,7 @@ class OpticsPlotter(AnalysisBase):
                             ("sigma", 2),
                         ]:
                 try:
-                    self.plot("ds", var, sub_var, color) # mean z
+                    self.plot("ds", var, sub_var, color, prefix) # mean z
                 except Exception:
                     sys.excepthook(*sys.exc_info())
         self.base_death()
@@ -217,6 +217,7 @@ class OpticsPlotter(AnalysisBase):
                             key = lambda ellipse: ellipse["mean"][z_var])
             self.refaffed_ellipse_dict[cut] = refaff
 
+    @classmethod
     def name_lookup(cls, var, sub_var, cut):
         if sub_var == None:
             name = var+"_"+cut
@@ -226,7 +227,7 @@ class OpticsPlotter(AnalysisBase):
             axis = str(var)+" "+str(sub_var)+" ("+cut+")"
         return name, axis
 
-    def plot(self, cut, var, sub_var, color):
+    def plot(self, cut, var, sub_var, color, prefix):
         ellipse_list = self.refaffed_ellipse_dict[cut]
         z_var = self.ellipse_variables.index("z")
         pred =  lambda ellipse: ellipse["mean"][z_var] >= self.min_z_us
@@ -238,7 +239,7 @@ class OpticsPlotter(AnalysisBase):
         if "beta" in var:
             var_list = [ellipse[var][sub_var]*1e-3 for ellipse in ellipse_list if pred(ellipse)]
         name, axis = self.name_lookup(var, sub_var, cut)
-        hist, graph = self.make_root_graph(name, name,
+        hist, graph = self.make_root_graph(name, name+"_"+prefix,
                       z_list, "z [m]", var_list, axis, True,
                       None, None, None, None)
         if len(self.get_plot(name)["histograms"]) == 1:

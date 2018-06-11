@@ -166,7 +166,7 @@ class Config(object):
     data_dir = "output/2017-02-Systematics-3"
     analyses = []
 
-    run_tuple = ("6", "10051", [27, 31]), # ("10", "10052", [27, 30]), #("3", "10069", [27, 32]) ,
+    run_tuple = ("6", "10051", [27, 31]), # ("10", "10052", [27, 30]), #("3", "10069", [27, 32]), ("4", "10064", [27, 32]) 
     #for emit, run, tof in run_tuple:
     #    index = 0
     #    for i in range(10):
@@ -186,7 +186,7 @@ class Config(object):
             files = "*"
             analyses.append(get_analysis(run+"_systematics_v4/"+name+"/"+files,
                             "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+name, 
-                            tof, data_dir, [[135, 145]], [100, 200], False))
+                            tof, data_dir, [[135, 145]], [90, 170], False))
     print "Planned", len(analyses), "analyses"
     amplitude_bin_width = 5
     amplitude_max = 25

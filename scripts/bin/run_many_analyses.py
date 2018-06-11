@@ -27,14 +27,14 @@ def run_analysis(jobs, cards_list, logs):
         analysis_pool.run_many()
 
 def main_mc_analysis():
-    job_list = range(12)
+    job_list = range(16)
     cards_list = ["scripts/config/config_mc.py",] #] # "scripts/config_mc.py", 
     logs = 'logs/mc-logs'
     run_analysis(job_list, cards_list, logs)
 
 def main_reco_analysis():
-    job_list = range(12)
-    cards_list = ["scripts/config/config_reco.py",] #] # "scripts/config_mc.py", 
+    job_list = range(16)
+    cards_list = ["scripts/config/config_reco.py",]
     logs = 'logs/reco-logs'
     run_analysis(job_list, cards_list, logs)
         
@@ -44,7 +44,15 @@ def main_systematics_analysis():
     logs = 'logs/systematics-logs'
     run_analysis(job_list, cards_list, logs)
 
+def main_both_analysis():
+    job_list = range(16)
+    cards_list = ["scripts/config/config_mc.py", "scripts/cconfig/config_reco.py"]
+    logs = 'logs/both-logs'
+    run_analysis(job_list, cards_list, logs)
+
 if __name__ == "__main__":
     #main_reco_analysis()
     #main_systematics_analysis()
     main_mc_analysis()
+    #main_both_analysis()
+

@@ -13,7 +13,7 @@ class CompareConfig(object):
         self.get_experiment_config()
         self.data_caption = ""
         self.mc_caption = ""
-        self.cuts_tex = "cut_plots/cuts_summary.tex"
+        self.cuts_tex = "cut_plots/cuts_summary_*.tex"
         self.conglomerate_dir = []
         if will_do_data:
             self.conglomerate_dir.append(run_dir+"plots_"+beam+"/")
@@ -77,8 +77,8 @@ class CompareConfig(object):
                     "y_range":y_range,
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
-
                 },
+                "canvas_fill_color":None,
                 "extra_lines":False,
                 "extra_labels":False,
                 "legend":{
@@ -89,6 +89,7 @@ class CompareConfig(object):
                 "defit":True,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
+                    "file_name":None,
                     "formats":["png", "root", "eps", "pdf"],
                 },
                 "axis_title":{
@@ -131,6 +132,7 @@ class CompareConfig(object):
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
                 },
+                "canvas_fill_color":None,
                 "extra_lines":False,
                 "extra_labels":False,
                 "legend":{
@@ -141,6 +143,7 @@ class CompareConfig(object):
                 "defit":True,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
+                    "file_name":None,
                     "formats":["png", "root", "eps", "pdf"],
                 },
                 "axis_title":{
@@ -151,10 +154,10 @@ class CompareConfig(object):
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
 
-    def get_conglomerate_3(self, canvas, hist_name, x_axis_title, y_axis_title):
-        return {
+    def get_conglomerate_3(self, canvas, hist_name, x_axis_title, y_axis_title, modifiers = {}):
+        my_config = {
                 "file_name":canvas,
-                "canvas_name":hist_name,
+                "canvas_name":canvas,
                 "histogram_names":[hist_name],
                 "graph_names":[],
                 "rescale_x":False,
@@ -178,12 +181,14 @@ class CompareConfig(object):
                     "graph_draw_option":["P", "P"],
                     "ignore_more_histograms":False,
                 },
+                "canvas_fill_color":None,
                 "legend":False,
                 "extra_lines":False,
                 "extra_labels":False,
                 "defit":False,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
+                    "file_name":None,
                     "formats":["png", "root", "eps", "pdf"],
                 },
                 "axis_title":{
@@ -191,6 +196,8 @@ class CompareConfig(object):
                     "y":y_axis_title,
                 },
             }
+        self.recursive_modify_dict(my_config, modifiers)
+        return my_config
 
     def recursive_modify_dict(self, target_config, source_config):
         for key, value in source_config.iteritems():
@@ -268,11 +275,13 @@ class CompareConfig(object):
                         "draw_order":graph_draw_order,
                     }
                 },
+                "canvas_fill_color":None,
                 "legend":False,
                 "extra_lines":False,
                 "defit":True,
                 "write_plots":{
                     "dir":self.beam_plot_dir,
+                    "file_name":None,
                     "formats":["png", "root", "eps", "pdf"],
                 },
                 "axis_title":{

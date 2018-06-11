@@ -34,24 +34,22 @@ class GlobalsPlotter(AnalysisBase):
 
     def birth(self):
         self.set_plot_dir("global_plots")
-        self.birth_residuals_1d("tkd_tp", "x", "global_through", -100., 200., 500)
-        self.birth_residuals_1d("tkd_tp", "y", "global_through", -100., 200., 500)
-        self.birth_residuals_1d("tkd_tp", "px", "global_through", -50., 100., 500)
-        self.birth_residuals_1d("tkd_tp", "py", "global_through", -50., 100., 500)
-        self.birth_residuals_1d("tkd_tp", "pz", "global_through", -50., 100., 500)
-        self.birth_residuals_1d("tkd_tp", "p", "global_through", -50., 100., 500)
-        self.birth_residuals_1d("tof0", "t", "global_through", -15., 20., 500)
-        self.birth_residuals_1d("tof1", "x", "global_through", -400., 800., 500)
-        self.birth_residuals_1d("tof1", "y", "global_through", -400., 800., 500)
+        self.birth_residuals_1d("tkd_tp", "x", "global_through", -100., 100., 500)
+        self.birth_residuals_1d("tkd_tp", "y", "global_through", -100., 100., 500)
+        self.birth_residuals_1d("tkd_tp", "px", "global_through", -50., 50., 500)
+        self.birth_residuals_1d("tkd_tp", "py", "global_through", -50., 50., 500)
+        self.birth_residuals_1d("tkd_tp", "pz", "global_through", -50., 50., 500)
+        self.birth_residuals_1d("tkd_tp", "p", "global_through", -50., 50., 500)
+        self.birth_residuals_1d("tof0", "t", "global_through", -2., 2., 500)
+        self.birth_residuals_1d("tof1", "x", "global_through", -400., 400., 500)
+        self.birth_residuals_1d("tof1", "y", "global_through", -400., 400., 500)
         self.birth_residuals_1d("tof1", "t", "global_through", -1., 2.0, 500)
-        self.birth_residuals_1d("tof2", "x", "global_through", -200., 400., 500)
-        self.birth_residuals_1d("tof2", "y", "global_through", -200., 400., 500)
-        self.birth_residuals_1d("tof2", "t", "global_through", -10., 20., 500)
-        self.birth_residuals_1d("tof2", "x", "global_ds", -200., 400., 500)
-        self.birth_residuals_1d("tof2", "y", "global_ds", -200., 400., 500)
-        self.birth_residuals_1d("tof2", "t", "global_ds", -10., 20., 500)
-        #self.birth_misses_2d("tkd_tp", "x", "y", "us cut", xmin=-300, xmax=300, nbinsx=40, ymin=-300, ymax=300., nbinsy=40)
-        #self.birth_misses_2d("tof2", "x", "y", "ex cut", xmin=-400, xmax=400, nbinsx=40, ymin=-400, ymax=400., nbinsy=40)
+        self.birth_residuals_1d("tof2", "x", "global_through", -200., 200., 500)
+        self.birth_residuals_1d("tof2", "y", "global_through", -200., 200., 500)
+        self.birth_residuals_1d("tof2", "t", "global_through", -2., 2., 500)
+        self.birth_residuals_1d("tof2", "x", "global_ds", -200., 200., 500)
+        self.birth_residuals_1d("tof2", "y", "global_ds", -200., 200., 500)
+        self.birth_residuals_1d("tof2", "t", "global_ds", -1., 1., 500)
         
         self.birth_event_display(3, False, ["global_through_tof1", "global_through_tkd_tp"], "ds cut")
 
@@ -144,6 +142,11 @@ class GlobalsPlotter(AnalysisBase):
         data_cut_ex = []
         n_det_hits, n_global_hits = 0, 0
         global_name = prefix+"_"+detector #self.detector_name_to_virtual_name(detector)
+        global_offset = 0.
+        if var == "t" and detector == "tof0":
+            global_offset = utilities.electron_tof("tof0", "tof1", self.config) # note sign
+        if var == "t" and detector == "tof2":
+            global_offset = utilities.electron_tof("tof2", "tof1", self.config)
         for event in self.data_loader.events:
             det_hit, global_hit = None, None
             for hit in event["data"]:
@@ -160,7 +163,8 @@ class GlobalsPlotter(AnalysisBase):
             if det_hit == None or global_hit == None:
                 # either we missed the detector or we didn't get a global extrapolation
                 continue
-            data = det_hit["hit"][var] - global_hit["hit"][var]
+            data = det_hit["hit"][var] - global_hit["hit"][var] - global_offset
+
             data_all.append(data)
             if not self.will_cut_us(event):
                 data_cut_us.append(data)

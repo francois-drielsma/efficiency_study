@@ -10,6 +10,7 @@ import ROOT
 from xboa.bunch import Bunch
 import utilities.cdb_tof_triggers_lookup as cdb_tof_triggers_lookup
 import utilities.utilities
+import utilities.cut_names
 
 from analysis_base import AnalysisBase
 
@@ -38,7 +39,7 @@ class CutsPlotter(AnalysisBase):
         tof01_min = self.config_anal["tof01_cut_low"]
         tof01_max = self.config_anal["tof01_cut_high"]
         self.birth_cut_correlations()
-        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [26., 33.], 100, {}, [tof01_min, tof01_max])
+        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [1., 7.], 160, {}, [tof01_min, tof01_max])
         self.birth_var_1d("tof", "tof0_n_sp", "us cut", ["tof_0_sp"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tof", "tof1_n_sp", "us cut", ["tof_1_sp"], [0.5, 4.5], 4, {}, [0.5, 1.5])
         self.birth_var_1d("tku", "n_tracks", "us cut", ["scifi_tracks_us", "global_through_tof0"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
@@ -59,11 +60,9 @@ class CutsPlotter(AnalysisBase):
         delta_tof01_max = self.config_anal["delta_tof01_upper"]
         self.birth_var_1d("tof", "delta_tof01", "us cut", ["delta_tof01"], [-10., 5.], 100, {}, [delta_tof01_min, delta_tof01_max])
 
-        p_min = self.config_anal["p_tot_ds_low"]
-        p_max = self.config_anal["p_tot_ds_high"]
-        delta_p = p_max-p_min
-
-        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
+        p_min = min([min(a_bin) for a_bin in self.config_anal["p_bins"]])
+        p_max = max([max(a_bin) for a_bin in self.config_anal["p_bins"]])
+        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-35., p_max+35.], 100, {}, [p_min, p_max])
         chi2_max = self.config_anal["chi2_threshold"]
         self.birth_var_1d("tku", "chi2", "us cut", ["chi2_us"], [0., chi2_max*2], 100, {}, [chi2_max])
         diff = "global_through_virtual_diffuser"
@@ -71,7 +70,10 @@ class CutsPlotter(AnalysisBase):
             max_r = self.config.upstream_aperture_cut[aperture]
             if not self.config.upstream_cuts["upstream_aperture_cut"] or not self.config_anal["do_globals"]:
                 continue
-            self.birth_var_1d(aperture, "r", "us cut", ["upstream_aperture_cut"], [0., 300.], 100, {}, [max_r])
+            self.birth_var_1d(aperture, "r", "us cut", ["upstream_aperture_cut"], [0., 200.], 100, {}, [max_r])
+        p_min = self.config_anal["p_tot_ds_low"]
+        p_max = self.config_anal["p_tot_ds_high"]
+        delta_p = p_max-p_min
         self.birth_var_1d("tkd", "p", "ds cut", ["p_tot_ds"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
         self.birth_var_1d("tkd", "chi2", "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
         self.birth_var_1d("tkd", "n_tracks", "ds cut", ["scifi_tracks_ds"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
@@ -322,24 +324,6 @@ class CutsPlotter(AnalysisBase):
 
     def process_cuts_summary(self):
         for event in self.data_loader.events:
-            self.global_cut["all_events"] += 1
-            will_cut = event["will_cut"]
-            for key in will_cut:
-                if not will_cut[key]:
-                    self.upstream_cut[key] += 1
-                    if event["upstream_cut"]:
-                        continue
-                    self.downstream_cut[key] += 1
-                    if event["downstream_cut"]:
-                        continue
-                    self.extrapolation_cut[key] += 1
-            if not event["upstream_cut"]:
-                self.global_cut["upstream_cut"] += 1
-            if not event["downstream_cut"]:
-                self.global_cut["downstream_cut"] += 1
-            if not event["extrapolation_cut"]:
-                self.global_cut["extrapolation_cut"] += 1
-            #############
             for i, a_report in enumerate(self.config.cut_report):
                 will_cut = False
                 for key in a_report:
@@ -362,63 +346,19 @@ class CutsPlotter(AnalysisBase):
 
 
     def death_cuts_summary(self):
-        fout = open(self.plot_dir+"/cuts_summary.txt", "w")
-        print >> fout, "========== cuts summary ============"
-        for key in ["all_events", "upstream_cut", "downstream_cut", "extrapolation_cut"]:
-            key_name = key.replace("_", " ")
-            print >> fout, "'"+key_name+":'", self.global_cut[key],
-        print >> fout
-
-        print >> fout, "   ", "'cut name'".ljust(25), "us?".ljust(8), "ds?".ljust(8), "ex?".ljust(8), "passed".ljust(8), \
-                       "'us passed and passed'".ljust(8), "'ds passed and passed'".ljust(8)
-        for key in sorted(self.upstream_cut.keys()):
-            key_name = "'"+key.replace("_", " ")+"'"
-            is_active_us = self.config.upstream_cuts[key]
-            is_active_ds = self.config.downstream_cuts[key]
-            is_active_ex = self.config.extrapolation_cuts[key]
-            print >> fout, "   ", key_name.ljust(25), \
-                          str(is_active_us).ljust(8), str(is_active_ds).ljust(8), str(is_active_ex).ljust(8), \
-                          str(self.upstream_cut[key]).ljust(8), str(self.downstream_cut[key]).ljust(8), str(self.extrapolation_cut[key]).ljust(8)
-        print >> fout
-        fout.close() 
-        fout = open(self.plot_dir+"/cuts_summary.txt", "r")
-        print fout.read()
-        fout = open(self.plot_dir+"/cuts_summary.tex", "w")
-        print >> fout, ("cut").ljust(20), "&", self.config_anal["name"], "//"
         for i, a_report in enumerate(self.config.cut_report):
+            file_name = self.plot_dir+"/cuts_summary_"+str(i)+".tex"
+            fout = open(file_name, "w")
+            print >> fout, ("cut").ljust(20), "&", self.config_anal["name"], "//"
             for key in a_report:
                 if key == "hline":
                     print >> fout, "\hline"
                     continue
                 print >> fout, key.ljust(20), "&", str(self.cuts_report_full[i][key]), "//"
-        fout.close()
-        fout = open(self.plot_dir+"/cuts_summary.tex", "r")
-        print fout.read()
+            fout.close()
+            fout = open(file_name, "r")
+            print fout.read()
+            print
 
-    cut_names = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
-          "scifi_tracks_us":"1 track in TKU",
-          "scifi_fiducial_us":"TKU fiducial volume",
-          "chi2_us":"TKU $\chi^2/dof$",
-          "scifi_tracks_ds":"TKD number of tracks",
-          "scifi_fiducial_ds":"TKD fiducial volume",
-          "chi2_ds":"TKD $\chi^2/dof$",
-          "tof01":"$t_{TOF1} - t_{TOF0}$",
-          "p_tot_us":"TKU momentum",
-          "p_tot_ds":"TKD momentum",
-          "tof_0_sp":"1 space point in TOF0",
-          "tof_1_sp":"1 space point in TOF1",
-          "tof_2_sp":"1 space point in TOF2",
-          "upstream_aperture_cut":"Diffuser aperture cut",
-          "downstream_aperture_cut":False,
-          "delta_tof01":"Extrapolated $t_{TOF0}$ - Reconstructed $t_{TOF0}$",
-          "delta_tof12":"Extrapolated $t_{TOF2}$ - Reconstructed $t_{TOF2}$", #extrapolatedtof12 compared to recon tof12
-          "global_through_tof0":"Successful extrapolation to TOF0",
-          "global_through_tof2":"Successful extrapolation to TOF2",
-          "mc_muon_us":"Monte Carlo muon in TKU",
-          "mc_stations_us":"Truth registered in all TKU stations",
-          "mc_scifi_fiducial_us":"Truth stayed within TKU fiducial volume",
-          "mc_muon_ds":"Monte Carlo muon in TKD",
-          "mc_stations_ds":"Truth passed through all TKD stations",
-          "mc_scifi_fiducial_ds":"Truth stayed within TKD fiducial volume",
-    }
+    cut_names = utilities.cut_names.cut_names
 

@@ -51,18 +51,22 @@ class ConglomerateMerge(object):
             legend.SetY2(legend_size[3]*1.0/0.9)
         legend.Draw()
 
+    def do_fit_tables(self):
+        pass
+
     def do_mice_logo(self, do_isis):
         y_min=0.895
         if do_isis:
-            y_min = 0.8
-        text_box = ROOT.TPaveText(0.2, y_min, 0.99, 0.99, "NDC")
+            y_min = 0.75
+        text_box = ROOT.TPaveText(0.6, y_min, 0.99, 0.99, "NDC")
         text_box.SetTextSize(0.05)
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextAlign(33)
-        text_box.AddText("MICE Preliminary")
+        text_box.AddText("MICE Internal")
         if do_isis:
-            text_box.AddText("ISIS User Runs 2017/02 and 2017/03")
+            text_box.AddText("ISIS User Runs")
+            text_box.AddText("2017/02 and 2017/03")
         text_box.Draw()
         self.root_objects.append(text_box)
         
@@ -71,20 +75,16 @@ class ConglomerateMerge(object):
         legend_size = None
         if cong.legend != None:
             legend_size = cong.options["legend"]["pos"]
+        frame_color = cong.pad.GetFrameFillColor()
+        pad.SetFrameFillColor(frame_color)
         if j != 0:
             for hist in cong.hist_list:
                 hist.GetYaxis().SetLabelOffset(100)
-                hist.GetYaxis().SetRangeUser(0, 100000)
+                #hist.GetYaxis().SetRangeUser(0, 100000)
 
         cong.label_size = 0.1
         cong.murgle_many(pad, cong.hist_list, cong.graph_list)
-
-        #for graph in cong.graph_list:
-        #    if graph.GetN() > 2:
-        #        graph.Draw("LP")
-        #    else:
-        #        graph.Draw("SAME L")
-        if i == 0 and j == 2:
+        if False: #i == 1 and j == 3:
             self.do_legend(i, j, cong.legend, legend_size, pad)
 
     def extra_labels(self, cong_list):
@@ -92,10 +92,12 @@ class ConglomerateMerge(object):
         if not extra_labels:
             return
         left_m = 0.128
-        right_m = 0.12
+        right_m = 0.1
+        top_m = 0.1
+        bottom_m = 0.1
         x_step = (1.0-left_m-right_m)/self.cols
         for i, item in enumerate(extra_labels["top"]):
-            text_box = ROOT.TPaveText(left_m+x_step*i, 0.87, left_m+x_step*(i+1), 0.95, "NDC")
+            text_box = ROOT.TPaveText(left_m+x_step*i, 1.0-top_m, left_m+x_step*(i+1), 1.0, "NDC")
             text_box.SetTextSize(0.04)
             text_box.SetFillColor(0)
             text_box.SetBorderSize(0)
@@ -103,8 +105,6 @@ class ConglomerateMerge(object):
             text_box.AddText(item)
             text_box.Draw()
             self.root_objects.append(text_box)
-        top_m = 0.14
-        bottom_m = 0.14
         y_step = (1.0-top_m-bottom_m)/self.rows
         for i, item in enumerate(extra_labels["right"]):
             text_box = ROOT.TPaveText(1.0-right_m, 1.0-top_m-y_step*(i+1),
@@ -117,6 +117,17 @@ class ConglomerateMerge(object):
             text_box.AddText(item)
             text_box.Draw()
             self.root_objects.append(text_box)
+
+    def write_canvas(self, canvas, options):
+        canvas.Update()
+        target_dir = self.conglomerate_list[0].conglomerations[0].config.target_plot_dir
+        if options["write_plots"]["file_name"]:
+            canvas_name = options["write_plots"]["file_name"]
+        else:
+            canvas_name = options["canvas_name"]
+        format_list = options["write_plots"]["formats"]
+        for fmt in format_list:
+            canvas.Print(target_dir+"/"+canvas_name+"."+fmt)
  
     def merge_one(self, canvas_name):
         """
@@ -146,10 +157,9 @@ class ConglomerateMerge(object):
                         break
                 source_x_axis = cong.x_axis
                 source_y_axis = cong.y_axis
-                target_dir = cong.config.target_plot_dir
                 self.draw_cong(pad.GetPad(hist_index+1), cong, i, j)
                 hist_index += 1
-                self.do_mice_logo(i == 0 and j == 2)
+                self.do_mice_logo(i == 0 and j == 3)
 
         merge_canvas.cd()
         if source_x_axis:
@@ -157,9 +167,7 @@ class ConglomerateMerge(object):
         if source_y_axis:
             source_y_axis.Draw()
         self.extra_labels(self.conglomerate_list)
-        merge_canvas.Update()
-        for fmt in ["root", "pdf", "png",]:
-            merge_canvas.Print(target_dir+"/"+canvas_name+"."+fmt)
         self.merge_list.append(merge_dict)
+        self.write_canvas(merge_canvas, cong.options)
         
     root_objects = []
