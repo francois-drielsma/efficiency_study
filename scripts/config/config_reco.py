@@ -154,7 +154,7 @@ class Config(object):
     extrapolation_cuts["global_through_tof2"] = True
     mc_true_us_cuts = copy.deepcopy(upstream_cuts)
     mc_true_ds_cuts = copy.deepcopy(upstream_cuts)
-    cut_report  = [[], []]
+    cut_report  = [[], [], []]
     cut_report[0] = ["hline", "all events", "hline",]
     cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
     cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
@@ -162,14 +162,15 @@ class Config(object):
         cut_report[0] += ["global_through_tof0",]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
-    cut_report[0] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
-    cut_report[0] += ["downstream_cut", "hline",]
-    cut_report[1] =  ["downstream_cut", "hline",]
-    cut_report[1] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report[1] += ["extrapolation_cut", "hline"]
+    cut_report[1] += ["hline", "upstream_cut", "hline",]
+    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[1] += ["downstream_cut", "hline",]
+    cut_report[2] =  ["hline", "downstream_cut", "hline",]
+    cut_report[2] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
+    cut_report[2] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02/" # to which data is written
+    data_dir = "output/2017-02-2/" # to which data is written
     src_dir = "MAUS-Test-4-npe"
     correct_amplitude = True
     analyses = []
@@ -209,7 +210,7 @@ class Config(object):
     time_from = "tof1"
     tof0_offset = 25.4
     tof1_offset = 0.
-    tof2_offset = 27.384 - 27.793 - 27.938
+    tof2_offset = -27.9
     #z_tof2 - ztof1 = 21139.4-12929.6 = 8209.800000000001
     #dt_tof2 = 8209.8/299.8 = 27.384256170780517
     #compare with position of the electron peak dt_tof2 = 27.793

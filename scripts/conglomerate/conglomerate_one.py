@@ -98,14 +98,54 @@ class ConglomerateOne(object):
             print key.ReadObj().GetName(), "of type", type(key.ReadObj())
         raise KeyError("Failed to find canvas")
 
+    def write_fit_parameters(self, canvas, hist_list, graph_list):
+        if "write_fit" not in self.options or not self.options["write_fit"]:
+            return
+        a_dir = "./"
+        if self.options["write_plots"]:
+            a_dir = self.options["write_plots"]["dir"]+"/"
+        fout = open(a_dir+self.options["write_fit"]["file_name"], "w")
+        fout_format = self.options["write_fit"]["format"] # order to write
+        justify = self.options["write_fit"]["justify"]
+        row_headings = self.options["write_fit"]["row_headings"]
+        col_headings = self.options["write_fit"]["col_headings"]
+        for heading in col_headings:
+            print >> fout, heading.rjust(justify),
+        print >> fout
+        for i, format_list in enumerate(fout_format):
+            print >> fout, row_headings[i].ljust(justify),
+            for format_item in format_list:
+                param = format_item["param"]
+                func_number = format_item["function"]
+                hist_number = format_item["hist"]
+                rounding = format_item["rounding"]
+                func = hist_list[hist_number].GetListOfFunctions()[func_number]
+                value = func.GetParameter(param)
+                value = str(round(value, rounding)).rjust(justify)
+                print >> fout, value,
+            print >> fout
+        # NB I never did the code to merge this stuff
+        example = {
+            "file_name":"tof0_t",
+            "justify":10,
+            "row_headings":["data", "mc"],
+            "col_headings":["", "mean", "s.d."],
+            "format":[[
+                  {"param":0, "function":0, "hist":0, "rounding":3},
+                  {"param":1, "function":0, "hist":0, "rounding":3}
+                ], [
+                  {"param":0, "function":0, "hist":1, "rounding":3},
+                  {"param":1, "function":0, "hist":1, "rounding":3}
+                ],
+            ]
+        }
+
     def defit(self, canvas, hist_list, graph_list):
         if not self.options["defit"]:
             return
         for hist in hist_list:
             for func in hist.GetListOfFunctions():
                 func.SetRange(-1e9, -0.9e9)
-            #function.SetRange(-1e9, -0.9e9)
-            #hist.Fit("gaus", "", "", -1e9, -0.9e9)
 
     def rescale_x(self, canvas, hist_list, graph_list):
         if not self.options["rescale_x"]:
@@ -128,15 +168,20 @@ class ConglomerateOne(object):
             axis.SetLabelSize(self.label_size)
         hist_list.insert(0, hist)
         
+    @classmethod
+    def bins(cls, hist):
+        return [hist.GetBinContent(i) for i in range(hist.GetNbinsX())]
+
     def rescale_y(self, canvas, hist_list, graph_list):
         if not self.options["rescale_y"]:
             return
         hist = hist_list[0]
         if self.options["rescale_y"] == True or self.options["rescale_y"] == "auto":
-            min_bin, max_bin = hist.GetMinimum(), hist.GetMaximum()
-            for hist in hist_list[1:]:
-                min_bin = max(min_bin, hist.GetMinimum())
-                max_bin = max(max_bin, hist.GetMaximum())
+            min_bin = min(self.bins(hist))
+            max_bin = max(self.bins(hist))
+            for hist in hist_list: # hist.GetMinimum()/GetMaximum() doesnt work here; who knows why!
+                min_bin = min([min_bin]+self.bins(hist))
+                max_bin = max([max_bin]+self.bins(hist))
             if self.options["log_y"]:
                 min_bin = max(1e-4, min_bin)
             for hist in hist_list:
@@ -222,6 +267,11 @@ class ConglomerateOne(object):
             y_text_box.Draw()
             self.y_axis = y_text_box
 
+    def canvas_fill(self, canvas, hist_list, graph_list):
+        if not self.options["canvas_fill_color"]:
+            return
+        self.pad.SetFrameFillColor(self.options["canvas_fill_color"])
+
     def do_an_extra_line(self, x_values, y_values, style_def):
         graph = ROOT.TGraph(2)
         graph.SetPoint(0, x_values[0], y_values[0])
@@ -272,6 +322,7 @@ class ConglomerateOne(object):
                     continue # ignore
                 hist.SetLineColor(redraw["line_color"][i])
                 hist.SetFillColor(redraw["fill_color"][i])
+                hist.SetLineWidth(1)
                 hist.SetMarkerStyle(redraw["marker_style"][i])
                 for axis in hist.GetXaxis(), hist.GetYaxis():
                     axis.SetNdivisions(5, 5, 0)
@@ -279,6 +330,7 @@ class ConglomerateOne(object):
                 hist.SetName(hist.GetName()+"_"+self.uid())
             draw_option = redraw["draw_option"]
             draw_order = redraw["draw_order"]
+            # nb if redraw range is wider than original, can draw overflow and underflow bins
             if redraw["x_range"] != None:
                 hist.GetXaxis().SetRangeUser(redraw["x_range"][0], redraw["x_range"][1])
             if redraw["y_range"] != None:
@@ -333,20 +385,29 @@ class ConglomerateOne(object):
     def mice_logo(self, canvas, hist_list, graph_list):
         if not self.options["mice_logo"]:
             return
-        text_box = ROOT.TPaveText(0.55, 0.3, 0.89, 0.4, "NDC")
+        # goes around the outside for black
+        text_box = ROOT.TPaveText(0.65, 0.8, 0.89, 0.89, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.04)
         text_box.SetTextAlign(12)
-        text_box.AddText("MICE Preliminary")
+        text_box.AddText("MICE Internal")
         text_box.Draw()
         self.root_objects.append(text_box)
-        text_box = ROOT.TPaveText(0.55, 0.15, 0.89, 0.3, "NDC")
+        text_box = ROOT.TPaveText(0.65, 0.74, 0.89, 0.8, "NDC")
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
         text_box.SetTextSize(0.03)
         text_box.SetTextAlign(12)
-        text_box.AddText("ISIS Cycle 2017/02 and 2017/03")
+        text_box.AddText("ISIS Cycle 2017/02")
+        text_box.AddText("and 2017/03")
+        text_box.Draw()
+        self.root_objects.append(text_box)
+        text_box = ROOT.TPaveText(0.65, 0.65, 0.89, 0.74, "NDC")
+        text_box.SetFillColor(0)
+        text_box.SetBorderSize(0)
+        text_box.SetTextSize(0.03)
+        text_box.SetTextAlign(12)
         text_box.AddText(str(self.config.channel))
         text_box.AddText(str(self.config.beamline))
         text_box.AddText(str(self.config.absorber))
@@ -372,14 +433,19 @@ class ConglomerateOne(object):
         canvas.cd()
         canvas.Draw()
         canvas.Update()
-        name = str(canvas.GetName()).replace(" ", "_")
+        if self.options["write_plots"]["file_name"]:
+            name = str(self.options["write_plots"]["file_name"])
+        else:
+            name = str(canvas.GetName())
+        print name, self.options["write_plots"]
+        name = name.replace(" ", "_")
         name = name.replace(".",  "_")
         name = os.path.join(plot_dir, name)
         for fmt in formats:
             canvas.Print(name+"."+fmt)
 
     def murgle_many(self, canvas, hist_list, graph_list):
-        self.label_size = 0.08
+        self.label_size = 0.12
         #self.rebin(canvas, hist_list, graph_list)
         #self.normalise(canvas, hist_list, graph_list)
         #self.defit(canvas, hist_list, graph_list)
@@ -391,22 +457,24 @@ class ConglomerateOne(object):
         self.redraw(canvas, hist_list, graph_list)
         self.extra_lines(canvas, hist_list, graph_list)
         #self.mice_logo(canvas, hist_list, graph_list)
-        self.do_legend(canvas, hist_list, graph_list)
+        #self.do_legend(canvas, hist_list, graph_list)
         #self.axis_title(canvas, hist_list, graph_list)
 
     def murgle_histograms(self, canvas, hist_list, graph_list):
         self.label_size = 0.05
-        self.rebin(canvas, hist_list, graph_list)
+        self.canvas_fill(canvas, hist_list, graph_list)
         self.normalise_hist(canvas, hist_list, graph_list)
         self.normalise_graph(canvas, hist_list, graph_list)
+        self.write_fit_parameters(canvas, hist_list, graph_list)
         self.defit(canvas, hist_list, graph_list)
         self.replace_hist(canvas, hist_list, graph_list)
         self.rescale_x(canvas, hist_list, graph_list)
-        self.rescale_y(canvas, hist_list, graph_list)
         self.calculate_errors(canvas, hist_list, graph_list)
         self.hist_title(canvas, hist_list, graph_list)
         self.log_y(canvas, hist_list, graph_list)
         self.redraw(canvas, hist_list, graph_list)
+        self.rebin(canvas, hist_list, graph_list)
+        self.rescale_y(canvas, hist_list, graph_list)
         self.extra_lines(canvas, hist_list, graph_list)
         self.mice_logo(canvas, hist_list, graph_list)
         self.do_legend(canvas, hist_list, graph_list)

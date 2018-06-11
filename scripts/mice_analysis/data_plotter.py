@@ -296,7 +296,7 @@ class DataPlotter(AnalysisBase):
 
         self.death_tof("tof01", -0.4, 0.4)
         dtof2 = self.config.tof2_offset
-        self.death_tof("tof12", -0.4, 0.4)
+        self.death_tof("tof12", -2.0, 2.0)
 
         self.print_plots()
 

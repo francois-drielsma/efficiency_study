@@ -50,8 +50,6 @@ def main_both_analysis():
     logs = 'logs/both-logs'
     run_analysis(job_list, cards_list, logs)
 
-
-
 if __name__ == "__main__":
     #main_reco_analysis()
     #main_systematics_analysis()

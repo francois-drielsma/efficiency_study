@@ -154,22 +154,30 @@ class Config(object):
     mc_true_ds_cuts["mc_muon_ds"] = True
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
-    cut_report = [[], []]
-    cut_report[0]  = ["hline", "all events", "hline",]
+    cut_report  = [[], [], [], [], []]
+    cut_report[0] = ["hline", "all events", "hline",]
     cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
     cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
     if global_through_cuts:
         cut_report[0] += ["global_through_tof0",]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
-    cut_report[0] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
-    cut_report[0] += ["downstream_cut", "hline",]
-    cut_report[0] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
-    cut_report[0] += ["extrapolation_cut", "hline"]
-    cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut",
-                     "hline", "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline", "mc_true_ds_cut", "hline", "downstream_cut"]
+    cut_report[1] += ["hline", "upstream_cut", "hline",]
+    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[1] += ["downstream_cut", "hline",]
+    cut_report[2] =  ["hline", "downstream_cut", "hline",]
+    cut_report[2] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
+    cut_report[2] += ["extrapolation_cut", "hline"]
 
-    data_dir = "output/2017-02"
+    cut_report[3] += ["hline", "upstream_cut", "hline",]
+    cut_report[3] += ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline",]
+    cut_report[3] += ["mc_true_us_cut", "hline",]
+
+    cut_report[4] += ["hline", "mc_true_us_cut", "hline",]
+    cut_report[4] += ["mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline",]
+    cut_report[4] += ["mc_true_ds_cut", "hline"]
+
+    data_dir = "output/2017-02-2"
     files = "*"
     analyses = []
     analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
@@ -177,10 +185,10 @@ class Config(object):
     analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH",       [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
     analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None",      [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis("10064_v1/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("9962_v1/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10484_v1/"+files, "Simulated 2017-2.7 4-140 LiH",       [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10445_v1/"+files, "Simulated 2017-2.7 4-140 None",      [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10064_v2/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("9962_v2/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10484_v2/"+files, "Simulated 2017-2.7 4-140 LiH",       [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10445_v2/"+files, "Simulated 2017-2.7 4-140 None",      [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
 
     analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
     analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full",   [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
@@ -216,10 +224,10 @@ class Config(object):
         "max_iterations":100,
         "resolution":1.,
     }
-
+    # 
     tof0_offset = 0.18+25.4
     tof1_offset = 0.
-    tof2_offset = -27.938
+    tof2_offset = -27.7
 
     # z position of central absorber (used for offsetting
     z_apertures = 0.
@@ -306,7 +314,7 @@ class Config(object):
         }
     }
     bz_tku = 3e-3
-    bz_tkd = 2e-3
+    bz_tkd = -2e-3
     z_afc = 16955.74
     # z position of apertures (z, maximum radius, name)
     # Notes from Jason: 209.6 to fixed flange

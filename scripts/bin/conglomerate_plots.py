@@ -1,3 +1,4 @@
+import copy
 import sys
 
 import ROOT
@@ -31,49 +32,105 @@ class MCConfig(CompareConfig):
             self.get_conglomerate_1("tof1_y", "tof1_y", "us cut", None, False),
         ]
 
-def vertical(x_value_list):
+def mc_mod(file_name, axis_range, right_labels, top_labels):
+    modifiers = {
+        "extra_labels":{
+            "right":right_labels,
+            "top":top_labels
+        },
+        "redraw":{
+            "draw_option":[""],
+            "fill_color":[ROOT.kOrange-2],
+            "x_range":axis_range,
+        },
+        "normalise_hist":True,
+        "defit":True,
+        "write_plots":{"file_name":file_name},
+    }
+    return modifiers
+  
+
+class CompareMCConfig(CompareConfig):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
+        self.setup(beam, target_dir, "mc_plots/", "compare_mc/", False, True)
+      
+        self.conglomerate_list = [
+            self.get_conglomerate_3("mc_residual_tku_x", "x", "TKU Res(x) [mm]", None, modifiers = mc_mod("tku_x", [-2., 2.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tku_px", "px", "TKU Res(p_{x}) [MeV/c]", None, modifiers = mc_mod("tku_px", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tku_y", "y", "TKU Res(y) [mm]", None, modifiers = mc_mod("tku_y", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tku_py", "py", "TKU Res(p_{y}) [MeV/c]", None, modifiers = mc_mod("tku_py", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tku_pz", "pz", "TKU Res(p_{z}) [MeV/c]", None, modifiers = mc_mod("tku_pz", [-10., 10.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tkd_x", "x", "TKD Res(x) [mm]", None, modifiers = mc_mod("tkd_x", [-2., 2.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tkd_px", "px", "TKD Res(p_{x}) [MeV/c]", None, modifiers = mc_mod("tkd_px", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tkd_y", "y", "TKD Res(y) [mm]", None, modifiers = mc_mod("tkd_y", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tkd_py", "py", "TKD Res(p_{y}) [MeV/c]", None, modifiers = mc_mod("tkd_py", [-5., 5.], right_labels, top_labels)),
+            self.get_conglomerate_3("mc_residual_tkd_pz", "pz", "TKD Res(p_{z}) [MeV/c]", None, modifiers = mc_mod("tkd_pz", [-10., 10.], right_labels, top_labels)),
+        ]
+
+
+def vertical(x_value_list, modifier):
     verticals = [
         {"x_value":x_value, "line_color":1, "line_style":2, "line_width":2} for x_value in x_value_list
     ]
-    modifier = {
-        "extra_lines":{
+    modifier = copy.deepcopy(modifier)
+    modifier["extra_lines"] = {
             "verticals":verticals,
             "horizontals":[],
         }
-    }
     return modifier
 
 class CompareCutsConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "cut_plots/", "compare_cuts/", True, True)
-        self.conglomerate_list = [
-            self.get_conglomerate_2("global_through_virtual_diffuser_ds_r_9_0", None, "Radius at diffuser (upstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100])),
-            self.get_conglomerate_2("global_through_virtual_diffuser_us_r_9_0", None, "Radius at diffuser (downstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100])),
-            self.get_conglomerate_2("tkd_n_tracks_13_0", None, "Number of tracks in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([1, 2])),
-            self.get_conglomerate_2("tkd_chi2_13_0", None, "#chi^{2}/D.o.F. in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4])),
-            self.get_conglomerate_2("tkd_max_r_13_0", None, "Maximum radius in TKD stations [mm]", [0., 300.], True, [0.5, 0.5, 0.9, 0.9], vertical([150])),
-            self.get_conglomerate_2("tkd_p_13_0", None, "Momentum at TKD Reference Plane [MeV/c]", [50., 250.], True, [0.5, 0.5, 0.9, 0.9], vertical([100, 200])),
-            self.get_conglomerate_2("tku_chi2_9_0", None, "#chi^{2}/D.o.F. in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4])),
-            self.get_conglomerate_2("tku_max_r_9_0", None, "Maximum radius in TKU stations [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([150])),
-            self.get_conglomerate_2("tku_n_tracks_8_0", None, "Number of tracks in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([1, 2])), # disable two cuts
-            self.get_conglomerate_2("tku_p_9_0", None, "Momentum at TKU Reference Plane [MeV/c]", [50., 250.], True, [0.5, 0.5, 0.9, 0.9], vertical([135, 145])),
-            self.get_conglomerate_2("tof_tof0_n_sp_9_0", None, "Number of space points in TOF0", None, True, [0.5, 0.5, 0.9, 0.9], vertical([1, 2])),
-            self.get_conglomerate_2("tof_tof1_n_sp_9_0", None, "Number of space points in TOF1", None, True, [0.5, 0.5, 0.9, 0.9], vertical([1, 2])),
-            self.get_conglomerate_2("tof_tof01_9_0", None, "Time between TOF0 and TOF1 [ns]", [28., 33.], True, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("tof_delta_tof01_9_0", None, "t(TOF01) - extrapolated t(TOF01) [ns]", None, True, [0.1, 0.5, 0.5, 0.9], vertical([-1.0, 1.5])),
+        mod = {
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            }
+        }
 
-            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_10_0", None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9]),
-            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_8_0",  None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9]),
-            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_8_1",  None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9]),
-            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_10_1", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9]),
-            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_11_1", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9]),
-            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_14_0", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9]),
+        self.conglomerate_list = [
+            self.get_conglomerate_2("global_through_virtual_diffuser_ds_r_9_0", None, "Radius at diffuser (upstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100], mod)),
+            self.get_conglomerate_2("global_through_virtual_diffuser_us_r_9_0", None, "Radius at diffuser (downstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100], mod)),
+            self.get_conglomerate_2("tkd_n_tracks_13_0", None, "Number of tracks in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)),
+            self.get_conglomerate_2("tkd_chi2_13_0", None, "#chi^{2}/D.o.F. in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4], mod)),
+            self.get_conglomerate_2("tkd_max_r_13_0", None, "Maximum radius in TKD stations [mm]", [0., 300.], True, [0.5, 0.5, 0.9, 0.9], vertical([150], mod)),
+            self.get_conglomerate_2("tkd_p_13_0", None, "Momentum at TKD Reference Plane [MeV/c]", [50., 250.], True, [0.5, 0.5, 0.9, 0.9], vertical([90, 170], mod)),
+            self.get_conglomerate_2("tku_chi2_9_0", None, "#chi^{2}/D.o.F. in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4], mod)),
+            self.get_conglomerate_2("tku_max_r_9_0", None, "Maximum radius in TKU stations [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([150], mod)),
+            self.get_conglomerate_2("tku_n_tracks_8_0", None, "Number of tracks in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)), # disable two cuts
+            self.get_conglomerate_2("tku_p_9_0", None, "Momentum at TKU Reference Plane [MeV/c]", [50., 250.], True, [0.5, 0.5, 0.9, 0.9], vertical([135, 145], mod)),
+            self.get_conglomerate_2("tof_tof0_n_sp_9_0", None, "Number of space points in ToF0", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)),
+            self.get_conglomerate_2("tof_tof1_n_sp_9_0", None, "Number of space points in ToF1", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)),
+            self.get_conglomerate_2("tof_tof01_9_0", None, "Time between ToF0 and ToF1 [ns]", [28., 33.], True, [0.5, 0.5, 0.9, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tof_delta_tof01_9_0", None, "t(ToF01) - extrapolated t(ToF01) [ns]", None, True, [0.1, 0.5, 0.5, 0.9], vertical([-1.0, 1.5], mod)),
+
+            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_10_0", None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_8_0",  None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tku_scifi_n_planes_with_clusters_8_1",  None, "Number of planes with clusters in TKU", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_10_1", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_11_1", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
+            self.get_conglomerate_2("tkd_scifi_n_planes_with_clusters_14_0", None, "Number of planes with clusters in TKD", None, True, [0.1, 0.5, 0.5, 0.9], modifiers = mod),
         ]
-        self.data_caption = """The sample selection criteria are listed sequentially, in the order 
-that the selection was made. The number of events surviving the 
-selection and all preceding selections is listed for each of the data runs studied
-in this note."""
-        self.mc_caption = "Simulated sample selection"
+        self.data_caption = [[],]
+        self.data_caption[0] = [
+            " Samples are listed for 3-140 and 4-140 datasets.",
+            " Samples are listed for 6-140 and 10-140 datasets.",
+        ]
+        self.data_caption.append(copy.deepcopy(self.data_caption[0]))
+        self.data_caption.append(copy.deepcopy(self.data_caption[0]))
+        self.mc_caption = copy.deepcopy(self.data_caption)
+        self.mc_caption.append(copy.deepcopy(self.mc_caption[0]))
+        self.mc_caption.append(copy.deepcopy(self.mc_caption[0]))
+        data_prefix = ["upstream", "downstream", "extrapolated"]
+        mc_prefix = ["upstream reconstructed", "downstream reconstructed", "extrapolated reconstructed",
+                     "upstream truth", "downstream truth"]
+        for i, prefix in enumerate(data_prefix):
+            for j, item in enumerate(self.data_caption[i]):
+                self.data_caption[i][j] = "The "+prefix+" reconstructed data sample is listed. "+item
+        for i, prefix in enumerate(mc_prefix):
+            for j, item in enumerate(self.mc_caption[i]):
+                self.mc_caption[i][j] = "The "+prefix+" simulated sample is listed. "+item
 
 class CompareData1DConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -86,9 +143,9 @@ class CompareData1DConfig(CompareConfig):
         }
       
         self.conglomerate_list = [
-            self.get_conglomerate_1("tof0_slab_dt", "tof0_slab_dt", "us_cut", "Slab dt for TOF0 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
-            self.get_conglomerate_1("tof1_slab_dt", "tof1_slab_dt", "us_cut", "Slab dt for TOF1 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
-            self.get_conglomerate_1("tof2_slab_dt", "tof2_slab_dt", "ds_cut", "Slab dt for TOF2 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
+            self.get_conglomerate_1("tof0_slab_dt", "tof0_slab_dt", "us_cut", "Slab dt for ToF0 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
+            self.get_conglomerate_1("tof1_slab_dt", "tof1_slab_dt", "us_cut", "Slab dt for ToF1 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
+            self.get_conglomerate_1("tof2_slab_dt", "tof2_slab_dt", "ds_cut", "Slab dt for ToF2 [ns]", [-2, 2], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
             self.get_conglomerate_1("tku_x",  "tku_x",  "us_cut", "x at TKU Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
             self.get_conglomerate_1("tku_y",  "tku_y",  "us_cut", "y at TKU Reference Plane [mm]",        [-175, 300], False, [0.55, 0.7, 0.9, 0.9], modifiers = modifiers),
             self.get_conglomerate_1("tku_px", "tku_px", "us_cut", "p_{x} at TKU Reference Plane [MeV/c]", [-120, 200], False, [0.55, 0.7, 0.9, 0.9], rescale_y = [0., 0.15], modifiers = modifiers),
@@ -105,49 +162,97 @@ class CompareData1DConfig(CompareConfig):
 class CompareData2DConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "data_plots/", "compare_data/", True, False)
+        mod = {
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            },
+            "redraw":{
+                "draw_option":["COL"],
+            },
+            "canvas_fill_color":root_style.get_frame_fill(),
+            "extra_lines":{
+                "verticals":[
+                  {"x_value":x_value, "line_color":ROOT.kRed+2, "line_style":2, "line_width":2} for x_value in [0, 20]
+                ],
+                "horizontals":[],
+            }
+        }
 
         self.conglomerate_list = [
-            self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", None, None),
-            self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", None, None),
+            self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "radius [mm]", modifiers = mod),
+            self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "y [mm]", modifiers = mod),
         ]
 
 
 class CompareOpticsConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
         self.setup(beam, target_dir, "optics_plots/", "compare_optics/", True, False)
+        graphs = ["_source_tku", "_source_tkd", "_virtual_absorber_centre",]
+        for tof in ["_tof0", "_tof1", "_tof2"]:
+            for element in "_us", "", "_ds":
+                graphs.append(tof+element)
+        for tracker in ["_tku", "_tkd"]:
+            for station in range(2, 6)+["tp"]:
+                graphs.append(tracker+"_"+str(station))
+        modifiers = {
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            },
+            "redraw":{
+                "graph":{
+                    "marker_style":None,
+                    "marker_color":None,
+                    "draw_option":["same lp"]*len(graphs),
+                    "draw_order":None,
+                    "fill_color":None,
+                }
+            },
+        }
 
         self.conglomerate_list = [
-            self.get_conglomerate_graph("beta_4d_ds", "z [m]", "#beta_{4D} [mm]"),
-            self.get_conglomerate_graph("beta_x_ds", "z [m]", "#beta_{x} [mm]"),
-            self.get_conglomerate_graph("beta_y_ds", "z [m]", "#beta_{y} [mm]"),
-            self.get_conglomerate_graph("sigma_0_ds", "z [m]", "#sigma_{x} [mm]"),
-            self.get_conglomerate_graph("sigma_2_ds", "z [m]", "#sigma_{y} [mm]"),
+            self.get_conglomerate_graph("beta_4d_ds", "z [m]", "#beta_{4D} [m]", graph_list = ["beta_4d_ds"+name for name in graphs], x_range = [12.9, 21.2], y_range = [0., 2.0], modifiers = modifiers),
+            self.get_conglomerate_graph("beta_x_ds",  "z [m]", "#beta_{x} [m]", graph_list = ["beta_x_ds"+name for name in graphs], x_range = [12.9, 21.2], y_range = [0., 2.0], modifiers = modifiers),
+            self.get_conglomerate_graph("beta_y_ds",  "z [m]", "#beta_{y} [m]", graph_list = ["beta_y_ds"+name for name in graphs], x_range = [12.9, 21.2], y_range = [0., 2.0], modifiers = modifiers),
+            self.get_conglomerate_graph("sigma_0_ds", "z [m]", "#sigma_{x} [mm]", graph_list = ["sigma_0_ds"+name for name in graphs], x_range = [12.9, 21.2], y_range = [20., 80.0], modifiers = modifiers),
+            self.get_conglomerate_graph("sigma_2_ds", "z [m]", "#sigma_{y} [mm]", graph_list = ["sigma_2_ds"+name for name in graphs], x_range = [12.9, 21.2], y_range = [20., 80.0],  modifiers = modifiers),
         ]
-
+ 
 
 
 class CompareGlobalsConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
-        self.setup(beam, target_dir, "global_plots/", "compare_globals/", True, False)
-
+        self.setup(beam, target_dir, "global_plots/", "compare_globals/", True, True)
+        mod1 = {
+            "legend":False,
+            "rebin":10,
+            "write_fit":False,
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            },
+            "extra_lines":{
+                    "verticals":[{"x_value":0., "line_color":1, "line_style":2, "line_width":2}],
+                    "horizontals":[],
+            },
+        }
+        mod2 = copy.deepcopy(mod1)
+        mod2["rebin"] = 4
         self.conglomerate_list = [
-            self.get_conglomerate_2("global_through_residual_tkd_tp_p", "res_ex_cut", "Residual Momentum in TKD [MeV/c]", [-20, 20], False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tkd_tp_px", "res_ex_cut", "Residual P_{x} in TKD [MeV/c]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tkd_tp_py", "res_ex_cut", "Residual P_{y} in TKD [MeV/c]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tkd_tp_pz", "res_ex_cut", "Residual P_{z} in TKD [MeV/c]", [-20, 20], False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tkd_tp_x", "res_ex_cut", "Residual x in TKD [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tkd_tp_y", "res_ex_cut", "Residual y in TKD [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tof0_t", "res_ex_cut", "Residual t in TOF0 [ns]", [-5, 5], False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tof1_x", "res_ex_cut", "Residual x in TOF1 [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tof1_y", "res_ex_cut", "Residual y in TOF1 [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_ds_residual_tof2_x", "res_ex_cut", "Residual x in TOF2 [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_ds_residual_tof2_y", "res_ex_cut", "Residual y in TOF2 [mm]", None, False, [0.5, 0.5, 0.9, 0.9]),
-            self.get_conglomerate_2("global_through_residual_tof2_t", "res_ex_cut", "Residual t in TOF2 [ns]", [-5, 5], False, [0.5, 0.5, 0.9, 0.9]),
+            self.get_conglomerate_2("global_through_residual_tof0_t", "res_ex_cut", "Residual t in ToF0 [ns]", [-5, 5], False, [0.5, 0.5, 0.9, 0.9], modifiers = mod1),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_p", "res_ex_cut", "Residual Momentum in TKD [MeV/c]", [-20, 20], False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_px", "res_ex_cut", "Residual P_{x} in TKD [MeV/c]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_py", "res_ex_cut", "Residual P_{y} in TKD [MeV/c]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_pz", "res_ex_cut", "Residual P_{z} in TKD [MeV/c]", [-20, 20], False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_x", "res_ex_cut", "Residual x in TKD [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tkd_tp_y", "res_ex_cut", "Residual y in TKD [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tof1_x", "res_ex_cut", "Residual x in ToF1 [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tof1_y", "res_ex_cut", "Residual y in ToF1 [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_ds_residual_tof2_x", "res_ex_cut", "Residual x in ToF2 [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_ds_residual_tof2_t", "res_ex_cut", "Residual y in ToF2 [mm]", None, False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
+            self.get_conglomerate_2("global_through_residual_tof2_t", "res_ex_cut", "Residual t in ToF2 [ns]", [-5, 5], False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
         ]
-        for item in self.conglomerate_list:
-            if "tof0_t" in item["file_name"]:
-                continue
-            item["rebin"] = 4
 
 class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -216,7 +321,7 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                         "draw_order":[0, 1, 2, 3],
                     }
             },
- 
+
         }
 
         self.conglomerate_list = [
@@ -275,25 +380,19 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                                         graph_draw_option = ["p", "2", "p", "2"], graph_marker_style=[20, 20, 22, 22], 
                                         graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
                                         modifiers=ratio_modifiers),
-
-            #self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
-            #                            "#frac{Cumulative number out}{Cumulative number in}",
-            #                            "cdf_ratio", ["CDF Ratio_stats hist"],
-            #                            ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.601, 1.399], replace_hist = True,
-            #                            graph_marker_style=[20, 20, 26, 26], graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed]),
         ]
 
 def cuts_summary(dir_list, target_dir):
     data_cuts_summary = MergeCutsSummaryTex()
     mc_cuts_summary = MergeCutsSummaryTex()
     for beam in dir_list:
-        config = CompareCutsConfig(beam, target_dir)
+        config = CompareCutsConfig(beam, target_dir, [], [])
         data_cuts_summary.append_summary(config, [0])
         mc_cuts_summary.append_summary(config, [1])
     data_cuts_summary.caption = config.data_caption
     mc_cuts_summary.caption = config.mc_caption
-    data_cuts_summary.merge_summaries(target_dir+"/cuts_summary/data/", "data_cuts_summary.tex")
-    mc_cuts_summary.merge_summaries(target_dir+"/cuts_summary/mc/", "mc_cuts_summary.tex")
+    data_cuts_summary.merge_summaries(target_dir+"/cuts_summary/data/", "data_cuts_summary")
+    mc_cuts_summary.merge_summaries(target_dir+"/cuts_summary/mc/", "mc_cuts_summary")
 
 def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, target_dir, top_labels, right_labels):
     rows = len(dir_lists)
@@ -336,9 +435,9 @@ def main(batch_level = 0):
     Main program; 
     - batch_level tells how much output for ROOT: batch_level 0 is silent, 10 is most verbose
     """
+    root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    #config_list += [CompareAmplitudeConfigData, CompareAmplitudeConfigBoth]#, CompareAmplitudeConfigMC]
-    target_dir = "output/2017-02-bkp/"
+    target_dir = "output/2017-02-2/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
@@ -353,8 +452,8 @@ def main(batch_level = 0):
     ]
     top_labels = ["No absorber", "Empty LH2", "Full LH2", "LiH"]
     right_labels = ["3-140", "4-140", "6-140", "10-140"]
-    config_list = [CompareData1DConfig, CompareCutsConfig, CompareOpticsConfig, CompareData2DConfig]
-    config_list += [CompareAmplitudeConfigBoth, CompareAmplitudeConfigMC, CompareAmplitudeConfigData]
+    config_list = [CompareData2DConfig]#, CompareOpticsConfig, CompareMCConfig, CompareCutsConfig, CompareData1DConfig, CompareGlobalsConfig]
+    #config_list += [CompareAmplitudeConfigBoth, CompareAmplitudeConfigMC, CompareAmplitudeConfigData]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
 
 if __name__ == "__main__":

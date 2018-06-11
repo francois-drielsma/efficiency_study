@@ -27,9 +27,10 @@ class MCPlotter(AnalysisBase):
             self.birth_var_one_d("p_at_"+virt_station, virt_station, "pid", "p", pid_colors, "us cut", 0., 300.)
             self.birth_var_one_d("r_at_"+virt_station, virt_station, "pid", "r", pid_colors, "us cut", 0., 300.)
             self.birth_var_two_d_scatter("x_vs_px_at_"+virt_station, virt_station, "pid", "x", "px", pid_colors, True)
-        self.birth_var_two_d_scatter("x_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "x", pid_colors)
-        self.birth_var_two_d_scatter("y_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "y", pid_colors)
-        self.birth_var_two_d_scatter("r_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "r", pid_colors)
+        #disabled due to file size
+        #self.birth_var_two_d_scatter("x_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "x", pid_colors)
+        #self.birth_var_two_d_scatter("y_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "y", pid_colors)
+        #self.birth_var_two_d_scatter("r_vs_z_of_mc_track_final", "mc_track_final", "pid", "z", "r", pid_colors)
         self.birth_var_two_d_scatter("x_vs_px_of_primary", "mc_primary", "pid", "x", "px", pid_colors)
         self.birth_var_two_d_scatter("y_vs_py_of_primary", "mc_primary", "pid", "y", "py", pid_colors)
         self.birth_var_one_d("p_at_mc_tof_0", "mc_tof_0", "pid", "p", pid_colors)
@@ -63,7 +64,8 @@ class MCPlotter(AnalysisBase):
         tkd_hit_predicate = lambda hit: 18800 < hit["hit"]["z"] and hit["hit"]["z"] < 20000
         self.birth_var_one_d("tkd_p_at_mc_track_initial", "mc_track_initial", "pid", "p", pid_colors, xmin = 0., xmax = 10., hit_predicate = tkd_hit_predicate)
         self.birth_var_one_d("tkd_z_at_mc_track_initial", "mc_track_initial", "pid", "z", pid_colors, hit_predicate = tkd_hit_predicate)
-        self.birth_var_two_d_scatter("z_vs_p_of_track_initial", "mc_track_initial", "pid", "z", "p", pid_colors)
+        #disabled due to file size
+        #self.birth_var_two_d_scatter("z_vs_p_of_track_initial", "mc_track_initial", "pid", "z", "p", pid_colors)
         self.birth_data_detector_residuals()
 
     def process(self):
@@ -269,8 +271,9 @@ class MCPlotter(AnalysisBase):
 
     def get_data_detector_residuals(self, tracker, virt_name):
         residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
+        cut = {"tku":"upstream_cut", "tkd":"downstream_cut"}[tracker]
         for event in self.data_loader.events:
-            if event["downstream_cut"]:
+            if event[cut]:
                 continue
             if event[tracker] == None:
                 continue
@@ -294,6 +297,18 @@ class MCPlotter(AnalysisBase):
                 for item in data:
                     hist.Fill(item)
 
+    def get_x_min_max(self, var):
+        #utilities.utilities.fractional_axis_range(data, 0.95)
+        keys = {
+            "x":(-4., 4.),
+            "y":(-4., 4.),
+            "z":(-5., 5.),
+            "px":(-10., 10.),
+            "py":(-10., 10.),
+            "pz":(-40., 40.),
+        }
+        return keys[var]
+
     def birth_data_detector_residuals(self):
         dummy_canvas = xboa.common.make_root_canvas("dummy")
         for detector, virtual_station_list in self.mc_stations.iteritems():
@@ -304,14 +319,8 @@ class MCPlotter(AnalysisBase):
                 data = residual_dict[var]
                 if len(data) == 0:
                     raise RuntimeError("Failed to find residual data for "+var+" "+detector+" "+virtual_station)
-                xmin, xmax = utilities.utilities.fractional_axis_range(data, 0.95)
+                xmin, xmax = self.get_x_min_max(var)
                 dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
-                hist = xboa.common.make_root_histogram(var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
-                hist.Draw()
-                fit = utilities.utilities.fit_peak(hist, nsigma=8)
-                mean = fit.GetParameter(1)
-                sigma = fit.GetParameter(2)
-                xmin, xmax = mean-5*sigma, mean+5*sigma
                 hist = self.make_root_histogram(canvas_name, var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()
 
