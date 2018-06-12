@@ -3,8 +3,12 @@ import numpy
 import bisect
 import time
 import copy
+import itertools
+import math
 
+import ROOT
 from xboa.hit import Hit
+import xboa.common
 
 class AmplitudeDataBinless(object):
     def __init__(self, file_name, bin_edges, mass, cov_fixed):
@@ -306,6 +310,7 @@ class AmplitudeDataBinless(object):
         sample_count = 0
         if self.n_cov_events <= self.min_events:
             self.min_events = self.n_cov_events - 1
+        self.save_state()
         while self.n_cov_events > self.min_events:
             amplitude_cut = -1
             max_event = -1
@@ -427,25 +432,82 @@ def test_fractional_amplitude(n_spills):
     import xboa.common
     import xboa.bunch
     import time
-    mean = numpy.array([10., 10., 0., 0.])
-    n_events_per_spill = 100
-    cov_1 = xboa.bunch.Bunch.build_penn_ellipse(6., xboa.common.pdg_pid_to_mass[13], 333, 0., 200, 0., 0.004, 1)
-    cov_2 = xboa.bunch.Bunch.build_penn_ellipse(20., xboa.common.pdg_pid_to_mass[13], 666, -1., 200, 0., 0.004, 1)
-    amp = AmplitudeData("/tmp/amplitude_analysis.tmp", [i * 5. for i in range(21)], 105.658)
-    for cov in cov_1,:# cov_2:
-        for spill in range(n_spills):
+    mean_1 = numpy.array([75., 10., 0., 0.])
+    mean_2 = numpy.array([-75., 10., -10., 0.])
+    n_events_per_spill = 125
+    cov_1 = xboa.bunch.Bunch.build_penn_ellipse(6., xboa.common.pdg_pid_to_mass[13], 100, 0., 200, 0., 0.0, 1)
+    cov_2 = xboa.bunch.Bunch.build_penn_ellipse(6., xboa.common.pdg_pid_to_mass[13], 333, -0.5, 200, 0., 0.0, 1)
+    amp = AmplitudeDataBinless("/tmp/amplitude_analysis.tmp", [i * 5. for i in range(21)], 105.658, False)
+    if n_spills%2 == 1:
+        print "n_spills must be event; changing from", n_spills,
+        n_spills += 1
+        print "to", n_spills
+    for spill in range(n_spills):
+        for mean, cov in (mean_1, cov_1), (mean_2, cov_2), (mean_2, cov_2), (mean_2, cov_2):
             ps_data = []
             for event in range(n_events_per_spill):
                 ps_vector = numpy.random.multivariate_normal(mean, cov)
                 event_data = ps_vector.tolist()
                 ps_data.append(event_data)
+            run_data = numpy.array([1 for i in range(n_events_per_spill)])
             spill_data = numpy.array([spill for i in range(n_events_per_spill)])
             event_data = numpy.array(range(n_events_per_spill))
             ps_data = numpy.array(ps_data)
-            amp.append(spill_data, event_data, ps_data, 20)
+            amp_data = numpy.array([0. for i in range(n_events_per_spill)])
+            amp.append(run_data, spill_data, event_data, ps_data, amp_data, spill%2)
+    n_events = 4*n_spills*n_events_per_spill
     start_time = time.time()
+    amp.min_events = n_events/10
+    amp.save_frequency = n_events/10
     amp.fractional_amplitude()
+    plot_fractional_amplitude(amp)
     return (time.time() - start_time)/60
+
+root_objects = []
+def plot_fractional_amplitude(amp_data):
+    import utilities.root_style
+    utilities.root_style.setup_gstyle()
+    canvas = ROOT.TCanvas("amplitude test 2d", "amplitude test 2d", 1400, 1000)
+    canvas.Divide(2, 1)
+    xpx_hist = ROOT.TH2D("amplitude test 2d", ";x [mm];px [mm]", 50, -200, 200, 70, -50, 50)
+    xpx_hist.SetStats(False)
+    amp_hist = ROOT.TH1D("amplitude test 1d", ";amplitude [mm];", 40, 0., 200.)
+    amp_hist.SetStats(False)
+    for run, spill, evt, psv, amp in itertools.chain(amp_data.retrieve(0), amp_data.retrieve(1)):
+         xpx_hist.Fill(psv[0], psv[1])
+         amp_hist.Fill(amp)
+    canvas.cd(1).SetFrameFillColor(utilities.root_style.get_frame_fill())
+    xpx_hist.Draw("COLZ")
+    print "get ellipse"
+    for i, ellipse in enumerate(amp_data.state_list):
+        graph = plot_ellipse(ellipse)
+        delta_list = [-10, -7, -4, 1, 3]
+        color_list = [ROOT.kGreen+d for d in delta_list]+[ROOT.kRed+d for d in delta_list]
+        graph.SetLineColor(color_list[i])
+    canvas.cd(2)
+    amp_hist.Draw("")
+    canvas.Update()
+    for fmt in ["root", "png", "pdf"]:
+        canvas.Print("TestAmplitudeBinless."+fmt)
+    root_objects.append(amp_hist)
+    root_objects.append(xpx_hist)
+    root_objects.append(canvas)
+
+def plot_ellipse(ellipse):
+    mean = ellipse["mean"][0:2]
+    cov = ellipse["cov"][0:2, 0:2]
+    points = xboa.common.make_shell(41, cov)
+    graph = ROOT.TGraph(len(points)+1)
+    points = [(a_point[0, 0], a_point[0, 1]) for a_point in points]
+    points = sorted(points, key = lambda points: math.atan2(points[1], points[0]))
+    points.append(points[0])
+    print ellipse
+    for i, a_point in enumerate(points):
+        graph.SetPoint(i, a_point[0]+mean[0], a_point[1]+mean[1])
+    graph.SetLineWidth(2)
+    graph.Draw("L")
+    root_objects.append(graph)
+    return graph
 
 
 def test_memmap():
@@ -466,12 +528,14 @@ def test_memmap():
 if __name__ == "__main__":
     #test_memmap()
     results_list = []
-    for n_spills in range(10, 11, 10):
+    #plot_ellipse({"mean":numpy.array([-1., -1.]), "cov":numpy.array([[1., 0.9,], [0.9, 1.]])})
+    #raw_input()
+    for n_spills in [20]:
         delta_t = test_fractional_amplitude(n_spills)
         results_list.append((n_spills, delta_t))
     print "N spills".ljust(10), "Time [mins]".rjust(10)
     for result in results_list:
         print str(result[0]).ljust(10), str(result[1]).rjust(10)
-
+    raw_input()
 
 
