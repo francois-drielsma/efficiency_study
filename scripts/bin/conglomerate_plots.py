@@ -437,7 +437,7 @@ def main(batch_level = 0):
     """
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-2/"
+    target_dir = "output/2017-02-Test/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
@@ -452,8 +452,8 @@ def main(batch_level = 0):
     ]
     top_labels = ["No absorber", "Empty LH2", "Full LH2", "LiH"]
     right_labels = ["3-140", "4-140", "6-140", "10-140"]
-    config_list = [CompareData2DConfig]#, CompareOpticsConfig, CompareMCConfig, CompareCutsConfig, CompareData1DConfig, CompareGlobalsConfig]
-    #config_list += [CompareAmplitudeConfigBoth, CompareAmplitudeConfigMC, CompareAmplitudeConfigData]
+    config_list = [CompareData2DConfig, CompareOpticsConfig, CompareMCConfig, CompareCutsConfig, CompareData1DConfig, CompareGlobalsConfig]
+    config_list += [CompareAmplitudeConfigBoth, CompareAmplitudeConfigMC, CompareAmplitudeConfigData]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
 
 if __name__ == "__main__":

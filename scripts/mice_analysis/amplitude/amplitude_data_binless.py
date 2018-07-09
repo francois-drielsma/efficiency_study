@@ -39,7 +39,7 @@ class AmplitudeDataBinless(object):
         self.min_events = 1000 # minimum number of events in the cov calculation
         self.save_frequency = 100 # frequency with which we save the state
         self.cov_fixed = cov_fixed
-        self.state_list = []
+        self.state_list = [[], []]
         self.clear()
 
     def clear(self):
@@ -59,13 +59,14 @@ class AmplitudeDataBinless(object):
         self.mean = numpy.array([0. for i in range(n_var)])
         self.cov = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
         self.cov_inv = numpy.array([[0. for i in range(n_var)] for j in range(n_var)])
-        self.state_list = []
+        self.state_list = [[], []]
         self.emittance = 0.
 
-    def append_hits(self, hit_list):
+    def append_hits(self, hit_list, aux_array):
         """
         Add a set of data to the amplitude_data structure
         * hit_list: list of hits, each formatted as an xboa.Hit
+        * aux_array: not used
         
         Splits the list into two samples and fills data.
         """
@@ -310,7 +311,7 @@ class AmplitudeDataBinless(object):
         sample_count = 0
         if self.n_cov_events <= self.min_events:
             self.min_events = self.n_cov_events - 1
-        self.save_state()
+        self.save_state(ref_sample)
         while self.n_cov_events > self.min_events:
             amplitude_cut = -1
             max_event = -1
@@ -329,7 +330,7 @@ class AmplitudeDataBinless(object):
                 sys.excepthook(*sys.exc_info())
                 break
             if sample_count % self.save_frequency == 0:
-                self.save_state()
+                self.save_state(ref_sample)
 
             for i in range(self.n_events[test_sample]):
                 if test_used[i]:
@@ -348,6 +349,9 @@ class AmplitudeDataBinless(object):
         self.amplitude[test_sample][:] = numpy.array(amplitude_list, dtype='float32')[:]
 
     def set_fixed_cov_matrix(self):
+        """
+        Set the "fixed" covariance matrix - for normal amplitudes calculation
+        """
         n_var = 4
         self.n_cov_events = 0.
         self.mean = numpy.array([0. for i in range(n_var)])
@@ -356,6 +360,9 @@ class AmplitudeDataBinless(object):
         self.get_emittance()
 
     def fractional_amplitude_fixed(self):
+        """
+        Calculate amplitudes using a fixed covariance matrix
+        """
         self.set_fixed_cov_matrix()
         for sample in [0, 1]:
             amplitude_list = [None]*self.n_events[sample]
@@ -387,15 +394,15 @@ class AmplitudeDataBinless(object):
         print "Registered", len(amplitude_dict), "amplitudes"
         return amplitude_dict
 
-    def save_state(self):
+    def save_state(self, sample):
         """
         Record internal state for plotting/diagnostics etc
 
         Append to self.state_list a dictionary containing:
-          - emittance
-          - mean
-          - cov
-          - number of events surviving in the reference sample
+          - "emittance" RMS 4D emittance
+          - "mean" vector of means
+          - "cov" covariance matrix
+          - "n_events" number of events surviving in the reference sample
         """
         my_state = {
             "emittance":copy.deepcopy(self.emittance),
@@ -403,7 +410,13 @@ class AmplitudeDataBinless(object):
             "cov":copy.deepcopy(self.cov),
             "n_events":self.n_cov_events,
         }
-        self.state_list.append(my_state)
+        self.state_list[sample].append(my_state)
+
+    def get_n_events(self):
+        n_events = sum([a_bin for a_bin in self.n_events])
+        return n_events
+
+
 
 def delete_elements(source_map, elements):
     if len(elements) == 0:
@@ -479,11 +492,11 @@ def plot_fractional_amplitude(amp_data):
     canvas.cd(1).SetFrameFillColor(utilities.root_style.get_frame_fill())
     xpx_hist.Draw("COLZ")
     print "get ellipse"
-    for i, ellipse in enumerate(amp_data.state_list):
-        graph = plot_ellipse(ellipse)
-        delta_list = [-10, -7, -4, 1, 3]
-        color_list = [ROOT.kGreen+d for d in delta_list]+[ROOT.kRed+d for d in delta_list]
-        graph.SetLineColor(color_list[i])
+    for color, sample in [(ROOT.kGreen, 0), (ROOT.kRed, 1)]: 
+        for i, ellipse in enumerate(amp_data.state_list[sample]):
+            graph = plot_ellipse(ellipse)
+            delta_list = [-10, -7, -4, 1, 3]
+            graph.SetLineColor(color+delta_list[i])
     canvas.cd(2)
     amp_hist.Draw("")
     canvas.Update()

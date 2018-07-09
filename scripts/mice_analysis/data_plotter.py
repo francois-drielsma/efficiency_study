@@ -704,7 +704,7 @@ class DataPlotter(AnalysisBase):
                                         "p_tot_vs_tof", 
                                         tof_data, tof+" [ns]", 100, p_data,
                                         "p_{"+tk+"} [MeV/c]", 100, [],
-                                        25., 45., 0., 300., )
+                                        -5., 15., 0., 300., )
         hist.Draw("COLZ")
 
     def process_p_tot_vs_tof(self, tof, tk, cuts):

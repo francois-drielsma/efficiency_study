@@ -17,9 +17,17 @@ def reco_file_names(run_number_list, maus, do_globals):
     print file_list
     return file_list
 
-def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_globals):
+def get_systematics_dir(emittance, suffix):
+    a_dir = "output/2017-02-Systematics/plots_Simulated_2017-2.7_"+str(emittance)+\
+           "-140_lH2_empty_Systematics_"+suffix+"/amplitude/amplitude.json"
+    return a_dir
+
+def get_analysis(datasets, name, tof01_min_max, data_dir, emittance):
     plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
+    p_bins = [[135, 145]]
+    tkd_cut = [90, 170]
+    do_globals = True
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
     return {
@@ -41,24 +49,25 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
-            "amplitude_systematic_reference":"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_base/amplitude/amplitude.json",
-            "amplitude_systematic_sources":{ # the first entry is the reference; others define deltas
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_pos_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E1_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_C_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_scale_E2_plus/amplitude/amplitude.json":1.,
-                #"output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tku_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_density_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_C_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_scale_E2_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_rot_plus/amplitude/amplitude.json":1.,
-                "output/2017-02-Systematics/plots_Simulated_2017-2.7_6-140_lH2_empty_Systematics_tkd_pos_plus/amplitude/amplitude.json":1.,
+            "amplitude_source":get_systematics_dir(emittance, "tku_base"),
+            "amplitude_systematic_reference":get_systematics_dir(emittance, "tku_base"),
+            "amplitude_systematic_sources":{
+                get_systematics_dir(emittance, "tku_pos_plus"):1.,
+                get_systematics_dir(emittance, "tku_rot_plus"):1.,
+                get_systematics_dir(emittance, "tku_scale_E1_plus"):1.,
+                get_systematics_dir(emittance, "tku_scale_C_plus"):1.,
+                get_systematics_dir(emittance, "tku_scale_E2_plus"):1.,
+                get_systematics_dir(emittance, "tku_density_plus"):1.,
+                get_systematics_dir(emittance, "tkd_pos_plus"):1.,
+                get_systematics_dir(emittance, "tkd_rot_plus"):1.,
+                get_systematics_dir(emittance, "tkd_scale_E1_plus"):1.,
+                get_systematics_dir(emittance, "tkd_scale_C_plus"):1.,
+                get_systematics_dir(emittance, "tkd_scale_E2_plus"):1.,
+                get_systematics_dir(emittance, "tkd_density_plus"):1.,
             },
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
-            "amplitude_algorithm":"binless",
+            "amplitude_algorithm":"binned",
 
             "field_uncertainty":0.02,
             "amplitude_chi2":False,
@@ -118,7 +127,7 @@ class Config(object):
           "tof_2_sp":False,
           "upstream_aperture_cut":True,
           "downstream_aperture_cut":False,
-          "delta_tof01":True, #extrapolatedtof01 compared to recon tof01
+          "delta_tof01":False, #True, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "global_through_tof0":global_through_cuts,
           "global_through_tof1":False,
@@ -126,6 +135,7 @@ class Config(object):
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
           "tof01_selection":False,
+          "mc_p_us":False,
           "mc_muon_us":False,
           "mc_stations_us":False,
           "mc_scifi_fiducial_us":False,
@@ -157,9 +167,9 @@ class Config(object):
     cut_report  = [[], [], [], [], []]
     cut_report[0] = ["hline", "all events", "hline",]
     cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
-    cut_report[0] += ["delta_tof01", "tof01", "p_tot_us", "hline",]
+    cut_report[0] += ["tof01", "p_tot_us", "hline",]
     if global_through_cuts:
-        cut_report[0] += ["global_through_tof0",]
+        cut_report[0] += ["global_through_tof0",]# "delta_tof01",]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
     cut_report[1] += ["hline", "upstream_cut", "hline",]
@@ -177,28 +187,28 @@ class Config(object):
     cut_report[4] += ["mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline",]
     cut_report[4] += ["mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-2"
+    data_dir = "output/2017-02-Test"
     files = "*"
     analyses = []
-    analyses.append(get_analysis("10069_v1/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("9971_v1/"+files,  "Simulated 2017-2.7 3-140 lH2 full",  [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH",       [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None",      [1.5, 6.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10069_v100/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, 3))
+    analyses.append(get_analysis("9971_v1/"+files,  "Simulated 2017-2.7 3-140 lH2 full",  [1.5, 6.5], data_dir, 3))
+    analyses.append(get_analysis("10483_v1/"+files, "Simulated 2017-2.7 3-140 LiH",       [1.5, 6.5], data_dir, 3))
+    analyses.append(get_analysis("10444_v1/"+files, "Simulated 2017-2.7 3-140 None",      [1.5, 6.5], data_dir, 3))
 
-    analyses.append(get_analysis("10064_v2/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("9962_v2/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10484_v2/"+files, "Simulated 2017-2.7 4-140 LiH",       [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10445_v2/"+files, "Simulated 2017-2.7 4-140 None",      [1.5, 6.0], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10064_v100/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, 4))
+    analyses.append(get_analysis("9962_v2/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, 4))
+    analyses.append(get_analysis("10484_v2/"+files, "Simulated 2017-2.7 4-140 LiH",       [1.5, 6.0], data_dir, 4))
+    analyses.append(get_analysis("10445_v2/"+files, "Simulated 2017-2.7 4-140 None",      [1.5, 6.0], data_dir, 4))
 
-    analyses.append(get_analysis("10051_v1/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full",   [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH",       [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None",      [1.5, 5.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10051_v100/"+files, "Simulated 2017-2.7 6-140 lH2 empty", [1.5, 5.5], data_dir, 6))
+    analyses.append(get_analysis("9966_v1/"+files, "Simulated 2017-2.7 6-140 lH2 full",   [1.5, 5.5], data_dir, 6))
+    analyses.append(get_analysis("10485_v1/"+files, "Simulated 2017-2.7 6-140 LiH",       [1.5, 5.5], data_dir, 6))
+    analyses.append(get_analysis("10446_v1/"+files, "Simulated 2017-2.7 6-140 None",      [1.5, 5.5], data_dir, 6))
 
-    analyses.append(get_analysis("10052_v3/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full",   [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH",       [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None",      [1.5, 4.5], data_dir, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis("10052_v100/"+files, "Simulated 2017-2.7 10-140 lH2 empty", [1.5, 4.5], data_dir, 10))
+    analyses.append(get_analysis("9970_v1/"+files, "Simulated 2017-2.7 10-140 lH2 full",   [1.5, 4.5], data_dir, 10))
+    analyses.append(get_analysis("10486_v1/"+files, "Simulated 2017-2.7 10-140 LiH",       [1.5, 4.5], data_dir, 10))
+    analyses.append(get_analysis("10447_v1/"+files, "Simulated 2017-2.7 10-140 None",      [1.5, 4.5], data_dir, 10))
     amplitude_bin_width = 5
     amplitude_max = 25
 

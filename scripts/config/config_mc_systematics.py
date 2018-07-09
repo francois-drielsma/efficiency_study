@@ -2,12 +2,8 @@ import copy
 import xboa.common
 from xboa.bunch import Bunch
 
-def mc_file_names(datasets):
-    file_list = ["/home/cr67/work/reco/mc/"+datasets+"/*_sim.root"]
-    return file_list
-
 def rogers_mc_file_names(datasets):
-    file_list = ["/work/ast/cr67/"+datasets+"/maus_reconstruction.root"]
+    file_list = ["/work/ast/cr67/systematics/"+datasets+"/maus_reconstruction.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus, do_globals):
@@ -72,8 +68,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_extrapolation":False,
             "do_globals":do_globals,
             "do_mc":False,
-            "do_plots":False,
-            "do_cuts_plots":False,
+            "do_plots":True,
+            "do_cuts_plots":True,
             "do_tof01_weighting":False,
             "do_optics":False,
             "do_data_recorder":False,
@@ -125,6 +121,7 @@ class Config(object):
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
           "tof01_selection":False,
+          "mc_p_us":False,
           "mc_muon_us":False,
           "mc_stations_us":False,
           "mc_scifi_fiducial_us":False,
@@ -153,38 +150,50 @@ class Config(object):
     mc_true_ds_cuts["mc_muon_ds"] = True
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
-    cut_report = [[], []]
+    cut_report = [[], [], [], []]
+
     cut_report[0]  = ["hline", "all events", "hline",]
     cut_report[0] += ["scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
     cut_report[0] += ["p_tot_us", "hline",]
-    if global_through_cuts:
-        cut_report[0] += ["global_through_tof0",]
-    cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
-    cut_report[1] = ["upstream_cut", "hline", "mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline", "mc_true_us_cut"]
+
+    cut_report[1] += ["hline", "upstream_cut", "hline",]
+    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[1] += ["downstream_cut", "hline",]
+
+    cut_report[2] = ["hline", "upstream_cut", "hline",]
+    cut_report[2] += ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us",]
+    cut_report[2] += ["hline", "mc_true_us_cut", "hline"]
+
+    cut_report[3] = ["hline", "upstream_cut", "hline",]
+    cut_report[3] += ["mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds",]
+    cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
     data_dir = "output/2017-02-Systematics-3"
     analyses = []
 
-    run_tuple = ("6", "10051", [27, 31]), # ("10", "10052", [27, 30]), #("3", "10069", [27, 32]), ("4", "10064", [27, 32]) 
-    #for emit, run, tof in run_tuple:
-    #    index = 0
-    #    for i in range(10):
-    #        files = '*'+str(i)
-    #        index += 1
-    #        analyses.append(get_analysis(run+"_systematics_v3/tku_base/"+files,
-    #                    "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
-    #                    tof, data_dir, [[135, 145]], [100, 200], False))
+    #run_tuple = [("3", "10069", [1.5, 6.5], "v5"), ("4", "10064", [1.5, 6.0], "v5"),]
+    run_tuple = [("6", "10051", [1.5, 5.5], "v5"), ("10", "10052", [1.5, 4.5], "v5"),]
+    for emit, run, tof, vers in run_tuple:
+        index = 0
+        for i in range(10):
+            files = '*'+str(i)
+            index += 1
+            analyses.append(get_analysis(run+"_systematics_"+vers+"/tku_base/"+files,
+                        "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
+                        tof, data_dir, [[135, 145]], [100, 200], False))
     for name in [
-      #"tku_base",
-      #"tku_pos_plus", "tku_rot_plus", 
-      #"tku_scale_C_plus", "tku_scale_E1_plus", "tku_scale_E2_plus",
-      "tkd_scale_C_plus", #"tkd_scale_E2_plus", "tku_density_plus", 
-      #"tkd_density_plus", "tkd_rot_plus", "tkd_scale_E1_plus", "tkd_pos_plus"
+      "tku_base",
+      "tku_pos_plus", "tku_rot_plus", 
+      "tku_scale_C_plus", "tku_scale_E1_plus", "tku_scale_E2_plus",
+      "tku_density_plus",
+      "tkd_pos_plus", "tkd_rot_plus", 
+      "tkd_scale_C_plus", "tkd_scale_E1_plus", "tkd_scale_E2_plus",
+      "tkd_density_plus",
     ]:
-        for emit, run, tof in run_tuple:
+        for emit, run, tof, vers in run_tuple:
             files = "*"
-            analyses.append(get_analysis(run+"_systematics_v4/"+name+"/"+files,
+            analyses.append(get_analysis(run+"_systematics_"+vers+"/"+name+"/"+files,
                             "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+name, 
                             tof, data_dir, [[135, 145]], [90, 170], False))
     print "Planned", len(analyses), "analyses"
@@ -214,9 +223,9 @@ class Config(object):
         "resolution":1.,
     }
 
-    tof0_offset = 0.18
+    tof0_offset = 0.18+25.4
     tof1_offset = 0.
-    tof2_offset = 0.
+    tof2_offset = -27.7
 
     # z position of central absorber (used for offsetting
     z_apertures = 0.
@@ -255,8 +264,8 @@ class Config(object):
 
     ]
     upstream_aperture_cut = {
-        "global_through_virtual_diffuser_us":100.,
-        "global_through_virtual_diffuser_ds":100.,
+        "global_through_virtual_diffuser_us":90.,
+        "global_through_virtual_diffuser_ds":90.,
     }
     downstream_aperture_cut = {
         "global_through_virtual_lh2_us_window_flange_1":100.,
@@ -303,6 +312,8 @@ class Config(object):
         }
     }
 
+    bz_tku = 3e-3
+    bz_tkd = -2e-3
     z_afc = 16955.74
     # z position of apertures (z, maximum radius, name)
     # Notes from Jason: 209.6 to fixed flange

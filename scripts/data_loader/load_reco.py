@@ -18,6 +18,7 @@ class LoadReco(object):
         self.time_offsets = {"tof0":self.config.tof0_offset,
                             "tof1":self.config.tof1_offset,
                             "tof2":self.config.tof2_offset}
+        self.do_rejects = True
 
 
     def load(self, event, spill, ev_number):
@@ -206,8 +207,7 @@ class LoadReco(object):
                     try:
                         self.nan_check(track_point.covariance())
                     except Exception:
-                        #print "\nCov nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event
-                        #print "    ", [x for x in track_point.covariance()]
+                        print "\nCov nan", [x for x in track_point.covariance()]
                         this_track_points.append({
                           "detector":detector+"_nan",
                           "hit":{"z":999},
@@ -233,7 +233,7 @@ class LoadReco(object):
                 try:
                     self.nan_check(tp_dict.values())
                 except:
-                    #print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
+                    print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
                     this_track_points.append({
                       "detector":detector+"_nan",
                       "hit":{"z":999},
@@ -241,6 +241,13 @@ class LoadReco(object):
                     break
                 pr_tracks = [prtk for prtk in scifi_event.helicalprtracks() if prtk.get_tracker() == track.tracker()]
                 #print detector, "with", len(pr_tracks), "helical pr tracks"
+                rejects = {"sz_chi2":[0.], "xy_chi2":[0.], "sz_r":[0.], "n_sp":[0], "tracker":[0]}
+                if self.do_rejects:
+                    try:
+                        rejects = self.load_rejects(track.pr_track_pointer())
+                    except ReferenceError:
+                        print "Loading rejects failed - disabling"
+                        self.do_rejects = False
                 this_track_points.append({
                   "hit":Hit.new_from_dict(tp_dict, "energy"),
                   "detector":detector,
@@ -249,7 +256,7 @@ class LoadReco(object):
                   "chi2":track.chi2(),
                   "ndf":track.ndf(),
                   "max_r2":-99., # maximum radius squared between this track point and the next one in the same tracker
-                  "rejects":self.load_rejects(track.pr_track_pointer()),
+                  "rejects":rejects,
                 })
             this_track_points = sorted(this_track_points)
             this_track_points = self.set_max_r_alt(this_track_points)
@@ -275,6 +282,8 @@ class LoadReco(object):
         if len(track_point_list) == 0:
             return track_point_list
         detector = track_point_list[0]["detector"]
+        if "nan" in detector:
+            return track_point_list
         detector = detector[:3]
         bz = {"tku":self.config.bz_tku, "tkd":self.config.bz_tkd}[detector]
         utilities.r_max.get_r_max(track_point_list, bz)

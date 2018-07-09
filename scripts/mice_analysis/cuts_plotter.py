@@ -93,6 +93,18 @@ class CutsPlotter(AnalysisBase):
         will_cut_list = ["scifi_tracks_ds"]
         self.birth_var_1d_cut_list("tkd", "scifi_n_planes_with_clusters", wont_cut_list, will_cut_list, [-0.5, 15.5], 16, {}, [])
 
+        # MC plots (MC inefficiency)
+        if self.config_anal["do_mc"]:
+            will_cut_list = self.get_cut_list("mc_true_ds_cuts", [])
+            wont_cut_list = self.get_cut_list("ds cut", [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "p", wont_cut_list, will_cut_list, [90., 170.], 100, {}, [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "pz", wont_cut_list, will_cut_list, [90., 170.], 100, {}, [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "x", wont_cut_list, will_cut_list, [-200., 200.], 100, {}, [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "px", wont_cut_list, will_cut_list, [-100., 100.], 100, {}, [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "y", wont_cut_list, will_cut_list, [-200., 200.], 100, {}, [])
+            self.birth_var_1d_cut_list("mc_virtual_tkd_tp", "py", wont_cut_list, will_cut_list, [-200., 200.], 100, {}, [])
+
+
         self.birth_cuts_summary()
 
     def process(self):
@@ -157,7 +169,8 @@ class CutsPlotter(AnalysisBase):
                         max_r2 = max(max_r2, hit["max_r2"])
                 data.append(max_r2**0.5)
             else:
-                data.append(event[detector][var])
+                if event[detector]:
+                    data.append(event[detector][var])
         return data
 
     def get_cut_list(self, sample, cut_exception_list):
@@ -165,6 +178,8 @@ class CutsPlotter(AnalysisBase):
             "us cut":self.config.upstream_cuts,
             "ds cut":self.config.downstream_cuts,
             "ex cut":self.config.extrapolation_cuts,
+            "mc_true_us_cuts":self.config.mc_true_us_cuts,
+            "mc_true_ds_cuts":self.config.mc_true_ds_cuts,
         }[sample]
         cut_list = [key for key in cut_dict if cut_dict[key]]
         cut_list = copy.deepcopy(cut_list)
@@ -260,8 +275,6 @@ class CutsPlotter(AnalysisBase):
         data = self.get_data(detector, var, wont_cut_list, will_cut_list)
         if len(data) == 0:
             if min_max[0] == None:
-                for det in self.data_loader.detector_list():
-                    print "   ", det
                 raise RuntimeError("Failed to find var_1d data for "+detector+" "+var+" with no min set")
             else:
                 data.append(min_max[0]-1.) # dummy underflow variable

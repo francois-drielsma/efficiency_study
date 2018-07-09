@@ -5,6 +5,10 @@ import operator
 import json
 import numpy
 import tempfile
+import glob
+import shutil
+import os
+
 
 import ROOT
 import xboa.common as common
@@ -65,6 +69,10 @@ class AmplitudeAnalysis(AnalysisBase):
     def birth(self):
         self.set_plot_dir("amplitude")
         self.load_errors()
+        try:
+            os.mkdir(self.plot_dir+"/phase_space")
+        except OSError:
+            pass
         self.append_data()
 
     def process(self):
@@ -95,6 +103,15 @@ class AmplitudeAnalysis(AnalysisBase):
             self.cdf_ratio_plot(suffix)
             self.amplitude_scatter_plot(suffix)
         self.print_data()
+        self.move_data()
+
+    def move_data(self):
+        target_dir = self.plot_dir+"/data"
+        os.mkdir(target_dir)
+        file_list = glob.glob(self.a_dir+"/*")
+        for a_file in file_list:
+            file_name = os.path.split(a_file)[1]
+            shutil.copy(a_file, target_dir+"/"+file_name)
 
     def delta_amplitude_calc(self, suffix):
         """
@@ -129,7 +146,7 @@ class AmplitudeAnalysis(AnalysisBase):
         for name, amp_data in [("all_upstream", data_0),
                            ("all_downstream", data_1)]:
             data[name]["emittance"] = amp_data.get_emittance()
-            data[name]["weight"] = sum(amp_data.n_events)
+            data[name]["weight"] = amp_data.get_n_events()
             data[name]["covariance_matrix"] = amp_data.cov.tolist()
             data[name]["bin_edge_list"] = self.bin_edge_list
         print "  upstream  ", data["all_upstream"]["pdf"], "sum", sum(data["all_upstream"]["pdf"])
@@ -138,8 +155,13 @@ class AmplitudeAnalysis(AnalysisBase):
         data["migration_matrix"] = self.migration_matrix(fractional_amplitude_dict_0, fractional_amplitude_dict_1, False)
         data["upstream_scraped"], data["upstream_not_scraped"] = self.get_delta_pdfs(fractional_amplitude_dict_0, fractional_amplitude_dict_1)
         self.amplitudes[suffix] = data
-        PlotAmplitudeData(data_0, self.plot_dir, "us").plot()
-        PlotAmplitudeData(data_1, self.plot_dir, "ds").plot()
+
+        us_plotter = PlotAmplitudeData(data_0, self.plot_dir, "us")
+        us_plotter.plot()
+
+        ds_plotter = PlotAmplitudeData(data_1, self.plot_dir, "ds")
+        ds_plotter.plot()
+
         print "  done amplitude calc                ", datetime.datetime.now()
 
     def get_bin_centre_list(self):
@@ -194,6 +216,42 @@ class AmplitudeAnalysis(AnalysisBase):
         amplitude calculation
         """
         pass
+
+    def migration_matrix_alt(self, fractional_amplitude_dict_0, fractional_amplitude_dict_1):
+        """
+        Generate a migration matrix to migrate from distribution 0 to distribution 1
+        * fractional_amplitude_dict_0: dictionary of <event_id>:amplitude
+        * fractional_amplitude_dict_1: dictionary of <event_id>:amplitude
+        <event_id> can be any hashable id; it has to be the same for dict_0 and dict_1
+
+        Builds the number of events N_0 and N_1 in each distribution; set matrix 
+        so that N_1 = M N_0; overflow bin is allowed
+        
+        WRONG!
+        """
+        n_bins = len(self.bin_edge_list)
+        # bin the data
+        n_0 = [0. for i in range(n_bins)]
+        n_1 = [0. for i in range(n_bins)]
+        for amp in fractional_amplitude_dict_0.values():
+            amp_bin = bisect.bisect_left(self.bin_edge_list, amp)-1
+            n_0[amp_bin] += 1.
+        for amp in fractional_amplitude_dict_1.values():
+            amp_bin = bisect.bisect_left(self.bin_edge_list, amp)-1
+            n_1[amp_bin] += 1.
+
+        migration_matrix = [[0. for i in range(n_bins)]  for j in range(n_bins)]
+        for i in range(n_bins):
+            for j in range(n_bins):
+                if n_0[j] < 0.5:
+                    if i == j:
+                        migration_matrix[i][j] = 1.
+                    else:
+                        migration_matrix[i][j] = 0.
+                else:
+                    migration_matrix[i][j] = n_1[i]/n_0[j]
+
+        return migration_matrix
 
 
     def migration_matrix(self, fractional_amplitude_dict_0, fractional_amplitude_dict_1, normalise):
@@ -265,7 +323,8 @@ class AmplitudeAnalysis(AnalysisBase):
                 inefficiency.append(1.)
             else:
                 inefficiency.append(float(all_mc_pdf[i])/reco_mc_pdf[i])
-        self.amplitudes["inefficiency"][target] = {"pdf_ratio":inefficiency}
+        ineff_migration = self.migration_matrix_alt(fractional_reco_mc, fractional_reco)
+        self.amplitudes["inefficiency"][target] = {"pdf_ratio":inefficiency, "migration_matrix":ineff_migration}
         self.amplitudes["crossing_probability"][target] = {}
         self.amplitudes["crossing_probability"][target]["migration_matrix"] = \
                       self.migration_matrix(fractional_reco, fractional_reco_mc, True)
@@ -883,7 +942,6 @@ class AmplitudeAnalysis(AnalysisBase):
         self.all_mc_data_ds.append_hits(hits_all_mc_ds)
         self.reco_mc_data_ds.append_hits(hits_reco_mc_ds)
         self.reco_data_ds.append_hits(hits_reco_ds)
-        return
         print "Loaded upstream:"
         print "    reco:   ", len(hits_reco_us)
         print "    all mc: ", len(hits_all_mc_us)
@@ -892,6 +950,7 @@ class AmplitudeAnalysis(AnalysisBase):
         print "    reco:   ", len(hits_reco_ds)
         print "    all mc: ", len(hits_all_mc_ds)
         print "    reco mc:", len(hits_reco_mc_ds)
+        return
 
     def print_data(self):
         fout = open(self.plot_dir+"/amplitude.json", "w")

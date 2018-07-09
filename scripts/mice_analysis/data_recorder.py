@@ -20,6 +20,8 @@ class DataRecorder(AnalysisBase):
         self.config = config
         self.config_anal = config_anal
         self.hit_vars = ("x", "px", "y", "py", "pz")
+        self.tof0_detector = "tof0"
+        self.tof1_detector = "tof1"
         self.upstream_detector = "tku_5"
         self.downstream_detector = "tkd_tp"
         self.hits_file_dict = {}
@@ -56,15 +58,23 @@ class DataRecorder(AnalysisBase):
                 cut = file_data["cut"]
                 if event[cut]:
                     continue
-                detector = file_data["detector"]
+                tk_detector = file_data["detector"]
                 fout = file_data["file"]
+                tk_hit, tof0_hit, tof1_hit = None, None, None
                 for hit in event["data"]:
-                    if hit["detector"] == detector:
-                        self.write_hit(hit, fout)
+                    if hit["detector"] == tk_detector:
+                        tk_hit = hit["hit"]
+                    elif hit["detector"] == self.tof0_detector:
+                        tof0_hit = hit["hit"]
+                    elif hit["detector"] == self.tof1_detector:
+                        tof1_hit = hit["hit"]
+                if tk_hit == None or tof0_hit == None or tof1_hit == None:
+                    continue
+                self.write_hit(tk_hit, tof0_hit, tof1_hit, fout)
 
-    def write_hit(self, hit, fout):
-        hit = hit["hit"]
-        out = [hit[var] for var in self.hit_vars]
+    def write_hit(self, tk_hit, tof0_hit, tof1_hit, fout):
+        out = [tk_hit[var] for var in self.hit_vars]
+        out += [tof0_hit["t"], tof1_hit["t"]]
         fout.write(json.dumps(out)+"\n")
 
     def death(self):

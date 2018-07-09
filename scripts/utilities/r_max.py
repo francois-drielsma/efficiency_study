@@ -76,7 +76,11 @@ def get_r_max(track_point_list, bz):
     points by extrapolating assuming uniform field and calculate the excursion
     analytically. Sets the max_r2 parameter on the track.
     """
-    q = track_point_list[0]["hit"]["charge"]
+    try:
+        q = track_point_list[0]["hit"]["charge"]
+    except KeyError:
+        print track_point_list[0]["hit"], track_point_list[0]["detector"]
+        raise
     if abs(q) < 1e-9:
         raise ValueError("Attempt to find r max on track with no charge")
     track_point_list = sorted(track_point_list, key = lambda tp: tp["hit"]["z"])

@@ -142,6 +142,10 @@ class LoadMC(object):
         # will_cut if not a muon
         if detector == "mc_virtual_tku_tp":
             self.virtual_cuts_tmp[0] = ("mc_muon_us", abs(hit["pid"]) != 13)
+            p_bins = self.config_anal["p_bins"]
+            p_low = min(min(p_bins))
+            p_high = max(max(p_bins))
+            self.virtual_cuts_tmp[6] = ("mc_p_us", hit["p"] > p_high or hit["p"] < p_low)
         elif detector == "mc_virtual_tkd_tp":
             self.virtual_cuts_tmp[3] = ("mc_muon_ds", abs(hit["pid"]) != 13)
          # will cut if > 150 mm
@@ -222,4 +226,4 @@ class LoadMC(object):
         return {}, loaded_mc_vector
 
     virtual_cut_list = ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us",
-                        "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds"]
+                        "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_us", ]

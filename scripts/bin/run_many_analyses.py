@@ -9,7 +9,7 @@ import utilities.run # check that the path is correct
 
 def run_analysis(jobs, cards_list, logs):
     if utilities.run.Run.is_scarf():
-        n_procs = 40
+        n_procs = 100
     else:
         n_procs = 3
     config = {
@@ -17,7 +17,7 @@ def run_analysis(jobs, cards_list, logs):
         'n_procs':n_procs,
         'extra_args':[],
         'delta_t':60,
-        'max_t':60*60*24,
+        'max_t':60*60*96,
         'logs':logs,
     }
     for cards in cards_list:
@@ -27,7 +27,7 @@ def run_analysis(jobs, cards_list, logs):
         analysis_pool.run_many()
 
 def main_mc_analysis():
-    job_list = range(16)
+    job_list = [0, 4, 8, 12] #range(16)
     cards_list = ["scripts/config/config_mc.py",] #] # "scripts/config_mc.py", 
     logs = 'logs/mc-logs'
     run_analysis(job_list, cards_list, logs)
@@ -39,7 +39,7 @@ def main_reco_analysis():
     run_analysis(job_list, cards_list, logs)
         
 def main_systematics_analysis():
-    job_list = range(1)
+    job_list = range(50)
     cards_list = ["scripts/config/config_mc_systematics.py",] #
     logs = 'logs/systematics-logs'
     run_analysis(job_list, cards_list, logs)
@@ -51,8 +51,8 @@ def main_both_analysis():
     run_analysis(job_list, cards_list, logs)
 
 if __name__ == "__main__":
-    #main_reco_analysis()
+    main_reco_analysis()
     #main_systematics_analysis()
-    main_mc_analysis()
+    #main_mc_analysis()
     #main_both_analysis()
 

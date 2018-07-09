@@ -132,7 +132,6 @@ class Config(object):
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
           "tof01_selection":False,
-          "mc_p_us":False,
           "mc_muon_us":False,
           "mc_stations_us":False,
           "mc_scifi_fiducial_us":False,
@@ -172,19 +171,19 @@ class Config(object):
 
 
     data_dir = "output/2017-02-Test/" # to which data is written
-    src_dir = "MAUS-TOF-ReFit"
+    src_dir = "MAUS-Test-4-npe"
     correct_amplitude = True
     analyses = []
     # BUG need to fix the systematics "emittance"
-    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [1.5, 6.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
 
-    analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True))
-    analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
+    analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [1.5, 6.0], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
 
     analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
     analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True))
@@ -205,7 +204,7 @@ class Config(object):
     will_load_tk_space_points = True # determines whether data loader will attempt to load tracker space points
     will_load_tk_track_points = True # determines whether data loader will attempt to load tracker track points
     number_of_spills = None # if set to an integer, limits the number of spills loaded for each sub-analysis
-    preanalysis_number_of_spills = 500 # number of spills to analyse during "pre-analysis"
+    preanalysis_number_of_spills = 100 # number of spills to analyse during "pre-analysis"
     analysis_number_of_spills = 100 # number of spills to analyse during each "analysis" step
     momentum_from_tracker = True # i.e. not from TOFs
     time_from = "tof1"

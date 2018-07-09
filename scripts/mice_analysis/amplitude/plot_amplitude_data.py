@@ -1,57 +1,134 @@
+import math
 import numpy
+import os
 
 import xboa.common
+import ROOT
+
+import utilities.root_style
 
 class PlotAmplitudeData(object):
-      def __init__(self, amplitude_data, plot_dir, key):
-          self.data = amplitude_data
-          self.plot_dir = plot_dir
-          self.key = key
+    def __init__(self, amplitude_data, plot_dir, key):
+        self.data = amplitude_data
+        self.plot_dir = plot_dir
+        self.key = key
 
-      def plot(self):
-          self.plot_data_1d("emittance_vs_n_events_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.n_events_lambda, "Number of Events")
-          self.plot_data_1d("emittance_vs_beta_x_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_x_lambda, "#beta_{x} [mm]")
-          self.plot_data_1d("emittance_vs_beta_y_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_y_lambda, "#beta_{y} [mm]")
+    def plot(self):
+        self.plot_data_1d("emittance_vs_n_events_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.n_events_lambda, "Number of Events")
+        self.plot_data_1d("emittance_vs_beta_x_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_x_lambda, "#beta_{x} [mm]")
+        self.plot_data_1d("emittance_vs_beta_y_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_y_lambda, "#beta_{y} [mm]")
+        for i in range(4):
+            for j in range(i+1, 4):
+                self.plot_phase_space(i, j)
 
-      def plot_data_1d(self, plot_name, plot_lambda_x, x_label, plot_lambda_y, y_label):
-          x_axis = []
-          y_axis = []
-          if len(self.data.state_list) == 0:
-              print "Warning - no data for emittance vs beta plots/etc"
-              return
-          for state in self.data.state_list:
-              x_axis.append(plot_lambda_x(state))
-              y_axis.append(plot_lambda_y(state))
-          canvas = xboa.common.make_root_canvas("plot")
-          hist, graph = xboa.common.make_root_graph(plot_name, x_axis, x_label, y_axis, y_label)
-          canvas.Draw()
-          hist.Draw()
-          graph.SetMarkerStyle(24)
-          graph.Draw("SAME P")
-          for fmt in ["png", "pdf", "root"]:
-              canvas.Print(self.plot_dir+"/"+plot_name+"."+fmt)
+    def plot_data_1d(self, plot_name, plot_lambda_x, x_label, plot_lambda_y, y_label):
+        if len(self.data.state_list) == 0:
+            print "Warning - no data for emittance vs beta plots/etc"
+            return
+        marker = 24
+        x_axis = []
+        y_axis = []
+        for sample_states in self.data.state_list:
+            for state in sample_states:
+                x_axis.append(plot_lambda_x(state))
+                y_axis.append(plot_lambda_y(state))
+            hist, graph = xboa.common.make_root_graph(plot_name, x_axis, x_label, y_axis, y_label)
+            canvas = xboa.common.make_root_canvas("plot")
+            canvas.Draw()
+            hist.Draw()
+        for sample_states in self.data.state_list:
+            x_axis = []
+            y_axis = []
+            for state in sample_states:
+                x_axis.append(plot_lambda_x(state))
+                y_axis.append(plot_lambda_y(state))
+            hist, graph = xboa.common.make_root_graph(plot_name, x_axis, x_label, y_axis, y_label)
+            graph.SetMarkerStyle(marker)
+            marker += 1
+            graph.Draw("SAME P")
+        canvas.Update()
+        for fmt in ["png", "pdf", "root"]:
+            canvas.Print(self.plot_dir+"/phase_space/"+plot_name+"."+fmt)
 
-      @classmethod
-      def emittance_4d_lambda(cls, state):
-          return state["emittance"]
+    def plot_phase_space(self, x_var, y_var):
+        x_label = self.psv_labels[x_var]
+        y_label = self.psv_labels[y_var]
+        title = "amplitude_phase_space_"+self.key+"_"+self.psv_names[x_var]+"_"+self.psv_names[y_var]
+        canvas = xboa.common.make_root_canvas(title)
+        x_data, y_data = [], []
+        for sample in range(2):
+            for a_bin in range(21):
+                for run, spill, evt, psv, amp in self.data.retrieve(a_bin, sample):
+                    x_data.append(psv[x_var])
+                    y_data.append(psv[y_var])
 
-      @classmethod
-      def n_events_lambda(cls, state):
-          return state["n_events"]
+        hist = xboa.common.make_root_histogram(title, x_data, x_label, 50, y_data, y_label, 50)
+        canvas.SetFrameFillColor(utilities.root_style.get_frame_fill())
+        hist.Draw("COLZ")
+        delta_list = [-10, -7, -4, 1, 3]
+        for color, sample in [(ROOT.kGreen, 0), (ROOT.kRed, 1)]: 
+            step = len(self.data.state_list[sample])/len(delta_list)+1
+            for i, ellipse in enumerate(self.data.state_list[sample][::step]):
+                my_color = color+4
+                if i < len(delta_list):
+                    my_color = color+delta_list[i]
+                graph = self.plot_ellipse(ellipse, x_var, y_var)
+                graph.SetLineColor(my_color)
+        canvas.Update()
+        for fmt in ["root", "png", "pdf"]:
+            canvas.Print(self.plot_dir+"/phase_space/"+title+"."+fmt)
 
-      @classmethod
-      def beta_x_lambda(cls, state):
-          return cls.beta_2d(state, 0)
+    @classmethod
+    def plot_ellipse(cls, ellipse, var_1, var_2):
+        mean = [ellipse["mean"][var_1], ellipse["mean"][var_2]]
+        cov = [[ellipse["cov"][i][j] for i in [var_1, var_2]] for j in [var_1, var_2]]
+        try:
+            points = xboa.common.make_shell(41, numpy.array(cov))
+        except Exception:
+            graph = ROOT.TGraph()
+            return graph
+        graph = ROOT.TGraph(len(points)+1)
+        points = [(a_point[0, 0], a_point[0, 1]) for a_point in points]
+        points = sorted(points, key = lambda points: math.atan2(points[1], points[0]))
+        points.append(points[0])
+        for i, a_point in enumerate(points):
+            graph.SetPoint(i, a_point[0]+mean[0], a_point[1]+mean[1])
+        graph.SetLineWidth(2)
+        graph.Draw("SAME L")
+        cls.root_objects.append(graph)
+        return graph
 
-      @classmethod
-      def beta_y_lambda(cls, state):
-          return cls.beta_2d(state, 2)
 
-      @classmethod
-      def beta_2d(cls, state, axis):
-          twod_matrix = [item[axis:axis+2] for item in state["cov"][axis:axis+2]]
-          emit = numpy.linalg.det(twod_matrix)**0.5/cls.mu_mass
-          beta = twod_matrix[0][0]/emit
-          return beta
+    @classmethod
+    def emittance_4d_lambda(cls, state):
+        return state["emittance"]
 
-      mu_mass = xboa.common.pdg_pid_to_mass[13]
+    @classmethod
+    def n_events_lambda(cls, state):
+        return state["n_events"]
+
+    @classmethod
+    def beta_x_lambda(cls, state):
+        return cls.beta_2d(state, 0)
+
+    @classmethod
+    def beta_y_lambda(cls, state):
+        return cls.beta_2d(state, 2)
+
+    @classmethod
+    def beta_2d(cls, state, axis):
+        twod_matrix = [item[axis:axis+2] for item in state["cov"][axis:axis+2]]
+        emit = numpy.linalg.det(twod_matrix)**0.5/cls.mu_mass
+        beta = twod_matrix[0][0]/emit
+        return beta
+
+    psv_names = ["x", "px", "y", "py"]
+    psv_labels = [
+        "x [mm]",
+        "p_{x} [MeV/c]",
+        "y [mm]",
+        "p_{y} [MeV/c]",
+    ]
+
+    mu_mass = xboa.common.pdg_pid_to_mass[13]
+    root_objects = []
