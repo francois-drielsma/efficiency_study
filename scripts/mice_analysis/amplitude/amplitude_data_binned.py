@@ -41,12 +41,12 @@ class AmplitudeDataBinned(object):
         self.min_events = 1000 # minimum number of events in the cov calculation
         self.min_bin = 4 # minimum bin to apply amplitude iterative procedure
         self.n_bins = len(self.bins) # we have an overflow bin
+        self.n_samples = 2
         for i in range(self.n_bins-1):
             if self.bins[i+1] - self.bins[i] < 1e-6:
                 print "Found bins:", self.bins
                 raise ValueError("Bin spacing is too small for bin "+str(i))
         self.mass = mass # for emittance calculation
-        self.clear()
         self.state_list = [[], []]
 
     def __del__(self):

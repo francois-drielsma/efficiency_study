@@ -1,5 +1,6 @@
 import bisect
 
+import utilities.r_max
 import xboa.common
 from xboa.hit import Hit
 
@@ -138,35 +139,48 @@ class LoadMC(object):
         #self.virtual_dict[my_det].append(z_pos)
         return my_det
 
-    def virtual_cuts(self, detector, hit):
-        # will_cut if not a muon
-        if detector == "mc_virtual_tku_tp":
-            self.virtual_cuts_tmp[0] = ("mc_muon_us", abs(hit["pid"]) != 13)
-            p_bins = self.config_anal["p_bins"]
-            p_low = min(min(p_bins))
-            p_high = max(max(p_bins))
-            self.virtual_cuts_tmp[6] = ("mc_p_us", hit["p"] > p_high or hit["p"] < p_low)
-        elif detector == "mc_virtual_tkd_tp":
-            self.virtual_cuts_tmp[3] = ("mc_muon_ds", abs(hit["pid"]) != 13)
-         # will cut if > 150 mm
-        if "mc_virtual_tku" in detector:
-            self.virtual_cuts_tmp[2] = ("mc_scifi_fiducial_us", hit["r"] > 150. or self.virtual_cuts_tmp[1][1])
-        elif "mc_virtual_tku" in detector:
-            self.virtual_cuts_tmp[5] = ("mc_scifi_fiducial_ds", hit["r"] > 150. or self.virtual_cuts_tmp[1][1])
-        mc_stations = self.config.mc_plots["mc_stations"]
-        for station in mc_stations["tku"]:
-            if station == detector:
-                self.station_count["tku"].add(station)
-        self.virtual_cuts_tmp[1] = ("mc_stations_us", len(self.station_count["tku"]) != len(mc_stations["tku"]) )
-        for station in mc_stations["tkd"]:
-            if station == detector:
-                self.station_count["tkd"].add(station)
-        self.virtual_cuts_tmp[4] = ("mc_stations_ds", len(self.station_count["tkd"]) != len(mc_stations["tkd"]) )
+    def virtual_cuts(self, loaded_virtual_vector):
+        # default to failed cut
+        virtual_cuts = {}
+        for cut in self.virtual_cut_list:
+            virtual_cuts[cut] = False
+        mc_tku_stations = self.config.mc_plots["mc_stations"]["tku"]
+        mc_tkd_stations = self.config.mc_plots["mc_stations"]["tkd"]
+        mc_tku_hits = {}
+        mc_tkd_hits = {}
+        tku_p_low = min([min(p_bin) for p_bin in self.config_anal["p_bins"]])
+        tku_p_high = max([max(p_bin) for p_bin in self.config_anal["p_bins"]])
+        tkd_p_low = self.config_anal["p_tot_ds_low"]
+        tkd_p_high = self.config_anal["p_tot_ds_high"]
+        for virtual_hit in loaded_virtual_vector:
+            detector = virtual_hit["detector"]
+            hit = virtual_hit["hit"]
+            if detector in mc_tku_stations and abs(hit["pid"]) == 13:
+                mc_tku_hits[detector] = virtual_hit
+            elif detector in mc_tkd_stations and abs(hit["pid"]) == 13:
+                mc_tkd_hits[detector] = virtual_hit
+        if "mc_virtual_tku_tp" in mc_tku_hits:
+            hit = mc_tku_hits["mc_virtual_tku_tp"]["hit"]
+            virtual_cuts["mc_p_us"] = hit["p"] > tku_p_high or hit["p"] < tku_p_low
+        if "mc_virtual_tkd_tp" in mc_tkd_hits:
+            hit = mc_tkd_hits["mc_virtual_tkd_tp"]["hit"]
+            virtual_cuts["mc_p_ds"] = hit["p"] > tkd_p_high or hit["p"] < tkd_p_low
+        virtual_cuts["mc_stations_us"] = len(mc_tku_hits) != len(mc_tku_stations)
+        virtual_cuts["mc_stations_ds"] = len(mc_tkd_hits) != len(mc_tkd_stations)
+        for bz, hit_dict, key in [(self.config.bz_tku, mc_tku_hits, "us"),
+                             (self.config.bz_tkd, mc_tkd_hits, "ds")]:
+            if len(hit_dict) < 2:
+                continue
+            hit_list = hit_dict.values()
+            hit_list = sorted(hit_list, key = lambda hit: hit["hit"]["z"])
+            utilities.r_max.get_r_max(hit_list, bz)
+            # the last hit in the hit_list doesnt get a max_r2 added...
+            max_r2 = max([hit["max_r2"] for hit in hit_list[:-1]])
+            virtual_cuts["mc_scifi_fiducial_"+key] = max_r2 > self.config_anal["tracker_fiducial_radius"]**2
+        return virtual_cuts
 
     def load_virtuals(self, virtual_vector):
         loaded_virtual_vector = [None]*len(virtual_vector)
-        self.virtual_cuts_tmp = [(cut, False) for cut in self.virtual_cut_list]
-        self.station_count = {"tku":set(), "tkd":set()}
         for i, virtual_hit in enumerate(virtual_vector):
             hit = xboa.hit.Hit()
             hit["x"] = virtual_hit.GetPosition().x()
@@ -194,8 +208,8 @@ class LoadMC(object):
                 "detector":detector,
             }
             loaded_virtual_vector[i] = loaded_virtual
-            self.virtual_cuts(detector, hit)
-        return dict(self.virtual_cuts_tmp), loaded_virtual_vector
+        virtual_cuts = self.virtual_cuts(loaded_virtual_vector)
+        return virtual_cuts, loaded_virtual_vector
 
     def load_mc_hits(self, mc_vector, detector, station_lambda):
         loaded_mc_vector = [None]*len(mc_vector)
@@ -222,8 +236,7 @@ class LoadMC(object):
                 "detector":detector+"_"+str(hit["station"]),
             }
             loaded_mc_vector[i] = loaded_mc
-        #print "Loaded", [mc["detector"] for mc in loaded_mc_vector]
         return {}, loaded_mc_vector
 
-    virtual_cut_list = ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us",
-                        "mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_us", ]
+    virtual_cut_list = ["mc_stations_us", "mc_scifi_fiducial_us", "mc_p_us",
+                        "mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]

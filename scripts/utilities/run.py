@@ -66,7 +66,7 @@ class Run(object):
         if self.is_scarf():
             bsub = ['bsub',
                     '-n', '1',
-                    '-W', '96:00',
+                    '-W', '48:00',
                     '-q', 'scarf-ibis',
                     '-o', log_name,
                     '-e', log_name,

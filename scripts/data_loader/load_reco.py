@@ -297,8 +297,8 @@ class LoadReco(object):
             else:
                 max_r2[1] = max(max_r2[1], tp["max_r2"])
         fiducial_r2 = self.config_anal["tracker_fiducial_radius"]**2
-        return [max_r2[0] > fiducial_r2, max_r2[0] > fiducial_r2]
-                
+        return [max_r2[0] > fiducial_r2, max_r2[1] > fiducial_r2]
+
     def load_scifi_event(self, scifi_event):
         will_cut_on_scifi_cluster = self.will_cut_on_scifi_clusters(scifi_event)
         will_cut_on_scifi_space_points = self.will_cut_on_scifi_space_points(scifi_event)

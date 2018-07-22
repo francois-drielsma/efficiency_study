@@ -18,6 +18,7 @@ from xboa.bunch import Bunch
 import utilities.chi2_distribution
 from utilities.binomial_confidence_interval import BinomialConfidenceInterval
 
+from mice_analysis.amplitude.weighting import Weighting
 from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
 from mice_analysis.amplitude.amplitude_data_binless import AmplitudeDataBinless
 from mice_analysis.analysis_base import AnalysisBase
@@ -39,6 +40,8 @@ class AmplitudeAnalysis(AnalysisBase):
         self.a_dir = tempfile.mkdtemp()
         file_name = self.a_dir+"/amp_data_"
         mu_mass = common.pdg_pid_to_mass[13]
+        self.us_color = ROOT.kOrange+4
+        self.ds_color = ROOT.kGreen+3
         AmplitudeData = self.get_amplitude_algorithm()
         self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
         self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
@@ -46,8 +49,6 @@ class AmplitudeAnalysis(AnalysisBase):
         self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
-        self.us_color = ROOT.kOrange+4
-        self.ds_color = ROOT.kGreen+3
 
     def get_amplitude_algorithm(self):
         if self.config_anal['amplitude_algorithm'] == 'binned':
@@ -68,9 +69,19 @@ class AmplitudeAnalysis(AnalysisBase):
 
     def birth(self):
         self.set_plot_dir("amplitude")
+        self.all_mc_data_us.clear()
+        self.reco_mc_data_us.clear()
+        self.reco_data_us.clear()
+        self.all_mc_data_ds.clear()
+        self.reco_mc_data_ds.clear()
+        self.reco_data_ds.clear()
         self.load_errors()
         try:
             os.mkdir(self.plot_dir+"/phase_space")
+        except OSError:
+            pass
+        try:
+            os.mkdir(self.plot_dir+"/weighting")
         except OSError:
             pass
         self.append_data()
@@ -93,6 +104,7 @@ class AmplitudeAnalysis(AnalysisBase):
             for suffix in ["reco_mc", "all_mc"]:
                 self.pdf_plot(suffix)
                 self.amplitude_scatter_plot(suffix)
+            self.efficiency_plot()
         for suffix in ["reco"]:
             self.corrections_and_uncertainties(suffix)
             self.cdf_data(suffix)
@@ -163,6 +175,16 @@ class AmplitudeAnalysis(AnalysisBase):
         ds_plotter.plot()
 
         print "  done amplitude calc                ", datetime.datetime.now()
+
+    def efficiency_plot(self):
+        weighting = Weighting(self.reco_mc_data_ds, self.all_mc_data_ds, self.plot_dir)
+        weighting.plot_sum("x", 20, [-200., 200.], "y", 20, [-200., 200.])
+        weighting.plot_sum("x", 20, [-200., 200.], "px", 20, [-100., 100.])
+        weighting.plot_sum("x", 20, [-200., 200.], "py", 20, [-100., 100.])
+        weighting.plot_sum("y", 20, [-200., 200.], "px", 20, [-100., 100.])
+        weighting.plot_sum("y", 20, [-200., 200.], "py", 20, [-100., 100.])
+        weighting.plot_sum("px", 20, [-100., 100.], "py", 20, [-100., 100.])
+
 
     def get_bin_centre_list(self):
         """

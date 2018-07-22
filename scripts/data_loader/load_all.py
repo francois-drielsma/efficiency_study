@@ -200,8 +200,6 @@ class LoadAll(object):
                 if value and self.config.extrapolation_cuts[key]:
                     event["extrapolation_cut"] = True
                 if value and self.config.mc_true_us_cuts[key]:
-                    if not event["upstream_cut"]:
-                        print "mc_true_us_cut", key, value
                     event["mc_true_us_cut"] = True
                 if value and self.config.mc_true_ds_cuts[key]:
                     event["mc_true_ds_cut"] = True

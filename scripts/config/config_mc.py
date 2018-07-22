@@ -18,7 +18,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     return file_list
 
 def get_systematics_dir(emittance, suffix):
-    a_dir = "output/2017-02-Systematics/plots_Simulated_2017-2.7_"+str(emittance)+\
+    a_dir = "output/2017-02-Systematics-5/plots_Simulated_2017-2.7_"+str(emittance)+\
            "-140_lH2_empty_Systematics_"+suffix+"/amplitude/amplitude.json"
     return a_dir
 
@@ -136,10 +136,9 @@ class Config(object):
           "global_through_tof2":False,
           "tof01_selection":False,
           "mc_p_us":False,
-          "mc_muon_us":False,
           "mc_stations_us":False,
           "mc_scifi_fiducial_us":False,
-          "mc_muon_ds":False,
+          "mc_p_ds":False,
           "mc_stations_ds":False,
           "mc_scifi_fiducial_ds":False,
     }
@@ -157,13 +156,12 @@ class Config(object):
     extrapolation_cuts["global_through_tkd_tp"] = True
     extrapolation_cuts["global_through_tof2"] = True
     mc_true_us_cuts = copy.deepcopy(upstream_cuts)
-    mc_true_us_cuts["mc_muon_us"] = True
     mc_true_us_cuts["mc_stations_us"] = True
     mc_true_us_cuts["mc_scifi_fiducial_us"] = True
     mc_true_ds_cuts = copy.deepcopy(mc_true_us_cuts)
-    mc_true_ds_cuts["mc_muon_ds"] = True
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
+    mc_true_ds_cuts["mc_p_ds"] = True
     cut_report  = [[], [], [], [], []]
     cut_report[0] = ["hline", "all events", "hline",]
     cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
@@ -179,13 +177,13 @@ class Config(object):
     cut_report[2] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
     cut_report[2] += ["extrapolation_cut", "hline"]
 
-    cut_report[3] += ["hline", "upstream_cut", "hline",]
-    cut_report[3] += ["mc_muon_us", "mc_stations_us", "mc_scifi_fiducial_us", "hline",]
-    cut_report[3] += ["mc_true_us_cut", "hline",]
+    cut_report[3] = ["hline", "upstream_cut", "hline",]
+    cut_report[3] += ["mc_stations_us", "mc_scifi_fiducial_us",]
+    cut_report[3] += ["hline", "mc_true_us_cut", "hline"]
 
-    cut_report[4] += ["hline", "mc_true_us_cut", "hline",]
-    cut_report[4] += ["mc_muon_ds", "mc_stations_ds", "mc_scifi_fiducial_ds", "hline",]
-    cut_report[4] += ["mc_true_ds_cut", "hline"]
+    cut_report[4] = ["hline", "mc_true_us_cut", "hline",]
+    cut_report[4] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
+    cut_report[4] += ["hline", "mc_true_ds_cut", "hline"]
 
     data_dir = "output/2017-02-Test"
     files = "*"

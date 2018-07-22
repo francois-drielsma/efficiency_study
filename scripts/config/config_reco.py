@@ -20,7 +20,7 @@ def reco_file_names(run_number_list, maus, do_globals):
 def get_amplitude_source(emittance, tk, name):
     if emittance == False or emittance == None:
         return None
-    amplitude_source = "output/2017-02-Systematics/plots_Simulated_2017-2.7_"
+    amplitude_source = "output/2017-02-Systematics-5/plots_Simulated_2017-2.7_"
     amplitude_source += str(emittance)+"-140_lH2_empty_Systematics_"+tk+"_"
     amplitude_source += name+"/amplitude/amplitude.json"
     return amplitude_source
@@ -133,10 +133,9 @@ class Config(object):
           "global_through_tof2":False,
           "tof01_selection":False,
           "mc_p_us":False,
-          "mc_muon_us":False,
           "mc_stations_us":False,
           "mc_scifi_fiducial_us":False,
-          "mc_muon_ds":False,
+          "mc_p_ds":False,
           "mc_stations_ds":False,
           "mc_scifi_fiducial_ds":False,
     }
