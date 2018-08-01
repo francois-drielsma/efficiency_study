@@ -86,18 +86,20 @@ def plot_hps(z_list, different_markers):
         return [graph]
 
 def plot_tracker_stations(z_list, btot_list):
+    tku_trp = 15068
+    tkd_trp = 18836.8+8.
     tracker_z_positions = [ # Ref email from Melissa 12th Jan 2017
-        (13968.0, "tku_5"),
-        (14319.0, "tku_4"),
-        (14618.0, "tku_3"),
-        (14867.0, "tku_2"),
-        (15068.0, "tku_tp"),
-        (15068.0/2.+18756.0/2., "absorber"),
-        (18756.0, "tkd_tp"),    
-        (18955.0, "tkd_2"),
-        (19206.0, "tkd_3"),
-        (19505.0, "tkd_4"),
-        (19855.0, "tkd_5"),
+        (tku_trp-1100., "tku_5"),
+        (tku_trp-750., "tku_4"),
+        (tku_trp-450., "tku_3"),
+        (tku_trp-200., "tku_2"),
+        (tku_trp, "tku_tp"),
+        ((tku_trp+tkd_trp)/2., "absorber"),
+        (tkd_trp, "tkd_tp"),    
+        (tkd_trp+200., "tkd_2"),
+        (tkd_trp+450., "tkd_3"),
+        (tkd_trp+750., "tkd_4"),
+        (tkd_trp+1100., "tkd_5"),
     ]
     graph_list = []
     for z_pos, station in tracker_z_positions:
@@ -194,7 +196,7 @@ def main():
     Make a plot of z, bz
     """
     # set up datacards (geometry specified e.g. on command line using --simulation_geometry_filename)
-    my_dir = "plots/field/"
+    my_dir = "field/"
     if os.path.exists(my_dir):
         shutil.rmtree(my_dir)
     os.makedirs(my_dir)

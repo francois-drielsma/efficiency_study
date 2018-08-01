@@ -14,12 +14,15 @@ class MergeCutsSummaryTex(object):
         # table captions
         self.caption = ""
         self.vertical_splits = 8
+        self.table_ref_pre = ""
 
     def append_summary(self, config, dir_selection):
         for i, a_dir in enumerate(config.conglomerate_dir):
+            print "Adding...", a_dir+config.cuts_tex,
             if i not in dir_selection:
                 continue
             self.summary_list_of_lists.append(glob.glob(a_dir+config.cuts_tex))
+            print len(self.summary_list_of_lists), "files"
     
     def parse_one_line(self, line):
         words_tmp = line.split("&")
@@ -87,7 +90,7 @@ class MergeCutsSummaryTex(object):
             end = min((table_index+1)*self.vertical_splits, len(self.data[0][0]))
             cell_format = "{l|"+"c"*(end-start)+"}\n"
             table_ref = file_name.split(".")[0]
-            table_ref = table_ref+"_"+str(table_index)
+            table_ref = self.table_ref_pre+table_ref+"_"+str(table_index)
             print >> fout, """
 \\begin{landscape}
 \\begin{table}
@@ -105,6 +108,7 @@ class MergeCutsSummaryTex(object):
                     item = self.data[file_number][row][column]
                     if row == 0:
                         item = "\\splitcell{"+item.replace(" ", "\\\\")+"}"
+                        item = item.replace("_", " ")
                     print >> fout, "&", str(item).rjust(8),
                 if self.headings[file_number][row] != "\hline":
                     print >> fout, "\\\\",

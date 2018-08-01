@@ -285,10 +285,10 @@ class Hacking(object):
 
 
 def file_list(src_dir, emittance, absorber, suffix):
-    name = "output/"+src_dir+"/plots_Simulated_2017-2.7_"
+    name = "from_scarf/"+src_dir+"/plots_Simulated_2017-2.7_"
     name += str(emittance)+"-140_"+absorber+"_Systematics_"+suffix
     name += "/amplitude/amplitude.json"
-    name_list = glob.glob(name)
+    name_list = sorted(glob.glob(name))
     if len(name_list) == 0:
         print name
         raise KeyError("Failed to find names for "+str(name))
@@ -354,13 +354,28 @@ def do_copy(input_dir, emittance_list, output_dir):
                 shutil.copy(src_file, target_file)
 
 
+def copy_more(input_dir, output_dir):
+    a_dir_list = glob.glob("from_scarf/"+input_dir+"/*tku_base/amplitude/weighting")
+    for a_dir in a_dir_list:
+        print a_dir
+        my_bl = a_dir.split("2017-2.7_")[1]
+        my_bl = my_bl.split("_lH2_empty")[0]
+        print my_bl
+        target_dir = output_dir+"/"+my_bl+"_efficiency"
+        try:
+            shutil.rmtree(target_dir)
+        except OSError:
+            pass
+        shutil.copytree(a_dir, target_dir)
+
 def main():
     utilities.root_style.setup_gstyle()
-    output_dir = "output/2017-02-Systematics/systematics_summary/"
+    output_dir = "from_scarf/2017-02-Systematics/systematics_summary/"
     
     #do_copy("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
-    do_upstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
-    do_downstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
+    copy_more("2017-02-Systematics", output_dir)
+    #do_upstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
+    #do_downstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
 
     return
 

@@ -345,7 +345,7 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
             self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
-                                        ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.801, 1.599], replace_hist = True,
+                                        ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.601, 1.599], replace_hist = True,
                                         graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[1, 1], graph_draw_order=[1,0], modifiers=ratio_modifiers),
         ]
 
@@ -369,14 +369,14 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
             self.get_conglomerate_graph("pdf_ratio*", "Reconstructed Amplitude [mm]",
                                         "#frac{Number out}{Number in}",
                                         "pdf_ratio", ["PDF Ratio stats_hist"],
-                                        ["PDF_Ratio stats", "PDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.01, 1.999], replace_hist = True,
+                                        ["PDF_Ratio stats", "PDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.01, 2.999], replace_hist = True,
                                         graph_draw_option = ["p", "2", "p", "2"], graph_marker_style=[20, 20, 22, 22], 
                                         graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
                                         modifiers=ratio_modifiers),
             self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
-                                        ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.801, 1.599], replace_hist = True,
+                                        ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 59.9], y_range = [0.601, 1.599], replace_hist = True,
                                         graph_draw_option = ["p", "2", "p", "2"], graph_marker_style=[20, 20, 22, 22], 
                                         graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
                                         modifiers=ratio_modifiers),
@@ -430,6 +430,28 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         for fail in fail_list:
             print "    ", fail
 
+def systematics():
+    target_dir = "from_scarf/2017-02-Systematics/"
+    dir_list = [
+        "2017-2.7_3-140_lH2_empty_Systematics_tku_base",  "2017-2.7_4-140_lH2_empty_Systematics_tku_base",
+        "2017-2.7_6-140_lH2_empty_Systematics_tku_base",  "2017-2.7_10-140_lH2_empty_Systematics_tku_base", 
+    ]
+    mc_cuts_summary = MergeCutsSummaryTex()
+    mc_cuts_summary.table_ref_pre = "systematics_"
+    for beam in dir_list:
+        config = CompareConfig()
+        config.setup(beam, target_dir, "cut_plots/", "compare_cuts/", False, True)
+        config.mc_caption = [["" for i in range(5)] for i in range(5)]
+        mc_prefix = ["upstream reconstructed", "downstream reconstructed", "extrapolated reconstructed",
+                     "upstream truth", "downstream truth"]
+        for i, prefix in enumerate(mc_prefix):
+            for j, item in enumerate(config.mc_caption[i]):
+                config.mc_caption[i][j] = "The "+prefix+" simulated sample is listed. "+item
+        mc_cuts_summary.append_summary(config, [0])
+
+    mc_cuts_summary.caption = config.mc_caption
+    mc_cuts_summary.merge_summaries(target_dir+"/cuts_summary/mc/", "mc_cuts_summary")
+
 def main(batch_level = 0):
     """
     Main program; 
@@ -437,12 +459,14 @@ def main(batch_level = 0):
     """
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-Test/"
+    target_dir = "from_scarf/2017-02/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
     if batch_level < 10 and hide_root_errors:
         ROOT.gErrorIgnoreLevel = 6000
+    systematics()
+    raw_input("Done systematics - press <CR> to continue to the rest")
     #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir)
     my_dir_list = [
         ["2017-2.7_3-140_None",  "2017-2.7_3-140_lH2_empty",  "2017-2.7_3-140_lH2_full",  "2017-2.7_3-140_LiH"], 

@@ -26,7 +26,8 @@ def material_to_colour(material):
     if material in ("Galactic"):
         return None
     elif material in ("AIR", "He"):
-        return ROOT.kYellow
+        return None
+        #return ROOT.kYellow
     if material in ("Fe"): # "kill volumes"
         return 1
     if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
@@ -123,17 +124,17 @@ def get_z_tk():
 def plot_trackers():
     initialise_maus()
     old_time = time.time()
-    plot_materials(-200.1, 200.1, 1., 13000, 20000., 1., name = "geometry")
+    plot_materials(-250.1, 250.1, 1., 12000, 23000., 1., name = "materials")
     tk_list = get_z_tk()
     print tk_list
-    for name, z_tk in tk_list:
+    for z_tk, name in tk_list:
         plot_materials(-2.1, 2.1, 0.01, z_tk-2., z_tk+2, 0.1, name = name)
     print "Plotting took", time.time() - old_time, "seconds"
     print "Found the following materials", MATERIAL_LIST 
 
 def main():
     plot_trackers()
-    raw_input()
+    #raw_input()
 
 if __name__ == "__main__":
     main()
