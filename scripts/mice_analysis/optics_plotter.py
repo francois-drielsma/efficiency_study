@@ -232,12 +232,20 @@ class OpticsPlotter(AnalysisBase):
         z_var = self.ellipse_variables.index("z")
         pred =  lambda ellipse: ellipse["mean"][z_var] >= self.min_z_us
         z_list = [ellipse["mean"][z_var]*1e-3 for ellipse in ellipse_list if pred(ellipse)]
+        #print "Ellipse list"
+        #for ellipse in ellipse_list:
+        #    print ellipse
+        units = 1.
+        if "beta" in var:
+            units = 1.e-3
         if sub_var == None:
             var_list = [ellipse[var] for ellipse in ellipse_list if pred(ellipse)]
         else:
-            var_list = [ellipse[var][sub_var] for ellipse in ellipse_list if pred(ellipse)]
-        if "beta" in var:
-            var_list = [ellipse[var][sub_var]*1e-3 for ellipse in ellipse_list if pred(ellipse)]
+            #try:
+            var_list = [ellipse[var][sub_var]*units for ellipse in ellipse_list if pred(ellipse)]
+            #except TypeError:
+            #    print "TYPE ERROR", var, sub_var, ellipse
+            #    raise
         name, axis = self.name_lookup(var, sub_var, cut)
         hist, graph = self.make_root_graph(name, name+"_"+prefix,
                       z_list, "z [m]", var_list, axis, True,

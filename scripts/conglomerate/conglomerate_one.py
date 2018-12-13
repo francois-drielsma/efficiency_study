@@ -167,7 +167,7 @@ class ConglomerateOne(object):
             axis.SetNdivisions(5, 5, 0)
             axis.SetLabelSize(self.label_size)
         hist_list.insert(0, hist)
-        
+
     @classmethod
     def bins(cls, hist):
         return [hist.GetBinContent(i) for i in range(hist.GetNbinsX())]
@@ -203,16 +203,27 @@ class ConglomerateOne(object):
                 hist.SetBinError(index, err)
 
     def normalise_hist(self, canvas, hist_list, graph_list):
-        if not self.options["normalise_hist"]:
+        norm = self.options["normalise_hist"]
+        if not norm:
             return
-        for hist in hist_list:
-            try:
-                n_entries = hist.GetEntries()
-            except AttributeError: # not a histogram (maybe a graph?)
-                continue
-            if n_entries == 0:
-                continue
-            hist.Scale(1./n_entries)
+        if norm == True:
+            for hist in hist_list:
+                try:
+                    n_entries = hist.GetEntries()
+                except AttributeError: # not a histogram (maybe a graph?)
+                    continue
+                if n_entries == 0:
+                    continue
+                hist.Scale(1./n_entries)
+        elif type(norm) == type([]):
+            for hist in hist_list:
+                bin_0 = hist.FindBin(norm[0])
+                bin_1 = hist.FindBin(norm[1])
+                contents = [hist.GetBinContent(i) for i in range(bin_0, bin_1+1)]
+                n_entries = sum(contents)
+                if n_entries == 0:
+                    continue
+                hist.Scale(1./n_entries)
 
     @classmethod
     def graph_max_y(cls, graph):
@@ -314,6 +325,7 @@ class ConglomerateOne(object):
             print "Will redraw", redraw["x_range"], redraw["y_range"]
             if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
                 print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
+                print json.dumps(redraw, indent=2)
                 raise RuntimeError("Failed to find all histograms for redraw")
             for i, hist in enumerate(hist_list):
                 if type(hist) == type(ROOT.TGraph()):
@@ -321,7 +333,10 @@ class ConglomerateOne(object):
                 if i >= len(redraw["line_color"]):
                     continue # ignore
                 hist.SetLineColor(redraw["line_color"][i])
-                hist.SetFillColor(redraw["fill_color"][i])
+                if redraw["transparency"] != None:
+                    hist.SetFillColorAlpha(redraw["fill_color"][i], redraw["transparency"][i])
+                else:
+                    hist.SetFillColor(redraw["fill_color"][i])
                 hist.SetLineWidth(1)
                 hist.SetMarkerStyle(redraw["marker_style"][i])
                 for axis in hist.GetXaxis(), hist.GetYaxis():
@@ -346,8 +361,10 @@ class ConglomerateOne(object):
                 "marker_style":None,
                 "marker_color":None,
                 "draw_option":["p"]*len(graph_list),
+                "transparency":None,
                 "draw_order":None,
                 "fill_color":None,
+                "fill_style":None,
             }
         if graph_draw["draw_order"] == None:
             graph_draw["draw_order"] = range(len(graph_list))
@@ -358,8 +375,15 @@ class ConglomerateOne(object):
                 graph.SetMarkerStyle(graph_draw["marker_style"][i])
             if graph_draw["marker_color"] != None:
                 graph.SetMarkerColor(graph_draw["marker_color"][i])
+            if graph_draw["fill_style"] != None:
+                graph.SetFillStyle(graph_draw["fill_style"][i])
             if graph_draw["fill_color"] != None:
-                graph.SetFillColor(graph_draw["fill_color"][i])
+                if graph_draw["transparency"] != None:
+                    graph.SetFillColorAlpha(graph_draw["fill_color"][i],
+                                            graph_draw["transparency"][i])
+                else:
+                    graph.SetFillColor(graph_draw["fill_color"][i])
+
             elif graph_draw["marker_color"] != None:
                 graph.SetFillColor(graph_draw["marker_color"][i])
             graph.Draw("SAME "+graph_draw["draw_option"][i])

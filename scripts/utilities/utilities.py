@@ -34,6 +34,8 @@ def electron_tof(detector_1, detector_2, config):
 def fractional_axis_range(data, fraction):
     data = sorted(data)
     data_len = len(data)
+    if data_len == 0:
+        return 0, 0
     half_fraction = (1.-fraction)/2.
     min_index = math.floor(half_fraction*data_len)
     max_index = math.ceil((1.-half_fraction)*data_len)
@@ -52,12 +54,15 @@ def fit_peak_data(data, nsigma=3, frac_guess=0.99):
     fit = fit_peak(hist, nsigma)
     return fit
 
-def fit_peak(hist, nsigma=3, fit_option="Q", draw_option=""):
+def fit_peak(hist, nsigma=3, fit_option="Q", draw_option="", fit_range=None):
     mean = hist.GetBinCenter(hist.GetMaximumBin())
     sigma = hist.GetRMS()
     name = hist.GetName()
     draw_color = (8, 4, 2)
+    # try to guess a good fit range
     for i in range(3):
+        if fit_range != None:
+            continue
         fit = ROOT.TF1(name+" fit", "gaus")
         fit.SetLineColor(draw_color[i])
         hist.Fit(fit, "QN", "", mean-nsigma*sigma, mean+nsigma*sigma)
@@ -65,12 +70,13 @@ def fit_peak(hist, nsigma=3, fit_option="Q", draw_option=""):
         sigma = fit.GetParameter(2)
         
     fit = ROOT.TF1(name+"_fit", "gaus")
-    #fit.SetLineColor(1)
-    #fit.SetLineStyle(3)
     fit.SetLineWidth(2)
     fit.SetLineColor(hist.GetLineColor())
     ROOT_OBJECTS.append(fit)
-    hist.Fit(fit, fit_option, draw_option, mean-nsigma*sigma, mean+nsigma*sigma)
+    if fit_range == None:
+        hist.Fit(fit, fit_option, draw_option, mean-nsigma*sigma, mean+nsigma*sigma)
+    else:
+        hist.Fit(fit, fit_option, draw_option, fit_range[0], fit_range[1])
     return fit
 
 text_boxes = []

@@ -70,6 +70,7 @@ class CompareConfig(object):
                 "redraw":{
                     "draw_option":["P E1 PLC", ""],
                     "fill_color":[1, ROOT.kOrange-2],
+                    "transparency":None,
                     "line_color":[1, 1],
                     "marker_style":[20, 20],
                     "draw_order":[1, 0],
@@ -124,6 +125,7 @@ class CompareConfig(object):
                 "redraw":{
                     "draw_option":["P E1 PLC", ""],
                     "fill_color":[1, ROOT.kOrange-2],
+                    "transparency":None,
                     "line_color":[1, 1],
                     "marker_style":[20, 20],
                     "draw_order":[1, 0],
@@ -173,6 +175,7 @@ class CompareConfig(object):
                 "redraw":{
                     "draw_option":["COLZ"],
                     "fill_color":[1],
+                    "transparency":None,
                     "line_color":[1],
                     "marker_style":[20],
                     "draw_order":[0],
@@ -261,6 +264,7 @@ class CompareConfig(object):
                 "redraw":{
                     "draw_option":[""],
                     "fill_color":[1],
+                    "transparency":None,
                     "line_color":[1],
                     "marker_style":[20],
                     "draw_order":[0],
@@ -272,6 +276,8 @@ class CompareConfig(object):
                         "marker_style":graph_marker_style,
                         "marker_color":graph_marker_color,
                         "fill_color":None,
+                        "fill_style":None,
+                        "transparency":None,
                         "draw_order":graph_draw_order,
                     }
                 },

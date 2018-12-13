@@ -25,6 +25,7 @@ class ConglomerateMerge(object):
         canvas_names = set()
         for cong_base in self.conglomerate_list:
             for cong in cong_base.conglomerations:
+                print "MERGE_ALL FILE NAME", cong.dir_path
                 canvas_names.add(cong.options["canvas_name"])
         for name in canvas_names:
             self.merge_one(name)
@@ -58,7 +59,7 @@ class ConglomerateMerge(object):
         y_min=0.895
         if do_isis:
             y_min = 0.75
-        text_box = ROOT.TPaveText(0.6, y_min, 0.99, 0.99, "NDC")
+        text_box = ROOT.TPaveText(0.7, y_min, 0.99, 0.99, "NDC")
         text_box.SetTextSize(0.05)
         text_box.SetFillColor(0)
         text_box.SetBorderSize(0)
@@ -91,30 +92,39 @@ class ConglomerateMerge(object):
         extra_labels = cong_list[0].conglomerations[0].options["extra_labels"]
         if not extra_labels:
             return
-        left_m = 0.128
-        right_m = 0.1
-        top_m = 0.1
-        bottom_m = 0.1
+        left_m = 0.13
+        right_m = 0.125
+        top_m = 0.11
+        bottom_m = 0.12
+        text_height = 0.05
         x_step = (1.0-left_m-right_m)/self.cols
         for i, item in enumerate(extra_labels["top"]):
-            text_box = ROOT.TPaveText(left_m+x_step*i, 1.0-top_m, left_m+x_step*(i+1), 1.0, "NDC")
+            row_btm = 1.0-top_m
+            row_top = row_btm+text_height
+            text_box = ROOT.TPaveText(left_m+x_step*i, row_btm,
+                                      left_m+x_step*(i+1), row_top, "NDC")
             text_box.SetTextSize(0.04)
             text_box.SetFillColor(0)
             text_box.SetBorderSize(0)
             print "Setting text", item
-            text_box.AddText(item)
+            for line in item.split("\n"):
+                text_box.AddText(line)
             text_box.Draw()
             self.root_objects.append(text_box)
         y_step = (1.0-top_m-bottom_m)/self.rows
         for i, item in enumerate(extra_labels["right"]):
-            text_box = ROOT.TPaveText(1.0-right_m, 1.0-top_m-y_step*(i+1),
-                                      0.99, 1.0-top_m-y_step*(i), "NDC")
+            lines = item.split("\n")
+            row_btm = 1.0-top_m-y_step*(i+0.5)-len(lines)/2.*text_height
+            row_top = row_btm + len(lines)*text_height
+            text_box = ROOT.TPaveText(1.0-right_m, row_top,
+                                      0.99, row_btm, "NDC")
             text_box.SetTextSize(0.04)
             text_box.SetTextAlign(12)
             text_box.SetFillColor(0)
             text_box.SetBorderSize(0)
             print "Setting text", item
-            text_box.AddText(item)
+            for line in lines:
+                text_box.AddText(line)
             text_box.Draw()
             self.root_objects.append(text_box)
 
@@ -151,7 +161,11 @@ class ConglomerateMerge(object):
         pad.Divide(self.cols, self.rows, 0., 0.)
         for i in range(self.rows):
             for j in range(self.cols):
-                cong_base = self.conglomerate_list[hist_index]
+                try:
+                    cong_base = self.conglomerate_list[hist_index]
+                except Exception:
+                    print "Exception while looping over pads in ", i, j
+                    print "Failed to find hist", hist_index, "in", canvas_name
                 for cong in cong_base.conglomerations:
                     if cong.options["canvas_name"] == canvas_name:
                         break
@@ -159,7 +173,8 @@ class ConglomerateMerge(object):
                 source_y_axis = cong.y_axis
                 self.draw_cong(pad.GetPad(hist_index+1), cong, i, j)
                 hist_index += 1
-                self.do_mice_logo(i == 0 and j == 3)
+                if cong.options["mice_logo"]:
+                    self.do_mice_logo(i == 0 and j == self.rows)
 
         merge_canvas.cd()
         if source_x_axis:

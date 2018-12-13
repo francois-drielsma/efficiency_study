@@ -1,4 +1,5 @@
 import copy
+import json
 
 def mc_file_names(job_name, datasets):
     file_list = ["/home/cr67/work/reco/mc/"+job_name+"/"+datasets+"/*_sim.root"]
@@ -17,29 +18,57 @@ def reco_file_names(run_number_list, maus, do_globals):
     print file_list
     return file_list
 
-def get_amplitude_source(emittance, tk, name):
-    if emittance == False or emittance == None:
-        return None
-    amplitude_source = "output/2017-02-Systematics-5/plots_Simulated_2017-2.7_"
-    amplitude_source += str(emittance)+"-140_lH2_empty_Systematics_"+tk+"_"
-    amplitude_source += name+"/amplitude/amplitude.json"
-    return amplitude_source
+def get_systematics_dir(emittance, suffix, absorber):
+    a_dir = "output/2017-02-Systematics-5/plots_Simulated_2017-2.7_"+str(emittance)+\
+           "-140_"+absorber+"_Systematics_"+suffix+"/amplitude/amplitude.json"
+    return a_dir
+
+def get_systematics(emittance):
+    systematics = {
+      "reco":{
+        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
+        "performance_reference":get_systematics_dir(emittance, "tku_base_alt", "lH2_empty"),
+        "all_upstream":{
+          "detector_systematics":{
+            get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_scale_E1_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_scale_C_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_scale_E2_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_density_plus", "lH2_empty"):1.,
+          },
+          "performance_systematics":{}
+        },
+        "all_downstream":{
+          "detector_systematics":{
+            get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_scale_E1_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_scale_C_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_scale_E2_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty"):1.,
+          },
+          "performance_systematics":{
+            get_systematics_dir(emittance, "tkd_fiducial_radius", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_chi2_threshold", "lH2_empty"):1.,
+          }
+        }
+      },
+    }
+    return systematics
 
 
-def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitude_source, p_bins, tkd_cut, do_globals):
+
+def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittance, p_bins, tkd_cut, do_globals):
     plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
     max_p = max([max(a_bin) for a_bin in p_bins])
-    amp_systematic_sources = {}
-    for tracker in ["tku", "tkd"]:
-        for variable in ["pos_plus", "rot_plus", "scale_E1_plus", "scale_C_plus", "scale_E2_plus"]:
-            this_source = get_amplitude_source(amplitude_source, tracker, variable)
-            if this_source != None:
-                amp_systematic_sources[this_source] = 1.
 
-    return {
+    analysis_variables = {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
+            "tof0_n_sp":1,
+            "tof1_n_sp":1,
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
             "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
@@ -56,10 +85,12 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":get_amplitude_source(amplitude_source, "tku", "base"),
-            "amplitude_systematic_reference":get_amplitude_source(amplitude_source, "tku", "base"),
-            "amplitude_systematic_sources":amp_systematic_sources,
+            "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tkd_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tku_fiducial_radius":150.,
+            "tkd_fiducial_radius":150.,
+            "amplitude_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
+            "amplitude_systematics":get_systematics(emittance),
             "field_uncertainty":0.02,
             "csv_output_detectors":["tof1", "diffuser_us", "diffuser_mid", "diffuser_ds"], # write data at listed detector locations
             "csv_output_filename":"test", #"8590_mc_extrapolated_tracks.csv", # write a summary output of data in flat text format to listed filename; set to None to do nothing
@@ -69,7 +100,6 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "weight_tof01_source":None,
             "weight_tof01_target":plot_dir+"tof01_weights",
             "weight_tof01_mode":"build_distribution",
-            "tracker_fiducial_radius":150.,
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
@@ -85,6 +115,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, amplitud
             "do_optics":True,
             "do_data_recorder":True,
     }
+    return analysis_variables
 
 
 class Config(object):
@@ -96,7 +127,6 @@ class Config(object):
     tk_plane = 0
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
-    global_through_cuts = True
     upstream_cuts = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
           "any_cut":None,
           "scifi_space_clusters":False,
@@ -126,8 +156,9 @@ class Config(object):
           "downstream_aperture_cut":False,
           "delta_tof01":False, #True, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
-          "global_through_tof0":global_through_cuts,
+          "global_through_tof0":False,
           "global_through_tof1":False,
+          "global_through_us_apertures":True,
           "global_through_tku_tp":False,
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
@@ -140,7 +171,7 @@ class Config(object):
           "mc_scifi_fiducial_ds":False,
     }
     downstream_cuts = copy.deepcopy(upstream_cuts)
-    downstream_cuts["p_tot_ds"] = True
+    downstream_cuts["p_tot_ds"] = False
     downstream_cuts["tof2_sp"] = False
     downstream_cuts["pvalue_ds"] = False
     downstream_cuts["chi2_ds"] = True
@@ -158,23 +189,21 @@ class Config(object):
     cut_report[0] = ["hline", "all events", "hline",]
     cut_report[0] += ["tof_1_sp", "tof_0_sp", "scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
     cut_report[0] += ["tof01", "p_tot_us", "hline",]
-    if global_through_cuts:
-        cut_report[0] += ["global_through_tof0"] #, "delta_tof01",]
+    cut_report[0] += ["global_through_us_apertures"]
     cut_report[0] += ["upstream_aperture_cut", "hline",]
     cut_report[0] += ["upstream_cut", "hline",]
     cut_report[1] += ["hline", "upstream_cut", "hline",]
-    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "hline",]
     cut_report[1] += ["downstream_cut", "hline",]
     cut_report[2] =  ["hline", "downstream_cut", "hline",]
     cut_report[2] += ["downstream_aperture_cut", "tof_2_sp", "global_through_tkd_tp", "global_through_tof2", "hline",]
     cut_report[2] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-Test/" # to which data is written
-    src_dir = "MAUS-TOF-ReFit"
+    data_dir = "output/2017-02-7-v2/"
+    src_dir = "MAUS-Drielsma-ReFit"
     correct_amplitude = True
     analyses = []
-    # BUG need to fix the systematics "emittance"
     analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
     analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
     analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True))
@@ -291,8 +320,8 @@ class Config(object):
     for z, dummy, plane in virtual_detectors:
         print z, plane
     upstream_aperture_cut = {
-        "global_through_virtual_diffuser_us":100.,
-        "global_through_virtual_diffuser_ds":100.,
+        "global_through_virtual_diffuser_us":90.,
+        "global_through_virtual_diffuser_ds":90.,
     }
     downstream_aperture_cut = {
         "global_through_virtual_lh2_us_window_flange_1":100.,

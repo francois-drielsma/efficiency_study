@@ -8,7 +8,7 @@ import shutil
 
 class Run(object):
     def __init__(self, config):
-        self.prefix = 'simulation'
+        self.prefix = ['simulation']
         self.config = config
         self.jobs = config['jobs']
         self.n_procs = config['n_procs']
@@ -24,7 +24,7 @@ class Run(object):
             shutil.rmtree(self.logs)
         except OSError:
             pass
-        os.makedirs(self.logs+"/bsub")
+        os.makedirs(self.logs+"/sbatch")
         
 
     def run_many(self):
@@ -44,7 +44,8 @@ class Run(object):
             print len(self.processes)
             while len(self.processes) < self.n_procs and len(job_list) > 0:
                 job = job_list.pop(0)
-                self.processes.append(self.run_one(job))
+                for cards in self.prefix:
+                    self.processes.append(self.run_one(job, cards))
             timer += self.delta_t
             if timer > self.max_t:
                 print 'Out of time ... killing all jobs'
@@ -52,35 +53,45 @@ class Run(object):
                 job_list = []
             time.sleep(self.delta_t)
         try:
-            print subprocess.check_output(['bjobs'])
+            print subprocess.check_output(['squeue', '-u', 'scarf148'])
         except OSError:
             pass # not on scarf
         print "Done"
 
-    def run_one(self, unique_id):
+    def make_sbatch_file(self, unique_id, command):
+        file_name = "logs/tmp/run_one_analysis_"+unique_id+".sbatch"
+        fout = open(file_name, "w")
+        print >> fout, "#!/bin/sh\n#SBATCH"
+        for item in command:
+            print >> fout, item,
+        print >> fout
+        return file_name
+
+    def run_one(self, unique_id, cards):
+        sbatch_name = cards.split(".")[0]
+        sbatch_name = sbatch_name.split("/")[-1]
         unique_id = str(unique_id)
-        log_name = self.logs+"/analysis_"+unique_id+".log"
-        cards = self.prefix
-        run = ['python', 'scripts/bin/run_one_analysis.py', cards, unique_id]+self.extra_args
-        bsub_name = ""
+        log_name = self.logs+"/analysis_"+sbatch_name+"_"+unique_id+".log"
+        command = ['python', 'scripts/bin/run_one_analysis.py', cards, unique_id]+self.extra_args
         if self.is_scarf():
-            bsub = ['bsub',
+            sbatch_filename = self.make_sbatch_file(unique_id, command)
+            print "Command for sbatch", command
+            command = ['sbatch',
                     '-n', '1',
-                    '-W', '48:00',
-                    '-q', 'scarf-ibis',
+                    '--time', '3-0', # minutes, 3 days 0 hrs
+                    '-p', 'ibis',
                     '-o', log_name,
                     '-e', log_name,
+                    sbatch_filename
                 ]
-            run = bsub+run
-            bsub_name = self.prefix.split(".")[0]
-            bsub_name = bsub_name.split("/")[-1]
-            bsub_name = self.logs+"/bsub/"+bsub_name+"_"+str(unique_id)+"_bsub.log"
-            log_file = open(bsub_name, 'w')
+            sbatch_name = self.logs+"/sbatch/"+sbatch_name+"_"+str(unique_id)+"_bsub.log"
+            log_file = open(sbatch_name, 'w')
         else:
             log_file = open(log_name, 'w')
-        subproc = subprocess.Popen(run, stdout=log_file, stderr=subprocess.STDOUT)
-        print "\nRunning", cards, unique_id, "in process id", subproc.pid
-        return subproc, bsub_name
+        subproc = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT)
+        print "Running command", command, "in process id", subproc.pid
+        print 
+        return subproc, sbatch_name
 
     @classmethod
     def is_scarf(cls):
@@ -91,9 +102,7 @@ class Run(object):
         line = open(bsub_name).readline()
         if line == "":
             return None
-        bjob_number = line.split(' ')[1]
-        bjob_number = bjob_number.rstrip('>')
-        bjob_number = bjob_number.lstrip('<')
+        bjob_number = line.split(' ')[3]
         return int(bjob_number)
 
     def poll(self, verbose = False):
@@ -123,22 +132,17 @@ class Run(object):
         processes_update = []
         for proc, bsub_name in self.processes:
             bjob_number = self.get_bjob_number(bsub_name)
-            output = subprocess.check_output(['bjobs', '-prw', str(bjob_number)])
+            output = subprocess.check_output(['squeue', '-u', 'scarf148'])
             okay = False
             for line in output.split('\n'):
-                is_alive = False
-                for alive_key in ['PEND', 'RUN']:
-                    is_alive = is_alive or alive_key in line
-                if self.prefix in line and str(bjob_number) in line and is_alive:
+                if str(bjob_number) in line:
                     processes_update.append((proc, bsub_name))
                     okay = True
                     break
             if not okay:
                 print "Process with id", proc.pid, "and bsub log", bsub_name, "died"
-            short_text = subprocess.check_output(['bjobs', str(bjob_number)])
             if verbose:
-                print '   ', proc.pid, dir_name, bjob_number, short_text 
-
+                print '   ', proc.pid, bjob_number
         return processes_update
 
     def kill_all(self):
@@ -157,7 +161,7 @@ class Run(object):
         for proc, dir_name in self.processes:
             bjob_number = self.get_bjob_number(dir_name)
             try:
-                output = subprocess.check_output(['bkill', str(bjob_number)])
+                output = subprocess.check_output(['scancel', str(bjob_number)])
             except Exception:
                 pass
 

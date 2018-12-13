@@ -34,6 +34,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             ).tolist()
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
+            "tof0_n_sp":1, # number of space points required in TOF0
+            "tof1_n_sp":1, # number of space points required in TOF1
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
             "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
@@ -50,15 +52,21 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "amplitude_source":None,
+            "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tkd_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "amplitude_corrections":None,
+            "amplitude_systematics":{},
             "field_uncertainty":0.02,
             "amplitude_chi2":False,
             "amplitude_mc":True,
             "weight_tof01_source":"output/2017-02_mc_weighting/plots_3-140-empty/tof01_weights",
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
-            "tracker_fiducial_radius":150.,
+            "amplitude_systematic_reference":None,
+            "amplitude_recon_systematic_sources":{},
+            "amplitude_performance_systematic_sources":{},
+            "tku_fiducial_radius":150.,
+            "tkd_fiducial_radius":150.,
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
@@ -67,7 +75,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_amplitude":True,
             "do_extrapolation":False,
             "do_globals":do_globals,
-            "do_mc":False,
+            "do_mc":True,
             "do_plots":True,
             "do_cuts_plots":True,
             "do_tof01_weighting":False,
@@ -85,7 +93,6 @@ class Config(object):
     tk_plane = 0
     # prerequisite for space point cut
     will_require_triplets = False #True # require triplet space points
-    global_through_cuts = False
     upstream_cuts = { # Set to true to make data_plotter and amplitude_analysis use these cuts; False to ignore the cut
           "any_cut":None,
           "scifi_space_clusters":False,
@@ -115,8 +122,9 @@ class Config(object):
           "downstream_aperture_cut":False,
           "delta_tof01":False, #extrapolatedtof01 compared to recon tof01
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
-          "global_through_tof0":global_through_cuts,
+          "global_through_tof0":False,
           "global_through_tof1":False,
+          "global_through_us_apertures":False,
           "global_through_tku_tp":False,
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
@@ -129,7 +137,7 @@ class Config(object):
           "mc_scifi_fiducial_ds":False,
     }
     downstream_cuts = copy.deepcopy(upstream_cuts)
-    downstream_cuts["p_tot_ds"] = True
+    downstream_cuts["p_tot_ds"] = False
     downstream_cuts["tof2_sp"] = False
     downstream_cuts["pvalue_ds"] = False
     downstream_cuts["chi2_ds"] = True
@@ -156,7 +164,7 @@ class Config(object):
     cut_report[0] += ["upstream_cut", "hline",]
 
     cut_report[1] += ["hline", "upstream_cut", "hline",]
-    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds", "hline",]
+    cut_report[1] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "hline",]
     cut_report[1] += ["downstream_cut", "hline",]
 
     cut_report[2] = ["hline", "upstream_cut", "hline",]
@@ -167,39 +175,86 @@ class Config(object):
     cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-Systematics-5"
+    data_dir = "output/2017-02-7-Systematics-v1"
     analyses = []
 
-    #analyses.append(get_analysis("10052_systematics_v100/tku_base/000?",
-    #            "Simulated 2017-2.7 10-140 lH2 empty Systematics test",
-    #            [1.5, 4.5], data_dir, [[135, 145]], [90, 170], False))
-    run_tuple = [("3", "10069", [1.5, 6.5], "v100"),
-                 ("4", "10064", [1.5, 6.0], "v100"),
-                 ("6", "10051", [1.5, 5.5], "v100"),
-                 ("10", "10052", [1.5, 4.5], "v100"),]
-    systematics_list = [
-      "tku_base",
-      "tku_pos_plus", "tku_rot_plus", 
-      "tku_scale_C_plus", "tku_scale_E1_plus", "tku_scale_E2_plus",
-      "tku_density_plus",
-      "tkd_pos_plus", "tkd_rot_plus", 
-      "tkd_scale_C_plus", "tkd_scale_E1_plus", "tkd_scale_E2_plus",
-      "tkd_density_plus",
+
+    files = "*"
+    lih_systematics_list = [
+      "mc_base", "mc_lih_plus"
     ]
-    for emit, run, tof, vers in run_tuple:
-        index = 0
+    lh2_systematics_list = [
+      "mc_base", "mc_beam_offset_plus", "mc_lh2_plus",
+      "mc_ssu_match_plus", "mc_beam_offset_minus", "mc_fc_plus",
+      "mc_ssd_match_plus",
+    ]
+    empty_systematics_list = [
+      "tku_base",
+      "tku_pos_plus", "tku_rot_plus", "tku_density_plus",
+      "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
+      "tkd_pos_plus", "tkd_rot_plus", "tkd_density_plus",
+      "tkd_scale_SSDC_plus", "tkd_scale_SSDE1_plus", "tkd_scale_SSDE2_plus",
+    ]
+    cuts = {}
+    suffix = None
+
+    run_list = [
+        ["3",  "10069", [1.5, 6.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["4",  "10064", [1.5, 6.0], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["6",  "10051", [1.5, 5.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["10", "10052", [1.5, 4.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["3",  "9971", [1.5, 6.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["4",  "9962", [1.5, 6.0], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["6",  "9966", [1.5, 5.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["10", "9970", [1.5, 4.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["3",  "10483", [1.5, 6.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
+        ["4",  "10484", [1.5, 6.0], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
+        ["6",  "10485", [1.5, 5.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
+        ["10", "10486", [1.5, 4.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
+    ]
+    tmp_run_list = []
+    for a_run in run_list:
         for i in range(10):
-            files = '*'+str(i)
-            index += 1
-            analyses.append(get_analysis(run+"_systematics_"+vers+"/tku_base/"+files,
-                        "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+str(index),
-                        tof, data_dir, [[135, 145]], [90, 170], False))
-    for name in systematics_list:
-        for emit, run, tof, vers in run_tuple:
-            files = "*"
-            analyses.append(get_analysis(run+"_systematics_"+vers+"/"+name+"/"+files,
-                            "Simulated 2017-2.7 "+emit+"-140 lH2 empty Systematics "+name, 
-                            tof, data_dir, [[135, 145]], [90, 170], False))
+            files = "*"+str(i)
+            if "tku_base" not in a_run[-1]:
+                continue
+            sys_list = ["tku_base"]
+            new_run = copy.deepcopy(a_run)
+            new_run[-4] = str(i)
+            new_run[-2] = files
+            new_run[-1] = sys_list
+            tmp_run_list.append(new_run)
+    selection_bias = {
+        "tkd_chi2_threshold":4.3,
+        "tkd_fiducial_radius":148., # r2 ~ pt/bz/c_light ~ pt [mm]
+    }
+    for a_run in run_list:
+        if "lH2 empty" not in a_run:
+            continue
+        sys_list = ["tku_base"]
+        for key, value in selection_bias.iteritems():
+            cuts = {key:value}
+            new_run = copy.deepcopy(a_run)
+            new_run[-1] = sys_list
+            new_run[-3] = cuts
+            new_run[-4] = str(key)
+            tmp_run_list.append(new_run)
+    run_list += tmp_run_list
+
+    for run_items in run_list:
+        print len(run_items)
+        [emit, run, tof, vers, absorber, suffix, cuts, files, systematics_list] = run_items
+        for sys in systematics_list:
+            name = str(sys)
+            if suffix != None:
+                name += "_"+suffix
+            my_analysis = get_analysis(run+"_systematics_"+vers+"/"+sys+"/"+files,
+                            "Simulated 2017-2.7 "+emit+"-140 "+absorber+" Systematics "+name, 
+                            tof, data_dir, [[135, 145]], [90, 170], False)
+            for cut, value in cuts.iteritems():
+                my_analysis[cut] = value
+            analyses.append(my_analysis)
+
     print "Planned", len(analyses), "analyses"
     amplitude_bin_width = 5
     amplitude_max = 25
@@ -267,6 +322,7 @@ class Config(object):
         (21220.4, None, "tof2"),
 
     ]
+    # Note this is disabled for hybrid MC as we don't go upstream of tracker
     upstream_aperture_cut = {
         "global_through_virtual_diffuser_us":90.,
         "global_through_virtual_diffuser_ds":90.,
@@ -311,8 +367,13 @@ class Config(object):
 
     mc_plots = { # Used for virtual_cuts as well as plots
         "mc_stations" : { # one virtual plane for each tracker view; first must be tracker reference plane
-            "tku":["mc_virtual_tku_tp", "mc_virtual_tku_2", "mc_virtual_tku_3", "mc_virtual_tku_4", "mc_virtual_tku_5",],
-            "tkd":["mc_virtual_tkd_tp", "mc_virtual_tkd_2", "mc_virtual_tkd_3", "mc_virtual_tkd_4", "mc_virtual_tkd_5",],
+            "tku_tp":["mc_virtual_tku_tp", "mc_virtual_tku_2", "mc_virtual_tku_3", "mc_virtual_tku_4", "mc_virtual_tku_5",],
+            "tkd_tp":["mc_virtual_tkd_tp", "mc_virtual_tkd_2", "mc_virtual_tkd_3", "mc_virtual_tkd_4", "mc_virtual_tkd_5",],
+            #"tof1":["mc_virtual_tof1"],
+            #"tof01":["mc_virtual_tof0", "mc_virtual_tof1"],
+            #"tof12":["mc_virtual_tof1", "mc_virtual_tof2"],
+            #"global_through_virtual_diffuser_us":["virtual_diffuser_us"],
+            #"global_through_virtual_diffuser_ds":["virtual_diffuser_ds"],
         }
     }
 

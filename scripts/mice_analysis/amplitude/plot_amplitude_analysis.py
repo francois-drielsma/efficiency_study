@@ -4,6 +4,7 @@ import ROOT
 import xboa.common as common
 
 import utilities
+from mice_analysis.amplitude.weighting import Weighting
 
 
 class PlotAmplitudeAnalysis(object):
@@ -81,7 +82,7 @@ class PlotAmplitudeAnalysis(object):
                           title+";"+tk+" A(true);"+tk+" A(reco) - A(true) [mm]",
                           nx_bins, 0., xmax,
                           ny_bins, -20., 20.)
-        self.amp.root_objects.append(res_hist)
+        self.root_objects.append(res_hist)
 
         for key, amp_true in amp_true_dict.iteritems():
             amp_reco = amp_reco_dict[key]
@@ -216,30 +217,26 @@ class PlotAmplitudeAnalysis(object):
         scraped_graph = self.get_asymm_error_graph(data["upstream_scraped"]["pdf"],
                                                     style=25, color=ROOT.kViolet+2, name="Raw scraped") # 25 for not raw
         
-        if suffix == "reco":
-            upstream_graph_stats = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                        us_data["pdf_stats_errors"],
-                                                        style=20, color=self.us_color,
-                                                        name = "Upstream stats")
-            upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                        us_data["pdf_sys_errors"],
-                                                        fill=self.us_color,
-                                                        name = "Upstream sys")
-            downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                          ds_data["pdf_stats_errors"],
-                                                        style=22, color=self.ds_color,
-                                                        name = "Downstream stats")
-            downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                          ds_data["pdf_sys_errors"],
-                                                        fill=self.ds_color,
-                                                        name = "Downstream sys")
-            print "Plotting us sys", us_data["pdf_sys_errors"]
-            print "Plotting ds sys", ds_data["pdf_sys_errors"]
-            graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
-            draw_list = ["2", "2", "p", "p", "p", "p", "p"]
-        else:
-            graph_list = [scraped_graph, raw_upstream_graph, raw_downstream_graph]
-            draw_list = ["p", "p", "p"]
+        upstream_graph_stats = self.get_asymm_error_graph(us_data["corrected_pdf"],
+                                                    us_data["pdf_stats_errors"],
+                                                    style=20, color=self.us_color,
+                                                    name = "Upstream stats")
+        upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
+                                                    us_data["pdf_sys_errors"],
+                                                    fill=self.us_color,
+                                                    name = "Upstream sys")
+        downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
+                                                      ds_data["pdf_stats_errors"],
+                                                    style=22, color=self.ds_color,
+                                                    name = "Downstream stats")
+        downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
+                                                      ds_data["pdf_sys_errors"],
+                                                    fill=self.ds_color,
+                                                    name = "Downstream sys")
+        print "Plotting us sys", us_data["pdf_sys_errors"]
+        print "Plotting ds sys", ds_data["pdf_sys_errors"]
+        graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
+        draw_list = ["2", "2", "p", "p", "p", "p", "p"]
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number")
         hist.Draw()
         same = "SAME "
@@ -292,7 +289,7 @@ class PlotAmplitudeAnalysis(object):
         for i in range(nbins):
             for j in range(nbins):
                 matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
-        self.amp.root_objects.append(matrix_hist)
+        self.root_objects.append(matrix_hist)
         canvas = common.make_root_canvas(title)
         canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
         matrix_hist.SetTitle(self.config_anal['name'])
@@ -302,6 +299,14 @@ class PlotAmplitudeAnalysis(object):
         for format in ["eps", "png", "root"]:
             canvas.Print(self.plot_dir+title+"."+format)
 
+    def efficiency_plot(self):
+        weighting = Weighting(self.amp.reco_mc_data_ds, self.amp.all_mc_data_ds, self.plot_dir)
+        weighting.plot_sum("x", 20, [-200., 200.], "y", 20, [-200., 200.])
+        weighting.plot_sum("x", 20, [-200., 200.], "px", 20, [-100., 100.])
+        weighting.plot_sum("x", 20, [-200., 200.], "py", 20, [-100., 100.])
+        weighting.plot_sum("y", 20, [-200., 200.], "px", 20, [-100., 100.])
+        weighting.plot_sum("y", 20, [-200., 200.], "py", 20, [-100., 100.])
+        weighting.plot_sum("px", 20, [-100., 100.], "py", 20, [-100., 100.])
 
     def systematics_plot(self, target):
         """
@@ -314,12 +319,6 @@ class PlotAmplitudeAnalysis(object):
             label = "US"
         elif "downstream" in target:
             label = "DS"
-        matrix = self.amp.amplitudes["momentum_uncertainty"][target]["migration_matrix"]
-        title = ("momentum_uncertainty_"+target).replace("_all", "").replace("_", " ")
-        self.matrix_plot(matrix, title,
-                         label+" "+self.get_suffix_label("reco")+" amplitude before momentum correction [mm]",
-                         label+" "+self.get_suffix_label("reco")+" amplitude after momentum correction [mm]")
-
         matrix = self.amp.amplitudes["crossing_probability"][target]["migration_matrix"]
         title = ("crossing_probability_"+target).replace("_all", "").replace("_", " ")
         self.matrix_plot(matrix, title,
@@ -347,7 +346,7 @@ class PlotAmplitudeAnalysis(object):
             canvas.Print(self.plot_dir+"amplitude_inefficiency_zoom_"+target+"."+format)
 
     def chi2_graph(self, suffix, distribution):
-        data = self.amplitudes[suffix]
+        data = self.amp.amplitudes[suffix]
         pdf_list_tku = data[distribution]["pdf"]
         bin_centre_list = data[distribution]["bin_centre_list"]
         n_bins = len(bin_centre_list)
@@ -360,8 +359,8 @@ class PlotAmplitudeAnalysis(object):
 
     def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, fill=None, name="Graph"):
         graph = ROOT.TGraphAsymmErrors(len(points)-1)
-        for i, low_edge in enumerate(self.bin_edge_list[:-1]):
-            high_edge = self.bin_edge_list[i+1]
+        for i, low_edge in enumerate(self.amp.bin_edge_list[:-1]):
+            high_edge = self.amp.bin_edge_list[i+1]
             centre = (low_edge+high_edge)/2.
             graph.SetPoint(i, centre, points[i]/norm)
             if errors != None:

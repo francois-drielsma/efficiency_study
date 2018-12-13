@@ -19,6 +19,7 @@ class LoadReco(object):
                             "tof1":self.config.tof1_offset,
                             "tof2":self.config.tof2_offset}
         self.do_rejects = True
+        self.nan_count = [0, 0]
 
 
     def load(self, event, spill, ev_number):
@@ -49,6 +50,8 @@ class LoadReco(object):
             "detector":station,
             "covariance":cov,
             "dt":tof_sp.GetDt(),
+            "charge_product":tof_sp.GetChargeProduct(),
+            "charge":tof_sp.GetCharge(),
         }
         return loaded_sp
 
@@ -93,8 +96,8 @@ class LoadReco(object):
                 tof12_cut = True
 
         return (tof_sp_list, {
-            "tof_0_sp":space_points.GetTOF0SpacePointArray().size() != 1,
-            "tof_1_sp":space_points.GetTOF1SpacePointArray().size() != 1,
+            "tof_0_sp":space_points.GetTOF0SpacePointArray().size() != self.config_anal["tof0_n_sp"],
+            "tof_1_sp":space_points.GetTOF1SpacePointArray().size() != self.config_anal["tof1_n_sp"],
             "tof_2_sp":len([det for det in detectors if det == "tof2"]) != 1,
             "tof01":tof01_cut,
             "tof12":tof12_cut,
@@ -207,7 +210,7 @@ class LoadReco(object):
                     try:
                         self.nan_check(track_point.covariance())
                     except Exception:
-                        print "\nCov nan", [x for x in track_point.covariance()]
+                        self.nan_count[track.tracker()] += 1
                         this_track_points.append({
                           "detector":detector+"_nan",
                           "hit":{"z":999},
@@ -232,8 +235,9 @@ class LoadReco(object):
                 }
                 try:
                     self.nan_check(tp_dict.values())
+
                 except:
-                    print "\nTP nan in run", self.this_run, "spill", self.this_spill, "event", self.this_event, ":", tp_dict
+                    self.nan_count[track.tracker()] += 1
                     this_track_points.append({
                       "detector":detector+"_nan",
                       "hit":{"z":999},
@@ -245,7 +249,7 @@ class LoadReco(object):
                 if self.do_rejects:
                     try:
                         rejects = self.load_rejects(track.pr_track_pointer())
-                    except ReferenceError:
+                    except (ReferenceError, AttributeError):
                         print "Loading rejects failed - disabling"
                         self.do_rejects = False
                 this_track_points.append({
@@ -255,6 +259,7 @@ class LoadReco(object):
                   "pvalue":track.P_value(),
                   "chi2":track.chi2(),
                   "ndf":track.ndf(),
+                  "refit":track.GetWasRefit(),
                   "max_r2":-99., # maximum radius squared between this track point and the next one in the same tracker
                   "rejects":rejects,
                 })
@@ -291,12 +296,14 @@ class LoadReco(object):
 
     def will_cut_on_scifi_fiducial(self, track_point_list):
         max_r2 = [-111., -111.]
+        fiducial_r2 = 0.
         for tp in track_point_list:
             if "tku" in tp["detector"]:
+                fiducial_r2 = self.config_anal["tku_fiducial_radius"]**2
                 max_r2[0] = max(max_r2[0], tp["max_r2"])
             else:
+                fiducial_r2 = self.config_anal["tkd_fiducial_radius"]**2
                 max_r2[1] = max(max_r2[1], tp["max_r2"])
-        fiducial_r2 = self.config_anal["tracker_fiducial_radius"]**2
         return [max_r2[0] > fiducial_r2, max_r2[1] > fiducial_r2]
 
     def load_scifi_event(self, scifi_event):
@@ -317,10 +324,6 @@ class LoadReco(object):
         track_points = [point for point in track_points if point["detector"] != "tku_tp_nan" and \
                                                            point["detector"] != "tkd_tp_nan"]
         n_tkd = len([point for point in track_points if "tkd" in point["detector"] ])
-        if n_tkd == 0 and will_cut_on_scifi_tracks[1] == False:
-            print "NAN?"
-            print nan_cut_downstream
-            raw_input()
         will_cut_on_scifi_fiducial = self.will_cut_on_scifi_fiducial(track_points)
         points = space_points + track_points
         return [
@@ -409,6 +412,20 @@ class LoadReco(object):
         n_clusters[1] = len([i for i in n_clusters[1] if i > 0])
         return n_clusters
 
+    def get_n_planes_with_used_clusters(self, scifi_event):
+        """
+        Number of planes with at least one cluster
+        """
+        n_clusters = [[0 for i in range(5)], [0 for i in range(5)]]
+        for space_point in scifi_event.spacepoints():
+            if not space_point.is_used():
+                continue
+            tracker = space_point.get_tracker()
+            station = space_point.get_station()
+            n_clusters[tracker][station-1] = space_point.get_channels_pointers().size()
+        n_clusters = [sum(n_clusters[0]), sum(n_clusters[0])]
+        return n_clusters
+
     def will_cut_on_scifi_tracks(self, scifi_event):
         """Require exactly one track in each tracker"""
         n_tracks = self.get_n_tracks(scifi_event)
@@ -426,11 +443,12 @@ class LoadReco(object):
     def will_cut_on_chi2(self, scifi_event):
         """Cut if all tracks in a tracker to have chi2 greater than threshold"""
         will_cut = [0, 0] #-1 passes; 0 no result; 1 fails
-        chi2_cut = self.config_anal["chi2_threshold"]
+        chi2_cut = [self.config_anal["tku_chi2_threshold"],
+                    self.config_anal["tkd_chi2_threshold"]]
         for track in scifi_event.scifitracks():
             tracker = track.tracker()
             chi2_df = track.chi2()/track.ndf()
-            if chi2_df > chi2_cut: # this track fails cut
+            if chi2_df > chi2_cut[tracker]: # this track fails cut
                 if will_cut[tracker] != -1: # no previous track passed cut; so chuck out
                     will_cut[tracker] = 1
                 else: # a previous track passed cut; so passes
@@ -540,7 +558,11 @@ class LoadReco(object):
 
     def load_global_event(self, global_event, verbose = False):
         # verbose = True
-        cuts = {"upstream_aperture_cut":False, "downstream_aperture_cut":False}
+        cuts = {
+          "upstream_aperture_cut":False,
+          "downstream_aperture_cut":False,
+          "global_through_us_apertures":True, # only passes if radius at aperture ok
+        }
         match_cuts = ["global_through_tof0", "global_through_tof1", "global_through_tof2",
                       "global_through_tku_tp", "global_through_tkd_tp",]
         for a_cut in match_cuts: # require global match of given detector type
@@ -551,6 +573,8 @@ class LoadReco(object):
         pid = self.config_anal["pid"]
         track_points_out = []
         mass = xboa.common.pdg_pid_to_mass[abs(pid)]
+        through_us_apertures = [(det, True) for det in self.config.upstream_aperture_cut]
+        through_us_apertures = dict(through_us_apertures)
         for track in global_event.get_tracks():
             # we require a TKU hit on the track
             this_track_points = []
@@ -601,16 +625,18 @@ class LoadReco(object):
                   "detector":detector,
                 })
                 if detector in self.config.upstream_aperture_cut:
+                    through_us_apertures[detector] = False
                     if hit["r"] > self.config.upstream_aperture_cut[detector]:
                        cuts["upstream_aperture_cut"] = True
                 if detector in self.config.downstream_aperture_cut:
                     if hit["r"] > self.config.downstream_aperture_cut[detector]:
                        cuts["downstream_aperture_cut"] = True
-                for ref_detector in match_cuts:
-                    if detector == ref_detector:
-                        cuts[ref_detector] = False
+                if detector in match_cuts:
+                    cuts[detector] = False
             print "   ", track.GetTrackPoints().size(), "track points including", track.GetTrackPoints(1).size(), "virtual hits"
             track_points_out += this_track_points
+            # True == 1 and False == 0 so true if any value is true
+            cuts["global_through_us_apertures"] = sum(through_us_apertures.values()) > 0
         sys.stdout = sys.__stdout__
         return track_points_out, cuts
 
@@ -621,6 +647,7 @@ class LoadReco(object):
         global_event = reco_event.GetGlobalEvent()
         scifi_event = reco_event.GetSciFiEvent()
         tof_loaded = self.load_tof_event(tof_event)
+        #print "    Loaded", len(tof_loaded[0]), "tof hits"
         if self.config.will_require_tof1 or self.config.will_require_tof2:
             tofs = [ev["detector"] for ev in tof_loaded[0]]
             if "tof1" not in tofs and self.config.will_require_tof1:
@@ -628,12 +655,16 @@ class LoadReco(object):
             if "tof2" not in tofs and self.config.will_require_tof2:
                 return None
         scifi_loaded = self.load_scifi_event(scifi_event)
+        #print "    Loaded", len(scifi_loaded[0]), "scifi hits"
+        #print "     ", [hit["detector"] for hit in scifi_loaded[0]]
+        #print "     ", scifi_loaded[1]
         verbose = False #spill_number < 5
         global_loaded = self.load_global_event(global_event, verbose)
+        #print "    Loaded", len(global_loaded[0]), "global hits"
         event["data"] += scifi_loaded[0]+tof_loaded[0]+global_loaded[0]
         event["tof_slabs"] = self.load_n_slabs(tof_event)
         event["scifi_n_tracks"] = self.get_n_tracks(scifi_event)
-        event["scifi_n_planes_with_clusters"] = self.get_n_planes_with_clusters(scifi_event)
+        event["scifi_n_planes_with_clusters"] = self.get_n_planes_with_used_clusters(scifi_event)
         event["particle_number"] = reco_event.GetPartEventNumber()
         
         cuts_chain = itertools.chain(tof_loaded[1].iteritems(), scifi_loaded[1].iteritems(), global_loaded[1].iteritems())

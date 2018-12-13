@@ -5,6 +5,7 @@ import copy
 import itertools
 import math
 import time
+import resource
 
 import ROOT
 
@@ -48,6 +49,12 @@ class AmplitudeDataBinned(object):
                 raise ValueError("Bin spacing is too small for bin "+str(i))
         self.mass = mass # for emittance calculation
         self.state_list = [[], []]
+        file_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if file_limit[0] < 2048:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (2048, file_limit[1]))
+            print "Adjusted number of allowed file handles from (soft, hard)", \
+                  file_limit, "to", resource.getrlimit(resource.RLIMIT_NOFILE)
+            # resource.getrusage(resource.RUSAGE_SELF) will probe the number of open files
 
     def __del__(self):
         pass

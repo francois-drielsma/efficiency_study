@@ -3,17 +3,24 @@ import importlib
 import sys
 import numpy
 
-import scripts.amplitude_analysis
+from mice_analysis.amplitude_analysis import AmplitudeAnalysis
 
 def load_config():
-    if len(sys.argv) != 2:
-        print "Usage: python calculate_emittance.py </path/to/config/script>"
-        sys.exit(1)
-    config_mod = sys.argv[1].replace(".py", "")
+    global config_mod
+    if config_mod == None:
+       print "Usage:"
+       print "echo 'scripts/config/config_mc.py' | "+\
+             "python scripts/mice_analysis/amplitude/test_amplitude_analysis.py"
+    config_mod = config_mod.replace(".py", "")
+    config_mod = config_mod.replace("scripts/", "")
     config_mod = config_mod.replace("/", ".")
     print "Using configuration module", config_mod
     config_file = importlib.import_module(config_mod)
     return config_file.Config()
+
+class DataLoaderMockup(object):
+    def __init__(self):
+        self.events = []
 
 class TestAmplitudeAnalysis(unittest.TestCase):
     @classmethod
@@ -21,7 +28,10 @@ class TestAmplitudeAnalysis(unittest.TestCase):
         cls.config = load_config()
 
     def setUp(self):
-        self.amps = scripts.amplitude_analysis.AmplitudeAnalysis(self.config, self.config.analyses[0])
+        self.data_loader_mockup = DataLoaderMockup()
+        self.amps = AmplitudeAnalysis(self.config,
+                                      self.config.analyses[0],
+                                      self.data_loader_mockup)
 
     def matrix_calc(self, n_matrix, a_in, a_out):
         n_rows = 21
@@ -84,8 +94,21 @@ class TestAmplitudeAnalysis(unittest.TestCase):
         print pdfs_out.tolist()
         print self.amps.matrix_str(migration_matrix.tolist())
         print pdfs_recovered.tolist()
-           
+
+    def test_performance_systematics(self):
+        self.amps.amplitudes["reco"] = {
+              "all_upstream":{"pdf":[1000/float(i) for i in range(8)]+[0., 0.]},
+              "all_downstream":{"pdf":[1000/float(i) for i in range(8)]+[0., 0.]},
+              "migration_matrix":[[float(i == j) for i in range(10)] for j in range(10)],
+        }
+        self.amps.amplitudes["systematics_performance_reference"] = None
+        sys = self.amps.calculate_performance_systematics("all_upstream")
+        [self.assertAlmostEqual(item, 0.) for item in sys]
+        test_matrix = self.get_matrix()
+
+
 if __name__ == "__main__":
+    config_mod = raw_input()
     unittest.main()
 
 

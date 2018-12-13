@@ -12,7 +12,7 @@ class Hacking(object):
     def __init__(self, output_dir):
         self.list_of_lists = None
         self.names = []
-        self.max_bin = 12
+        self.max_bin = 21
         self.canvas_split = (3, 4)
         self.output_dir = output_dir+"/"
         self.run_configuration = ""
@@ -188,7 +188,7 @@ class Hacking(object):
         legend = ROOT.TLegend(0.65, 0.5, 0.85, 0.9)
         self.root_objects.append(legend)
         for i, graph in enumerate(graph_list):
-            if self.names[i] == "tku_base":
+            if "tku_base" in self.names[i]:
                 continue
             graph.SetName(self.names[i])
             graph.SetTitle()
@@ -285,7 +285,7 @@ class Hacking(object):
 
 
 def file_list(src_dir, emittance, absorber, suffix):
-    name = "from_scarf/"+src_dir+"/plots_Simulated_2017-2.7_"
+    name = "output/"+src_dir+"/plots_Simulated_2017-2.7_"
     name += str(emittance)+"-140_"+absorber+"_Systematics_"+suffix
     name += "/amplitude/amplitude.json"
     name_list = sorted(glob.glob(name))
@@ -296,8 +296,7 @@ def file_list(src_dir, emittance, absorber, suffix):
 
 def do_upstream(input_dir, emittance_list, output_dir):
     for emittance in emittance_list:
-        a_file_list = file_list(input_dir, emittance, "lH2_empty", "?")+\
-                      file_list(input_dir, emittance, "lH2_empty", "??")
+        a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base_?")
         a_file_list = sorted(a_file_list)
         my_hacking = Hacking(output_dir+emittance+"-upstream")
         my_hacking.clean_output_dir()
@@ -317,12 +316,45 @@ def do_upstream(input_dir, emittance_list, output_dir):
         my_hacking.plot_corrections([('crossing_probability', 'migration_matrix')],
                           ['all_upstream'], "multigraph")
 
+def do_correction_comparison(input_dir, emittance_list, output_dir):
+    for emittance in emittance_list:
+        files = file_list(input_dir, emittance, "lH2_empty", "tku_base")
+        fin = json.loads(open(files[0]).read())
+        for us_ds in ["all_downstream", "all_upstream",]:
+            name = emittance+"_"+us_ds
+            canvas = xboa.common.make_root_canvas(name)
+            print emittance, us_ds
+            corr_reco_pdf = fin["reco"][us_ds]["corrected_pdf"]
+            raw_reco_pdf = fin["reco"][us_ds]["pdf"]
+            mc_truth_pdf = fin["all_mc"][us_ds]["pdf"]
+            edges = fin["reco"][us_ds]["bin_edge_list"]
+            print "   Raw: ", [format(i, "10.3g") for i in raw_reco_pdf]
+            print "   Cor: ", [format(i, "10.3g") for i in corr_reco_pdf]
+            print "   MC:  ", [format(i, "10.3g") for i in mc_truth_pdf]
+            bin_centre = [(edges[i]+edge)/2. for i, edge in enumerate(edges[1:])]
+            raw_ratio = [raw-mc_truth_pdf[i] for i, raw in enumerate(raw_reco_pdf)]
+            corr_ratio = [corr-mc_truth_pdf[i] for i, corr in enumerate(corr_reco_pdf)]
+            hist, raw_graph = xboa.common.make_root_graph("Raw", bin_centre, "A [mm]",
+                                                raw_ratio[:20], "Reco PDF - MC PDF", ymin=-10000, ymax=5000)
+            raw_graph.SetMarkerStyle(26)
+            hist, corr_graph = xboa.common.make_root_graph("Corrected", bin_centre, "A [mm]",
+                                                corr_ratio[:20], "Reco PDF - MC PDF", ymin=-10000, ymax=5000)
+            corr_graph.SetMarkerStyle(22)
+            hist.SetTitle(name)
+            hist.Draw()
+            raw_graph.Draw("SAME P")
+            corr_graph.Draw("SAME P")
+            legend = xboa.common.make_root_legend(canvas, [raw_graph, corr_graph])
+            legend.SetX1(0.6)
+            legend.SetX2(0.8)
+            legend.SetY1(0.2)
+            legend.SetY2(0.4)
+            canvas.Print(output_dir+"/"+name+".png")
 
 
 def do_downstream(input_dir, emittance_list, output_dir):
     for emittance in emittance_list:
-        a_file_list = file_list(input_dir, emittance, "lH2_empty", "?")+\
-                      file_list(input_dir, emittance, "lH2_empty", "??")
+        a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base_?")
         a_file_list = sorted(a_file_list)
         my_hacking = Hacking(output_dir+emittance+"-downstream")
         my_hacking.clean_output_dir()
@@ -334,13 +366,14 @@ def do_downstream(input_dir, emittance_list, output_dir):
         my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
                           ['all_downstream'], "graph")
 
-        a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base")+\
-                      file_list(input_dir, emittance, "lH2_empty", "tkd_*")
-        my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
-                          ['all_downstream'],
-                          a_file_list)
-        my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
-                          ['all_downstream'], "multigraph")
+        #a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base")+\
+        #              file_list(input_dir, emittance, "lH2_empty", "tkd_*")
+        #my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        #                  ['all_downstream'],
+        #                  a_file_list)
+        #my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        #                  ['all_downstream'], "multigraph")
+
 
 def do_copy(input_dir, emittance_list, output_dir):
     for emittance in emittance_list:
@@ -351,11 +384,15 @@ def do_copy(input_dir, emittance_list, output_dir):
             for src_file in plot_files:
                 target_file = output_dir+"/"+emittance+"-"+stream+"/"+os.path.split(src_file)[1]
                 print "Copying", src_file, "to", target_file
+                try:
+                    os.makedirs(target_file.split()[0])
+                except OSError:
+                    pass
                 shutil.copy(src_file, target_file)
 
 
 def copy_more(input_dir, output_dir):
-    a_dir_list = glob.glob("from_scarf/"+input_dir+"/*tku_base/amplitude/weighting")
+    a_dir_list = glob.glob("output/"+input_dir+"/*tku_base/amplitude/weighting")
     for a_dir in a_dir_list:
         print a_dir
         my_bl = a_dir.split("2017-2.7_")[1]
@@ -370,12 +407,12 @@ def copy_more(input_dir, output_dir):
 
 def main():
     utilities.root_style.setup_gstyle()
-    output_dir = "from_scarf/2017-02-Systematics/systematics_summary/"
-    
-    #do_copy("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
-    copy_more("2017-02-Systematics", output_dir)
-    #do_upstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
-    #do_downstream("2017-02-Systematics", ["3", "4", "6", "10"], output_dir)
+    output_dir = "output/2017-02-7-Systematics-v1/systematics_summary/"
+    #do_copy("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir)# "4", "6", "10"
+    #copy_more("2017-02-7-Systematics-v1", output_dir)
+    #do_upstream("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) # 
+    #do_downstream("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) # 
+    do_correction_comparison("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) #
 
     return
 

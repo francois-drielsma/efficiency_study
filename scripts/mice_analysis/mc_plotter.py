@@ -55,7 +55,7 @@ class MCPlotter(AnalysisBase):
             for station in range(1, 6):
                 for plane in range(1, 4):
                     det_str = "mc_tk_"+str(100*tracker + 10*station + plane)
-                    self.birth_var_one_d("tku_accumulated_e_dep_in_"+det_str, det_str, "pid", "accumulated_e_dep", pid_colors, cuts = "us cut", xmin = 0., xmax = 1.0)
+                    #self.birth_var_one_d("tku_accumulated_e_dep_in_"+det_str, det_str, "pid", "accumulated_e_dep", pid_colors, cuts = "us cut", xmin = 0., xmax = 1.0)
 
         tku_hit_predicate = lambda hit: 13900 < hit["hit"]["z"] and hit["hit"]["z"] < 15100
         self.birth_var_one_d("tku_p_at_mc_track_initial", "mc_track_initial", "pid", "p", pid_colors, xmin = 0., xmax = 10., hit_predicate = tku_hit_predicate)
@@ -141,8 +141,14 @@ class MCPlotter(AnalysisBase):
 
     def process_var_one_d(self, name, detector, slice_variable, plot_variable, color_dict, cuts, hit_predicate):
         all_list, track_final = self.get_data_var_one_d(detector, slice_variable, plot_variable, cuts, hit_predicate)
-        for item in all_list:
-            self.plots[name]["histograms"]["all"].Fill(item)
+        try:
+            for item in all_list:
+                self.plots[name]["histograms"]["all"].Fill(item)
+        except TypeError:
+            print "Process var one d in mc_plotter failed to Fill with type error"
+            print name, detector, slice_variable, plot_variable, cuts
+            print item
+            sys.excepthook(*sys.exc_info())
         for i, key in enumerate(sorted(track_final.keys())):
             hist_dict = self.plots[name]["histograms"]
             plot_name = str(slice_variable)+" = "+str(key)
@@ -176,7 +182,6 @@ class MCPlotter(AnalysisBase):
             if key not in self.get_plot(canvas_name)["config"]:
                 raise KeyError("Did not recignise plot option "+str(key))
             self.get_plot(canvas_name)["config"][key] = options[key]
-
 
     def get_data_var_two_d_scatter(self, name, *args):
         track_final = {}
@@ -241,7 +246,7 @@ class MCPlotter(AnalysisBase):
             graph.Draw("PSAME")
         self.process_args[canvas_name] = [self.process_var_two_d_scatter, (detector, slice_variable, plot_variable_1, plot_variable_2, color_dict, cuts)]
 
-    axis_labels = {"x":"x(meas) - x(true) [mm]", "y":"y(meas) - y(true) [mm]", "z":"z(meas) - z(true) [mm]",
+    axis_labels = {"x":"x(meas) - x(true) [mm]", "y":"y(meas) - y(true) [mm]", "z":"z(meas) - z(true) [mm]", "t":"t(meas) - t(true) [ns]",
                    "px":"p_{x}(meas) - p_{x}(true) [MeV/c]", "py":"p_{y}(meas) - p_{y}(true) [MeV/c]", "pz":"p_{z}(meas) - p_{z}(true) [MeV/c]"}
     def plot_detector_residuals(self, suffix):
         self.axis_min_max = {}
@@ -269,21 +274,68 @@ class MCPlotter(AnalysisBase):
             for format in ["png", "eps", "root"]:
                 canvas.Print(self.plot_dir+"/mc_residual_"+suffix+"_"+var+"."+format)
 
-    def get_data_detector_residuals(self, tracker, virt_name):
-        residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
-        cut = {"tku":"upstream_cut", "tkd":"downstream_cut"}[tracker]
+    def get_tofij_residual(self, det_name):
+        if det_name == "tof01":
+            virtuals = ["mc_virtual_tof0", "mc_virtual_tof1"]
+            cut = "upstream_cut"
+            offset_i = self.config.tof0_offset
+            offset_j = self.config.tof1_offset
+        elif det_name == "tof12":
+            virtuals = ["mc_virtual_tof1", "mc_virtual_tof2"]
+            cut = "downstream_cut"
+            offset_i = self.config.tof1_offset
+            offset_j = self.config.tof2_offset
+        residuals = []
         for event in self.data_loader.events:
             if event[cut]:
                 continue
-            if event[tracker] == None:
+            reco_tof = event[det_name]
+            if reco_tof == None:
                 continue
+            t_i, t_j = None, None
             for detector_hit in event["data"]:
-                if detector_hit["detector"] != virt_name:
+                if detector_hit["detector"] == virtuals[0]:
+                    t_i = detector_hit["hit"]["t"]
+                elif detector_hit["detector"] == virtuals[1]:
+                    t_j = detector_hit["hit"]["t"]
+                else:
                     continue
-                vhit = detector_hit["hit"]
-                thit = event[tracker]
-                for residual in residual_dict.keys():
-                    residual_dict[residual].append(thit[residual] - vhit[residual])
+                if t_i != None and t_j != None:
+                    mc_tof = (t_j + offset_j) - (t_i + offset_i)
+                    residuals.append(reco_tof - mc_tof)
+                    break
+        return {"t":residuals}
+
+
+    def get_data_detector_residuals(self, det_name, virt_name):
+        if det_name in ["tof01", "tof12"]:
+            return self.get_tofij_residual(det_name)
+
+        if det_name in ["tku_tp", "tkd_tp"]:
+            residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
+        elif det_name in ["tof0", "tof1", "tof2"]:
+            residual_dict = {"x":[], "y":[], "z":[]}
+        elif "global" in det_name:
+            residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
+        if det_name in ["tku_tp", "tof0", "tof1"] or "global_through" in det_name:
+            cut = "upstream_cut"
+        else:
+            cut = "downstream_cut"
+        for event in self.data_loader.events:
+            if event[cut]:
+                continue
+            vhit, thit = None, None
+            for detector_hit in event["data"]:
+                if detector_hit["detector"] == virt_name:
+                    vhit = detector_hit["hit"]
+                elif detector_hit["detector"] == det_name:
+                    thit = detector_hit["hit"]
+                else:
+                    continue
+                if vhit != None and thit != None:
+                    for residual in residual_dict.keys():
+                        residual_dict[residual].append(thit[residual] - vhit[residual])
+                    break # next event please
         return residual_dict
 
     def process_data_detector_residuals(self):
@@ -302,18 +354,22 @@ class MCPlotter(AnalysisBase):
         keys = {
             "x":(-4., 4.),
             "y":(-4., 4.),
-            "z":(-5., 5.),
+            "z":(-10., 10.),
             "px":(-10., 10.),
             "py":(-10., 10.),
             "pz":(-40., 40.),
+            "t":(-1., 1.),
         }
         return keys[var]
 
     def birth_data_detector_residuals(self):
         dummy_canvas = xboa.common.make_root_canvas("dummy")
         for detector, virtual_station_list in self.mc_stations.iteritems():
+            #print "Birth residuals", detector, virtual_station_list
             virtual_station = virtual_station_list[0]
             residual_dict = self.get_data_detector_residuals(detector, virtual_station)
+            #print "    keys", residual_dict.keys()
+            #print "    length", [len(value) for value in residual_dict.values()]
             for var in sorted(residual_dict.keys()):
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]

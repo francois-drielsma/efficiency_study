@@ -113,7 +113,11 @@ class LoadAll(object):
             if self.this_daq_event >= self.this_tree.GetEntries():
                 self.next_file()
                 self.load_new_file()
-            print "  ...loaded", load_spills_daq_event, "'daq events'", self.spill_count, "'physics_event' spills and", self.event_count,"events"
+            print "  ...loaded", load_spills_daq_event, "'daq events'", \
+                  self.spill_count, "'physics_event' spills, ", \
+                  self.event_count,"events and", \
+                  self.reco_loader.nan_count, "tracker nans"
+            #self.mc_loader.print_virtual_detectors()
             if self.this_tree != None:
                 print " at", self.this_daq_event, "/", self.this_tree.GetEntries(), "spills from file", self.this_file_name, self.this_run
             else:

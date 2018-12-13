@@ -78,9 +78,10 @@ class Analyser(object):
     def file_mangle(self, config_file_name):
         print "Clearing old data"
         try:
-            shutil.rmtree(self.config_anal["plot_dir"])
+            if os.path.exists(self.config_anal["plot_dir"]):
+                shutil.rmtree(self.config_anal["plot_dir"])
         except OSError:
-            pass
+            sys.excepthook(*sys.exc_info())
         os.makedirs(self.config_anal["plot_dir"])
         shutil.copy(config_file_name, self.config_anal["plot_dir"])
 

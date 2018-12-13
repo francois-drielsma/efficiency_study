@@ -1,5 +1,6 @@
 import bisect
 
+import numpy
 import utilities.r_max
 import xboa.common
 from xboa.hit import Hit
@@ -18,6 +19,7 @@ class LoadMC(object):
     def __init__(self, config, config_anal):
         self.config = config
         self.config_anal = config_anal
+        self.report_virtuals = True
         self.virtual_dict = {}
 
     def load(self, event, spill, ev_number):
@@ -133,10 +135,11 @@ class LoadMC(object):
             det_pos, dummy, det_name = det_list[detector]
         else:
             det_pos, dummy, det_name = det_list[detector-1]
-        my_det = "mc_"+det_name
-        #if my_det not in self.virtual_dict:
-        #    self.virtual_dict[my_det] = []
-        #self.virtual_dict[my_det].append(z_pos)
+        if self.report_virtuals:
+            my_det = "mc_"+det_name
+            if my_det not in self.virtual_dict:
+                self.virtual_dict[my_det] = []
+            self.virtual_dict[my_det].append(z_pos)
         return my_det
 
     def virtual_cuts(self, loaded_virtual_vector):
@@ -144,8 +147,8 @@ class LoadMC(object):
         virtual_cuts = {}
         for cut in self.virtual_cut_list:
             virtual_cuts[cut] = False
-        mc_tku_stations = self.config.mc_plots["mc_stations"]["tku"]
-        mc_tkd_stations = self.config.mc_plots["mc_stations"]["tkd"]
+        mc_tku_stations = self.config.mc_plots["mc_stations"]["tku_tp"]
+        mc_tkd_stations = self.config.mc_plots["mc_stations"]["tkd_tp"]
         mc_tku_hits = {}
         mc_tkd_hits = {}
         tku_p_low = min([min(p_bin) for p_bin in self.config_anal["p_bins"]])
@@ -169,6 +172,7 @@ class LoadMC(object):
         virtual_cuts["mc_stations_ds"] = len(mc_tkd_hits) != len(mc_tkd_stations)
         for bz, hit_dict, key in [(self.config.bz_tku, mc_tku_hits, "us"),
                              (self.config.bz_tkd, mc_tkd_hits, "ds")]:
+            tk = {"us":"tku", "ds":"tkd"}[key]
             if len(hit_dict) < 2:
                 continue
             hit_list = hit_dict.values()
@@ -176,7 +180,7 @@ class LoadMC(object):
             utilities.r_max.get_r_max(hit_list, bz)
             # the last hit in the hit_list doesnt get a max_r2 added...
             max_r2 = max([hit["max_r2"] for hit in hit_list[:-1]])
-            virtual_cuts["mc_scifi_fiducial_"+key] = max_r2 > self.config_anal["tracker_fiducial_radius"]**2
+            virtual_cuts["mc_scifi_fiducial_"+key] = max_r2 > self.config_anal[tk+"_fiducial_radius"]**2
         return virtual_cuts
 
     def load_virtuals(self, virtual_vector):
@@ -237,6 +241,17 @@ class LoadMC(object):
             }
             loaded_mc_vector[i] = loaded_mc
         return {}, loaded_mc_vector
+
+    def print_virtual_detectors(self):
+        if not self.report_virtuals:
+            return
+        print "Found virtual detectors:"
+        for det in sorted(self.virtual_dict.keys()):
+            z_values = self.virtual_dict[det]
+            print "    ", det, "had", len(z_values), "hits", \
+                  "with mean", numpy.mean(z_values), \
+                  "and rms", format(numpy.std(z_values), '.2e')
+
 
     virtual_cut_list = ["mc_stations_us", "mc_scifi_fiducial_us", "mc_p_us",
                         "mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]

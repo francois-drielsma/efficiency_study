@@ -25,16 +25,17 @@ def material_to_colour(material):
         MATERIAL_LIST.append(material)
     if material in ("Galactic"):
         return None
-    elif material in ("AIR", "He"):
-        return None
-        #return ROOT.kYellow
+    elif material in ("AIR"):
+        return ROOT.kYellow
+    elif material in ("He"):
+        return ROOT.kYellow+1
     if material in ("Fe"): # "kill volumes"
         return 1
     if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
         return 8
     if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON", "TAM1000"):
         return 2
-    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "RenCast6400", "TUFNOL"):
+    if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "TrackerGlue", "TUFNOL"):
         return 4
     print "UNRECOGNISED MATERIAL", material
     return 1
@@ -97,7 +98,7 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
                 z_max = materials[i+1]["z"]
             if i == 0:
                 z_min -= 1
-            print material["material"], round(z_min), round(z_max), colour, "   ",
+            #print material["material"], round(z_min), round(z_max), colour, "   ",
             graph = ROOT.TGraph(2)
             graph.SetPoint(0, z_min, radius)
             graph.SetPoint(1, z_max, radius)
@@ -121,14 +122,29 @@ def get_z_tk():
     print "Found tracker detectors at", z_list
     return z_list
 
+def get_z_diffuser():
+    config = importlib.import_module("config.config_reco").Config
+    z_list = [z for z, dummy, name in config.virtual_detectors if "diffuser" in name]
+    z_list = sorted(z_list)
+    print "Found diffusers at", z_list
+    return z_list
+
+
+
 def plot_trackers():
     initialise_maus()
     old_time = time.time()
-    plot_materials(-250.1, 250.1, 1., 12000, 23000., 1., name = "materials")
-    tk_list = get_z_tk()
-    print tk_list
-    for z_tk, name in tk_list:
-        plot_materials(-2.1, 2.1, 0.01, z_tk-2., z_tk+2, 0.1, name = name)
+    #plot_materials(-250.1, 250.1, 1., 12000, 23000., 1., name = "materials")
+    try:
+        tk_list = get_z_tk()
+        print tk_list
+        #for z_tk, name in tk_list:
+        #    plot_materials(-2.1, 2.1, 0.01, z_tk-2., z_tk+2, 0.01, name = name)
+        diff_z = get_z_diffuser()
+        plot_materials(-500.1, 500.1, 1., min(diff_z)-800., max(diff_z)+500., 0.1, "diffuser")
+    except ImportError:
+        print "Failed to do tracker zoom"
+        sys.excepthook(*sys.exc_info())
     print "Plotting took", time.time() - old_time, "seconds"
     print "Found the following materials", MATERIAL_LIST 
 

@@ -18,6 +18,7 @@ cut_names = {
     "delta_tof12":"Extrapolated $t_{ToF2}$ - Reconstructed $t_{ToF2}$", #extrapolatedtof12 compared to recon tof12
     "global_through_tof0":"Successful extrapolation to ToF0",
     "global_through_tof2":"Successful extrapolation to ToF2",
+    "global_through_us_apertures":"Successful extrapolation to diffuser",
     "global_through_tkd_tp":"Successful extrapolation to TKD",
     "mc_p_us":"TKU true momentum",
     "mc_stations_us":"Muon in all TKU stations",

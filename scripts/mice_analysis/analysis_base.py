@@ -81,6 +81,8 @@ class AnalysisBase(object):
             "rescale":False,
             "logy":False,
             "fit_1d_cuts":False,
+            "fit_1d_cuts_list":["all", "us cut", "ds cut", "ex cut"],
+            "fit_range":None,
             "draw_1d_cuts":False,
             "normalise":False,
             "background_fill":False,
@@ -170,14 +172,16 @@ class AnalysisBase(object):
 
     def fit_1d_cuts(self, plot_name):
         self.plots[plot_name]["canvas"].cd()
+        fit_range = self.plots[plot_name]["config"]["fit_range"]
+        fit_name_list = self.plots[plot_name]["config"]["fit_1d_cuts_list"]
         hist_dict = self.plots[plot_name]["histograms"]
-        fit_list = [None for i in range(4)]
-        hist_list = [None for i in range(4)]
+        fit_list = [None for i in range(len(fit_name_list))]
+        hist_list = [None for i in range(len(fit_name_list))]
         for hist_name in sorted(hist_dict.keys()):
-            for i, key in enumerate(["all", "us cut", "ds cut", "ex cut"]):
+            for i, key in enumerate(fit_name_list):
                 if key in hist_name:
                     hist_list[i] = hist_dict[hist_name]
-                    fit_list[i] = utilities.utilities.fit_peak(hist_list[i], 2, "Q", "SAME")
+                    fit_list[i] = utilities.utilities.fit_peak(hist_list[i], 2, "Q", "SAME", fit_range)
                     fit_list[i].SetLineColor(hist_list[i].GetLineColor())
                     xmin, xmax = hist_list[i].GetXaxis().GetXmin(), hist_list[i].GetXaxis().GetXmax()
                     hist_list[i].GetXaxis().SetRangeUser(xmin, xmax + (xmax-xmin))

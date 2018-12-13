@@ -64,12 +64,13 @@ class DataPlotter(AnalysisBase):
           "normalise":False,
           "logy":False,
         }
-        for detector, test_cut in []:#("tku", "us cut"), ("tkd", "ds cut"):
+        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
-                for predicate in [self.doublet, self.triplet, self.any_sp,
-                                  self.used_doublet, self.used_triplet, self.used,
-                                  self.not_used, self.not_used_triplet, self.not_used_doublet]:
-                    for cut in ["all", test_cut]:
+                for predicate in [self.used, self.used_doublet, self.used_triplet]:
+#                                 self.not_used, self.doublet, self.triplet, 
+#                                 self.used, self.used_doublet, self.used_triplet,
+#                                 self.not_used_triplet, self.not_used_doublet]:
+                    for cut in [test_cut]: #"all", 
                         a_detector = detector+"_sp_"+str(station)
                         self.birth_var_2d("x", a_detector, "y", a_detector, [-150, 150], [-150, 150], cut, None, predicate, options = my_options)
                     var = "sp_npe_per_cluster_"+str(station)
@@ -95,6 +96,8 @@ class DataPlotter(AnalysisBase):
         self.birth_var_2d("x", "tof0", "x", "tof1", [-200, 200.], [-210, 210.], "us cut", None, None, n_bins_x=10, n_bins_y=7)
         self.birth_var_2d("y", "tof0", "y", "tof1", [-200, 200.], [-210, 210.], "us cut", None, None, n_bins_x=10, n_bins_y=7)
 
+        self.birth_var_1d("charge_product", "tof0", None, None, min_max=[0, 10000], n_bins=100)
+        self.birth_var_1d("charge_product", "tof1", None, None, min_max=[0, 10000], n_bins=100)
         self.birth_var_1d("x", "tof0", None, None, min_max=[-200, 400.], n_bins=15)
         self.birth_var_1d("y", "tof0", None, None, min_max=[-200, 400.], n_bins=15)
         self.birth_var_1d("x", "tof1", None, None, min_max=[-210, 390.], n_bins=10)
@@ -105,12 +108,19 @@ class DataPlotter(AnalysisBase):
         self.birth_var_1d("py", "tku", None, None, min_max=[-200, 400.], n_bins=75)
         min_p = min([bins[0] for bins in self.config_anal["p_bins"]])
         max_p = max([bins[1] for bins in self.config_anal["p_bins"]])
-        delta_p = max_p-min_p
-        max_p += delta_p*10.
-        min_p -= delta_p*5.
-        min_p = max(min_p, 0)
-        self.birth_var_1d("p", "tku", None, None, min_max=[min_p, max_p], n_bins=200)
+        max_p_ax = max_p + (max_p-min_p)*10.
+        min_p_ax = min_p - (max_p-min_p)*5.
+        min_p_ax = max(min_p_ax, 0)
+        self.birth_var_1d("p", "tku", None, None, min_max=[min_p_ax, max_p_ax], options={"fit_range":[min_p, max_p]}, n_bins=200)
         self.birth_var_1d("r", "tku", None, None, min_max=[0, 450.], n_bins=160)
+
+        refit_options = {
+            "fit_1d_cuts":False,
+            "normalise":False,
+            "logy":True,
+        }
+        self.birth_var_1d("refit", "tku", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
+        self.birth_var_1d("refit", "tkd", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
         self.birth_var_1d("SP Res(x)", "tku", None, None, min_max=[-2.5, 2.5])
         self.birth_var_1d("SP Res(y)", "tku", None, None, min_max=[-2.5, 2.5])
         if self.config_anal["do_globals"]:
@@ -192,12 +202,13 @@ class DataPlotter(AnalysisBase):
         self.process_var_2d("x", "tku", "y", "tku", "all", None, None)
         self.process_var_2d("r", "tku", "pt", "tku", "all", None, None)
 
-        for detector, test_cut in []: #("tku", "us cut"), ("tkd", "ds cut"):
+        for detector, test_cut in ("tku", "us cut"), ("tkd", "ds cut"):
             for station in range(1, 6):
-                for predicate in [self.doublet, self.triplet, self.any_sp,
-                                  self.used_doublet, self.used_triplet, self.used,
-                                  self.not_used, self.not_used_triplet, self.not_used_doublet]:
-                    for cut in ["all", test_cut]:
+                for predicate in [self.used, self.used_doublet, self.used_triplet]:
+                                 #[self.doublet, self.triplet, self.any_sp,
+                                 # self.used_doublet, self.used_triplet, self.used,
+                                 # self.not_used, self.not_used_triplet, self.not_used_doublet]:
+                    for cut in [test_cut]: #"all", 
                         a_detector = detector+"_sp_"+str(station)
                         self.process_var_2d("x", a_detector, "y", a_detector, cut, None, predicate)
                     var = "sp_npe_per_cluster_"+str(station)
@@ -221,6 +232,8 @@ class DataPlotter(AnalysisBase):
         self.process_var_2d("y", "tof0", "y", "tof1", "us cut", None, None)
 
 
+        self.process_var_1d("charge_product", "tof0", None, None)
+        self.process_var_1d("charge_product", "tof1", None, None)
         self.process_var_1d("x", "tof0", None, None)
         self.process_var_1d("y", "tof0", None, None)
         self.process_var_1d("x", "tof1", None, None)
@@ -233,6 +246,9 @@ class DataPlotter(AnalysisBase):
         self.process_var_1d("r", "tku", None, None)
         self.process_var_1d("SP Res(x)", "tku", None, None)
         self.process_var_1d("SP Res(y)", "tku", None, None)
+
+        self.process_var_1d("refit", "tku", None, None)
+        self.process_var_1d("refit", "tkd", None, None)
 
         self.process_var_1d("r", "tku", None, None)
         self.process_var_1d("x", "tkd", None, None)
@@ -328,6 +344,12 @@ class DataPlotter(AnalysisBase):
     def birth_tof(self, tof, xmin, xmax):
         axis = {"tof01":"tof1 - tof0 [ns]", "tof12":"tof2 - tof1 [ns]"}[tof]
         tof_us_cut, tof_ds_cut, tof_all = self.get_data_tof(tof)
+        if len(tof_us_cut) == 0:
+            tof_us_cut.append(0.)
+        if len(tof_ds_cut) == 0:
+            tof_ds_cut.append(0.)
+        if len(tof_all) == 0:
+            tof_all.append(0.)
         hist = self.make_root_histogram(tof, tof+" all", tof_all, axis, 250, [], '', 0, [], xmin, xmax)
         hist = self.make_root_histogram(tof, tof+" us cut", tof_us_cut, axis, 250, [], '', 0, [], xmin, xmax)
         hist = self.make_root_histogram(tof, tof+" ds cut", tof_ds_cut, axis, 250, [], '', 0, [], xmin, xmax)
@@ -481,6 +503,23 @@ class DataPlotter(AnalysisBase):
                 residuals_cut_ds_list.append(sp[axis] - tp[axis])        
         return residuals_cut_us_list, residuals_cut_ds_list, residuals_list
 
+    def get_tof_charge_stuff(self, detector, var):
+        data_all = []
+        data_cut_us = []
+        data_cut_ds = []
+        for event in self.data_loader.events:
+            if event[tracker] == None:
+                continue
+            if event_predicate != None and not event_predicate(event):
+                continue
+            data = event[tracker][var]
+            data_all.append(data)
+            if not self.will_cut_us(event):
+                data_cut_us.append(data)
+            if not self.will_cut_ds(event):
+                data_cut_ds.append(data)
+        return data_cut_us, data_cut_ds, data_all
+
     def get_detector_data(self, detector, var, event_predicate, hit_predicate):
         if "SP Res" in var:
             return self.get_data_sp_residuals(detector, var)
@@ -530,7 +569,10 @@ class DataPlotter(AnalysisBase):
                 continue
             if hit_predicate != None and not hit_predicate(hit):
                 continue
-            data = hit["hit"][var]
+            if var in hit["hit"].get_variables():
+                data = hit["hit"][var]
+            else:
+                data = hit[var]
             data_all.append(data)
             if not self.will_cut_us(event):
                 data_cut_us.append(data)
@@ -648,7 +690,7 @@ class DataPlotter(AnalysisBase):
     def birth_chi2(self, tracker):
         chi2_cut_us, chi2_cut_ds, chi2_all = self.get_tracker_data(tracker, "chi2")
         axis =  "#chi^{2}/n_{df} ("+tracker+")"
-        chi_max = 2.*self.config_anal["chi2_threshold"]
+        chi_max = 2.*self.config_anal[tracker+"_chi2_threshold"]
         hist = self.make_root_histogram("chi2 "+tracker, "chi2 all", chi2_all, axis, 100, [], '', 0, [], 0., chi_max)
         hist_cut_us = self.make_root_histogram("chi2 "+tracker, "chi2 us cut", chi2_cut_us, axis, 100, [], '', 0, [], 0., chi_max)
         hist_cut_ds = self.make_root_histogram("chi2 "+tracker, "chi2 ds cut", chi2_cut_ds, axis, 100, [], '', 0, [], 0., chi_max)
@@ -705,7 +747,21 @@ class DataPlotter(AnalysisBase):
                                         tof_data, tof+" [ns]", 100, p_data,
                                         "p_{"+tk+"} [MeV/c]", 100, [],
                                         -5., 15., 0., 300., )
+        tof_low = self.config_anal[tof+"_cut_low"]
+        tof_high = self.config_anal[tof+"_cut_high"]
+        if tk == "tku":
+            tk_low = min([min(a_bin) for a_bin in self.config_anal["p_bins"]])
+            tk_high = max([max(a_bin) for a_bin in self.config_anal["p_bins"]])
+        else:
+            tk_low = self.config_anal["p_tot_ds_low"]
+            tk_high = self.config_anal["p_tot_ds_high"]
+        x_list = [tof_low, tof_low, tof_high, tof_high, tof_low]
+        y_list = [tk_low, tk_high, tk_high, tk_low, tk_low]
         hist.Draw("COLZ")
+        hist, graph = self.make_root_graph("p_"+tk+"_vs_"+tof+"_"+cuts,
+                                     "cuts_graph", x_list, "", y_list, "", False)
+        graph.SetLineColor(ROOT.kRed)
+        graph.Draw("SAMEL")
 
     def process_p_tot_vs_tof(self, tof, tk, cuts):
         tof_data, p_data = self.get_p_tot_vs_tof_data(tof, tk, cuts)

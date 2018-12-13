@@ -34,12 +34,20 @@ class CutsPlotter(AnalysisBase):
             will_cut = will_cut or not event["will_cut"][a_cut]
         return will_cut
 
+    def fits_on(self, name):
+        fits_options = {
+            "fit_1d_cuts":True,
+            "fit_1d_cuts_list":[name],
+            "fit_range":None,
+        }
+        return fits_options
+
     def birth(self):
         self.set_plot_dir("cut_plots")
         tof01_min = self.config_anal["tof01_cut_low"]
         tof01_max = self.config_anal["tof01_cut_high"]
         self.birth_cut_correlations()
-        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [1., 7.], 160, {}, [tof01_min, tof01_max])
+        self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [1., 7.], 160, self.fits_on("tof01_8_0_hist"), [tof01_min, tof01_max])
         self.birth_var_1d("tof", "tof0_n_sp", "us cut", ["tof_0_sp"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tof", "tof1_n_sp", "us cut", ["tof_1_sp"], [0.5, 4.5], 4, {}, [0.5, 1.5])
         self.birth_var_1d("tku", "n_tracks", "us cut", ["scifi_tracks_us", "global_through_tof0"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
@@ -62,8 +70,8 @@ class CutsPlotter(AnalysisBase):
 
         p_min = min([min(a_bin) for a_bin in self.config_anal["p_bins"]])
         p_max = max([max(a_bin) for a_bin in self.config_anal["p_bins"]])
-        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-35., p_max+35.], 100, {}, [p_min, p_max])
-        chi2_max = self.config_anal["chi2_threshold"]
+        self.birth_var_1d("tku", "p", "us cut", ["p_tot_us"], [p_min-35., p_max+35.], 100, self.fits_on("tku_p_8_0_hist"), [p_min, p_max])
+        chi2_max = self.config_anal["tku_chi2_threshold"]
         self.birth_var_1d("tku", "chi2", "us cut", ["chi2_us"], [0., chi2_max*2], 100, {}, [chi2_max])
         diff = "global_through_virtual_diffuser"
         for aperture in self.config.upstream_aperture_cut:
@@ -75,6 +83,7 @@ class CutsPlotter(AnalysisBase):
         p_max = self.config_anal["p_tot_ds_high"]
         delta_p = p_max-p_min
         self.birth_var_1d("tkd", "p", "ds cut", ["p_tot_ds"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
+        chi2_max = self.config_anal["tkd_chi2_threshold"]
         self.birth_var_1d("tkd", "chi2", "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
         self.birth_var_1d("tkd", "n_tracks", "ds cut", ["scifi_tracks_ds"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tkd", "max_r", "ds cut", ["scifi_fiducial_ds"], [0., 300.], 100, {}, [150.])
@@ -284,7 +293,7 @@ class CutsPlotter(AnalysisBase):
         if units != '':
             label += ' ['+units+']'
 
-        hist = self.make_root_histogram(plot_name, plot_name,
+        hist = self.make_root_histogram(plot_name, plot_name+"_hist",
                                         data, label, n_bins,
                                         [], "", 50, [], min_max[0], min_max[1])
         hist.Draw("p e1")
@@ -312,7 +321,7 @@ class CutsPlotter(AnalysisBase):
         data = self.get_data(detector, var, wont_cut_list, will_cut_list)
         #if var == "max_r":
         #    print "cuts_plotter process_var_1d", data
-        hist = self.get_plot(plot_name)["histograms"][plot_name]
+        hist = self.get_plot(plot_name)["histograms"][plot_name+"_hist"]
         for item in data:
             hist.Fill(item)
 

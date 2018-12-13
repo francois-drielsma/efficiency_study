@@ -8,6 +8,7 @@ import tempfile
 import glob
 import shutil
 import os
+import copy
 
 
 import ROOT
@@ -18,11 +19,12 @@ from xboa.bunch import Bunch
 import utilities.chi2_distribution
 from utilities.binomial_confidence_interval import BinomialConfidenceInterval
 
-from mice_analysis.amplitude.weighting import Weighting
 from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
 from mice_analysis.amplitude.amplitude_data_binless import AmplitudeDataBinless
 from mice_analysis.analysis_base import AnalysisBase
 from mice_analysis.amplitude.plot_amplitude_data import PlotAmplitudeData
+from mice_analysis.amplitude.plot_amplitude_analysis import PlotAmplitudeAnalysis
+
 
 #REPHRASE SYSTEMATICS;
 #* efficiency and purity is the migration matrix from mc to reco mc
@@ -35,13 +37,11 @@ class AmplitudeAnalysis(AnalysisBase):
         super(AmplitudeAnalysis, self).__init__(config, config_anal, data_loader)
         self.config = config
         self.config_anal = config_anal
-        self.amplitudes = {"momentum_uncertainty":{}, "inefficiency":{}, "crossing_probability":{}}
+        self.clear_amplitude_data()
         self.bin_edge_list = [float(i) for i in range(0, 101, config.amplitude_bin_width)]
         self.a_dir = tempfile.mkdtemp()
         file_name = self.a_dir+"/amp_data_"
         mu_mass = common.pdg_pid_to_mass[13]
-        self.us_color = ROOT.kOrange+4
-        self.ds_color = ROOT.kGreen+3
         AmplitudeData = self.get_amplitude_algorithm()
         self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
         self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
@@ -49,6 +49,8 @@ class AmplitudeAnalysis(AnalysisBase):
         self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
         self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+        self.plotter = PlotAmplitudeAnalysis(self)
+        self.calculate_corrections = self.config_anal["amplitude_corrections"] == None
 
     def get_amplitude_algorithm(self):
         if self.config_anal['amplitude_algorithm'] == 'binned':
@@ -69,12 +71,14 @@ class AmplitudeAnalysis(AnalysisBase):
 
     def birth(self):
         self.set_plot_dir("amplitude")
+        self.plotter.plot_dir = self.plot_dir
         self.all_mc_data_us.clear()
         self.reco_mc_data_us.clear()
         self.reco_data_us.clear()
         self.all_mc_data_ds.clear()
         self.reco_mc_data_ds.clear()
         self.reco_data_ds.clear()
+        self.clear_amplitude_data()
         self.load_errors()
         try:
             os.mkdir(self.plot_dir+"/phase_space")
@@ -91,29 +95,37 @@ class AmplitudeAnalysis(AnalysisBase):
 
     def death(self):
         self.delta_amplitude_calc("reco")
-        self.field_uncertainty_calc("all_upstream")
-        self.field_uncertainty_calc("all_downstream")
         if self.config_anal["amplitude_mc"]:
             self.delta_amplitude_calc("all_mc")
             self.delta_amplitude_calc("reco_mc")
-            self.systematics_calc("all_upstream")
-            self.systematics_calc("all_downstream")
-        if self.config_anal["amplitude_mc"]:
+        if self.calculate_corrections:
+            self.corrections_calc("all_upstream")
+            self.corrections_calc("all_downstream")
             for target in "all_upstream", "all_downstream":
-                self.systematics_plot(target)
+                self.plotter.systematics_plot(target)
+        if self.config_anal["amplitude_mc"]:
             for suffix in ["reco_mc", "all_mc"]:
-                self.pdf_plot(suffix)
-                self.amplitude_scatter_plot(suffix)
-            self.efficiency_plot()
+                self.corrections_and_uncertainties(suffix)
+                self.cdf_data(suffix)
+                self.ratio_data(suffix)
+                self.plotter.pdf_plot(suffix)
+                self.plotter.cdf_plot(suffix)
+                self.plotter.pdf_ratio_plot(suffix)
+                self.plotter.cdf_ratio_plot(suffix)
+                self.plotter.amplitude_scatter_plot(suffix)
+        if self.calculate_corrections:
+            self.plotter.amplitude_residuals_plot("upstream")
+            self.plotter.amplitude_residuals_plot("downstream")
+            self.plotter.efficiency_plot()
         for suffix in ["reco"]:
             self.corrections_and_uncertainties(suffix)
             self.cdf_data(suffix)
             self.ratio_data(suffix)
-            self.pdf_plot(suffix)
-            self.cdf_plot(suffix)
-            self.pdf_ratio_plot(suffix)
-            self.cdf_ratio_plot(suffix)
-            self.amplitude_scatter_plot(suffix)
+            self.plotter.pdf_plot(suffix)
+            self.plotter.cdf_plot(suffix)
+            self.plotter.pdf_ratio_plot(suffix)
+            self.plotter.cdf_ratio_plot(suffix)
+            self.plotter.amplitude_scatter_plot(suffix)
         self.print_data()
         self.move_data()
 
@@ -132,7 +144,7 @@ class AmplitudeAnalysis(AnalysisBase):
           as defined during the append_data step. reco is supposed to be
           recontructed data; all_mc is all monte carlo data; reco_mc is all
           monte carlo data that is also in the reco sample
-        Calculates amplitudes using the AmplitudeDataBinless algorithms; fills
+        Calculates amplitudes using the AmplitudeData algorithms; fills
         dicts; then fills pdfs and migration matrices
         """
         data_0, data_1 = {
@@ -142,7 +154,7 @@ class AmplitudeAnalysis(AnalysisBase):
         }[suffix]
         print "Amplitude", suffix
         print "  starting delta_amplitude_calc    ", datetime.datetime.now()
-        data = {}
+        data = self.amplitudes[suffix]
         print "  Upstream amplitude calculation...  ", datetime.datetime.now()
         fractional_amplitude_dict_0 = data_0.fractional_amplitude()
         print "  n_events", len(fractional_amplitude_dict_0)
@@ -153,8 +165,8 @@ class AmplitudeAnalysis(AnalysisBase):
 
         data["amplitude_dict_upstream"] = fractional_amplitude_dict_0
         data["amplitude_dict_downstream"] = fractional_amplitude_dict_1
-        data["all_upstream"] = self.get_pdfs(fractional_amplitude_dict_0)
-        data["all_downstream"] = self.get_pdfs(fractional_amplitude_dict_1)
+        self.set_pdfs(data, "all_upstream", fractional_amplitude_dict_0)
+        self.set_pdfs(data, "all_downstream", fractional_amplitude_dict_1)
         for name, amp_data in [("all_upstream", data_0),
                            ("all_downstream", data_1)]:
             data[name]["emittance"] = amp_data.get_emittance()
@@ -165,7 +177,7 @@ class AmplitudeAnalysis(AnalysisBase):
         print "  downstream", data["all_downstream"]["pdf"], "sum", sum(data["all_downstream"]["pdf"])
 
         data["migration_matrix"] = self.migration_matrix(fractional_amplitude_dict_0, fractional_amplitude_dict_1, False)
-        data["upstream_scraped"], data["upstream_not_scraped"] = self.get_delta_pdfs(fractional_amplitude_dict_0, fractional_amplitude_dict_1)
+        self.set_delta_pdfs(data, fractional_amplitude_dict_0, fractional_amplitude_dict_1)
         self.amplitudes[suffix] = data
 
         us_plotter = PlotAmplitudeData(data_0, self.plot_dir, "us")
@@ -176,16 +188,6 @@ class AmplitudeAnalysis(AnalysisBase):
 
         print "  done amplitude calc                ", datetime.datetime.now()
 
-    def efficiency_plot(self):
-        weighting = Weighting(self.reco_mc_data_ds, self.all_mc_data_ds, self.plot_dir)
-        weighting.plot_sum("x", 20, [-200., 200.], "y", 20, [-200., 200.])
-        weighting.plot_sum("x", 20, [-200., 200.], "px", 20, [-100., 100.])
-        weighting.plot_sum("x", 20, [-200., 200.], "py", 20, [-100., 100.])
-        weighting.plot_sum("y", 20, [-200., 200.], "px", 20, [-100., 100.])
-        weighting.plot_sum("y", 20, [-200., 200.], "py", 20, [-100., 100.])
-        weighting.plot_sum("px", 20, [-100., 100.], "py", 20, [-100., 100.])
-
-
     def get_bin_centre_list(self):
         """
         Return the list of bin centres, calculated using self.bin_edge_list
@@ -194,7 +196,7 @@ class AmplitudeAnalysis(AnalysisBase):
         bin_centre_list = [bin_edge+bin_width/2. for bin_edge in self.bin_edge_list[:-1]]
         return bin_centre_list
 
-    def get_delta_pdfs(self, a_dict_us, a_dict_ds):
+    def set_delta_pdfs(self, data, a_dict_us, a_dict_ds):
         """
         Return binned data corresponding to scraped events
         
@@ -214,30 +216,22 @@ class AmplitudeAnalysis(AnalysisBase):
                 not_scraped_dict[key] = value
             else:
                 scraped_dict[key] = value
-        upstream_scraped = self.get_pdfs(scraped_dict)
-        upstream_not_scraped = self.get_pdfs(not_scraped_dict)
-        return upstream_scraped, upstream_not_scraped
+        self.set_pdfs(data, "upstream_scraped", scraped_dict)
+        self.set_pdfs(data, "upstream_not_scraped", not_scraped_dict)
 
-    def get_pdfs(self, fractional_amplitude_dict):
+    def set_pdfs(self, data, us_ds, fractional_amplitude_dict):
         """
         Bin the data in the amplitude dict and return as a list
         """
         bin_centre_list = self.get_bin_centre_list()
-        data = {}
-        data["bin_centre_list"] = bin_centre_list
-        data["pdf"] = [0]*(len(self.bin_edge_list))
+        if us_ds not in data:
+            data[us_ds] = {}
+        data[us_ds]["bin_centre_list"] = bin_centre_list
+        data[us_ds]["pdf"] = [0.]*(len(self.bin_edge_list))
         amplitude_index = 0
         for amplitude in fractional_amplitude_dict.values():
             amp_0_bin = bisect.bisect_left(self.bin_edge_list, amplitude)-1
-            data["pdf"][amp_0_bin] += 1
-        return data
-
-    def plot_amplitude_data(self, amplitude_data, plot_lambda):
-        """
-        Plot 1D histogram of the ellipse together with the ellipses used for the
-        amplitude calculation
-        """
-        pass
+            data[us_ds]["pdf"][amp_0_bin] += 1.
 
     def migration_matrix_alt(self, fractional_amplitude_dict_0, fractional_amplitude_dict_1):
         """
@@ -248,8 +242,6 @@ class AmplitudeAnalysis(AnalysisBase):
 
         Builds the number of events N_0 and N_1 in each distribution; set matrix 
         so that N_1 = M N_0; overflow bin is allowed
-        
-        WRONG!
         """
         n_bins = len(self.bin_edge_list)
         # bin the data
@@ -314,19 +306,36 @@ class AmplitudeAnalysis(AnalysisBase):
             amp_1_bin = bisect.bisect_left(self.bin_edge_list, amp_pair[1])-1
             migration_matrix[amp_0_bin][amp_1_bin] += 1
         if normalise:
-            for i, row in enumerate(migration_matrix):
-                row_sum = float(sum(row))
-                for j, element in enumerate(row):
-                    if abs(row_sum) < 1e-3:
-                        if i == j:
-                            migration_matrix[i][j] = 1. # identity
-                        else:
-                            migration_matrix[i][j] = 0.
-                    else:
-                        migration_matrix[i][j] /= row_sum
+            migration_matrix = self.row_normalise_matrix(migration_matrix, 1.)
         return migration_matrix
 
-    def systematics_calc(self, target):
+    def row_normalise_matrix(self, matrix, default):
+        """
+        Return a copy of matrix that is normalised to the number in row so that
+        sum_i(m_ij) = 1.
+        - matrix: matrix to be normalised
+        - default: if row_sum is 0., the diagonal terms go to "default"
+        """
+        migration_matrix = copy.deepcopy(matrix)
+        for i, row in enumerate(migration_matrix):
+            row_sum = float(sum(row))
+            for j, element in enumerate(row):
+                if abs(row_sum) < 1e-3:
+                    if i == j:
+                        migration_matrix[i][j] = default # identity
+                    else:
+                        migration_matrix[i][j] = 0.
+                else:
+                    migration_matrix[i][j] /= row_sum
+        return migration_matrix
+
+
+    def corrections_calc(self, target):
+        """
+        Calculate the pdf corrections (migration matrix and efficiency matrix)
+        
+        Uses the MC to generate corrections
+        """
         amp_key = {"all_upstream":"amplitude_dict_upstream",
                    "all_downstream":"amplitude_dict_downstream"}[target]
         all_mc_pdf = self.amplitudes["all_mc"][target]["pdf"]
@@ -351,66 +360,8 @@ class AmplitudeAnalysis(AnalysisBase):
         self.amplitudes["crossing_probability"][target]["migration_matrix"] = \
                       self.migration_matrix(fractional_reco, fractional_reco_mc, True)
 
-    def field_uncertainty_calc(self, target):
-        amp_key = {"all_upstream":"amplitude_dict_upstream",
-                   "all_downstream":"amplitude_dict_downstream"}[target]
-        fractional_reco = self.amplitudes["reco"][amp_key]
-        fractional_reco_uncertainty = {}
-        for key, value in fractional_reco.iteritems():
-            #print "field uncertainty calc", key, value
-            if value == None:
-                fractional_reco_uncertainty[key] = None
-            else:
-                fractional_reco_uncertainty[key] = value*(1.+self.config_anal["field_uncertainty"])
-        self.amplitudes["momentum_uncertainty"][target] = {}
-        self.amplitudes["momentum_uncertainty"][target]["migration_matrix"] = \
-             self.migration_matrix(fractional_reco_uncertainty, fractional_reco, True)
-
-    def systematics_plot(self, target):
-        """
-        Plot systematic corrections:
-        * Momentum correction matrix
-        * Crossing probability due to reconstruction
-        * Inefficiency/impurity
-        """
-        if "upstream" in target:
-            label = "US"
-        elif "downstream" in target:
-            label = "DS"
-        matrix = self.amplitudes["momentum_uncertainty"][target]["migration_matrix"]
-        title = ("momentum_uncertainty_"+target).replace("_all", "").replace("_", " ")
-        self.matrix_plot(matrix, title,
-                         label+" "+self.get_suffix_label("reco")+" amplitude before momentum correction [mm]",
-                         label+" "+self.get_suffix_label("reco")+" amplitude after momentum correction [mm]")
-
-        matrix = self.amplitudes["crossing_probability"][target]["migration_matrix"]
-        title = ("crossing_probability_"+target).replace("_all", "").replace("_", " ")
-        self.matrix_plot(matrix, title,
-                         label+" "+self.get_suffix_label("reco")+" amplitude [mm]",
-                         label+" "+self.get_suffix_label("reco_mc")+" amplitude [mm]")
-
-        inefficiency = self.amplitudes["inefficiency"][target]["pdf_ratio"]
-        canvas = common.make_root_canvas("inefficiency_"+target)
-
-        hist, graph = common.make_root_graph("inefficiency",
-                                             self.get_bin_centre_list(), label+" MC Truth Amplitude [mm]",
-                                             inefficiency[:-1], label+" "+self.get_suffix_label("all_mc")+" number/"+self.get_suffix_label("reco_mc")+" number")
-        hist.GetYaxis().SetRangeUser(0., 2.0)
-        hist.SetTitle(self.config_anal['name'])
-        hist.Draw()
-        graph.SetMarkerStyle(24)
-        graph.Draw("p")
-        for format in "eps", "root", "png":
-            canvas.Print(self.plot_dir+"amplitude_inefficiency_"+target+"."+format)
-        hist.GetYaxis().SetRangeUser(0.9, 1.1)
-        hist.Draw()
-        graph.SetMarkerStyle(24)
-        graph.Draw("p")
-        for format in "eps", "root", "png":
-            canvas.Print(self.plot_dir+"amplitude_inefficiency_zoom_"+target+"."+format)
-
     def matrix_str(self, matrix, rounding=2, width=10):
-        """Represent the matrix as a string (space separated)"""
+        """Represent a matrix as a string (space separated)"""
         matrix_str = ""
         for row in matrix:
             try:
@@ -452,13 +403,13 @@ class AmplitudeAnalysis(AnalysisBase):
                 # Square because we add errors in quadrature
                 error_matrix[j][i] = error**2
         # Add errors in quadrature
-        suffix_label = self.get_suffix_label(suffix)
-        self.matrix_plot(migration_matrix, "migration matrix",
+        suffix_label = self.plotter.get_suffix_label(suffix)
+        self.plotter.matrix_plot(migration_matrix, "migration matrix",
                          "DS "+suffix_label+" Amplitude [mm]",
                          "US "+suffix_label+" Amplitude [mm]")
         downstream_errors = [sum(row)**0.5 for row in error_matrix]
         error_matrix_sqrt = [[element**0.5 for element in row] for row in error_matrix]
-        self.matrix_plot(error_matrix_sqrt, "stats error",
+        self.plotter.matrix_plot(error_matrix_sqrt, "stats error",
                          "DS "+suffix_label+" Amplitude [mm]",
                          "US "+suffix_label+" Amplitude [mm]")
         print "upstream pdf\n", self.matrix_str(row_sum)
@@ -467,55 +418,125 @@ class AmplitudeAnalysis(AnalysisBase):
         print "downstream errors\n", self.matrix_str(downstream_errors)
         return downstream_errors
 
-    def matrix_plot(self, matrix, title, axis_1, axis_2):
+    def do_migrations(self, suffix, us_ds, migrations):
         """
-        Plot the matrix entries as a TH2D
-        
-        * matrix: matrix data to plot; list n_bins by n_bins
-        * title: the title of the hist (used in the file name also)
-        * axis_1: x axis title
-        * axis_2: y axis title
+        Calculate the pdf that results from applying the specified migrations.
+        - suffix: Controls the source data and how the migration is applied.
+        If suffix is "reco", this will apply the correction matrix 
+        (for detector resolution) and then the efficiency correction; if suffix 
+        is "reco_mc" this will apply only the efficiency correction; else no 
+        correction is applied at all and the pdf is returned with no change
+        - us_ds: control whether to apply the data on upstream or downstream
+        - migrations: source for the migrations
         """
-        bin_centre_list = self.amplitudes["reco"]["all_upstream"]["bin_centre_list"]
-        xmax = max(self.bin_edge_list)
-        nbins = len(bin_centre_list)
-        matrix_hist = ROOT.TH2D(title, title+";"+axis_1+";"+axis_2, nbins, 0., xmax, nbins, 0., xmax)
-        for i in range(nbins):
-            for j in range(nbins):
-                matrix_hist.Fill(bin_centre_list[i], bin_centre_list[j], matrix[i][j])
-        self.root_objects.append(matrix_hist)
-        canvas = common.make_root_canvas(title)
-        canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
-        matrix_hist.SetTitle(self.config_anal['name'])
-        matrix_hist.SetStats(False)
-        matrix_hist.Draw("COLZ")
-        title = title.replace(" ", "_")
-        for format in ["eps", "png", "root"]:
-            canvas.Print(self.plot_dir+title+"."+format)
+        pdf = numpy.array(self.amplitudes[suffix][us_ds]["pdf"])
+        if suffix == "reco":
+            reco_mc_matrix = migrations["crossing_probability"][us_ds]["migration_matrix"]
+            reco_mc_matrix = numpy.transpose(numpy.array(reco_mc_matrix))
+            pdf = numpy.dot(reco_mc_matrix, pdf)
+        if suffix == "reco" or suffix == "reco_mc":
+            pdf = pdf*numpy.array(migrations["inefficiency"][us_ds]["pdf_ratio"])
+        return pdf.tolist()
 
-    def do_migrations(self, target, systematic):
-        #print "Doing migrations for", target
-        if systematic == None:
-            migrations = self.amplitudes
-        else:
-            migrations = self.amplitudes["systematics"][systematic]
-        reco_pdfs = numpy.array(self.amplitudes["reco"][target]["pdf"])
-        #print "Reco             ", reco_pdfs
-        reco_mc_matrix = migrations["crossing_probability"][target]["migration_matrix"]
-        reco_mc_matrix = numpy.transpose(numpy.array(reco_mc_matrix))
-        mc_reco_pdfs = numpy.dot(reco_mc_matrix, reco_pdfs)
-        #print "Recovered MC Reco", mc_reco_pdfs
-        #try:
-        #    print "Actual MC Reco   ", numpy.array(self.amplitudes["reco_mc"][target]["pdf"])
-        #except KeyError:
-        #    print "<Nothing recorded>"
-        mc_pdfs = mc_reco_pdfs*numpy.array(migrations["inefficiency"][target]["pdf_ratio"])
-        #print "Recovered All MC ", mc_pdfs
-        #try:
-        #    print "Actual all MC    ", numpy.array(self.amplitudes["all_mc"][target]["pdf"])
-        #except KeyError:
-        #    print "<Nothing recorded>"
-        return mc_pdfs.tolist()
+    def calculate_detector_systematics(self, suffix, us_ds):
+        """
+        Calculate the systematic errors in the reconstruction of tracks
+        """
+        data = self.amplitudes[suffix]
+        bins = range(len(data[us_ds]["pdf"]))
+        sys_error_list = [0 for i in bins]
+        if data["detector_reference"] == None:
+            return [0. for i in bins]
+
+        print "\nReconstruction systematic errors", us_ds
+        migrations = data["detector_reference"]
+        ref_pdf_list = self.do_migrations(suffix, us_ds, migrations)
+
+        print 'ref pdf: ', [format(p, '6.4g') for p in ref_pdf_list]
+
+        systematics_list = data[us_ds]["detector_systematics"]
+        for i, migrations in enumerate(systematics_list):
+            scale = migrations["scale"]
+            source = migrations["source"]
+            sys_pdf_list = self.do_migrations(suffix, us_ds, migrations)
+            print "sys pdf: ", [format(p, '6.4g') for p in sys_pdf_list]
+            print "  ", i, str(scale).ljust(6), "  err:",
+            for j in bins:
+                err = (sys_pdf_list[j] - ref_pdf_list[j])*scale
+                print format(err, '6.2e'),
+                sys_error_list[j] = (sys_error_list[j]**2+err**2)**0.5
+            print
+        print "\nsum: ", [format(err, '6.2e') for err in sys_error_list]
+        return sys_error_list
+
+    def calculate_performance_systematics(self, suffix, us_ds):
+        """
+        Calculate the systematic errors in the channel performance. We study the
+        migration from tku bin i to tkd bin j. We characterise the uncertainty 
+        in the downstream distributions from those uncertainties.
+        
+        The uncertainty in the migration from ith bin to jth bin m_ij is 
+        calculated by taking
+            m(err_k)_ij = m(err)_ij - m(ref)_ij
+            m(err)_ij = (sum_k m**2(err_k)_ij)**0.5
+            n(err)_i = sum_j m(err)_ij n(tku)_j
+        Stored migration matrix m_ij is number in (TKU bin i) AND (TKD bin j).
+        """
+        data = self.amplitudes[suffix]
+        tku_ref = data["all_upstream"]["pdf"]
+        bins = range(len(tku_ref))
+        if data["performance_reference"] == None:
+            return [0. for i in bins]
+        print "\nPerformance systematic errors", suffix
+        migrations = data["performance_reference"]
+        ref_matrix = migrations[suffix]["migration_matrix"]
+        ref_matrix = self.row_normalise_matrix(ref_matrix, 0.)
+        err_matrix = [[0. for i in bins] for j in bins]
+
+        systematics_list = data[us_ds]["performance_systematics"]
+        for i, systematic in enumerate(systematics_list):
+            sys_matrix = systematic[suffix]["migration_matrix"]
+            sys_matrix = self.row_normalise_matrix(sys_matrix, 0.)
+            scale = systematic["scale"]
+            source = systematic["source"]
+            print "  ", i, scale, source, "  error matrix:"
+            for i in bins:
+                print "   ",
+                for j in bins:
+                    err = sys_matrix[i][j] - ref_matrix[i][j]
+                    print format(err, '10.4g'),
+                    err_matrix[i][j] += (err*scale)**2
+                print
+            print
+        err_matrix = [[cell**0.5 for cell in row] for row in err_matrix]
+        ref = data["performance_reference"][suffix]
+        print 'Finally TKU pdf:\n   ',
+        for i in bins:
+              pdf = ref["all_upstream"]["pdf"]
+              print format(pdf[i], '6.4g'),
+        print '\nFinally TKD pdf:\n   ',
+        for i in bins:
+              pdf = ref["all_downstream"]["pdf"]
+              print format(pdf[i], '6.4g'),
+        tku_list = ref["all_upstream"]["pdf"]
+        sys_error_list = [0. for i in bins]
+        for i in bins:
+            for j in bins:
+                sys_error_list[j] += err_matrix[i][j] * tku_list[i]
+        print 'Finally err pdf:\n   ',
+        for i in bins:
+              pdf = sys_error_list
+              print format(pdf[i], '6.4g'),
+        print "\nFinally error matrix\n   ",
+        print self.matrix_str(err_matrix)
+        print "\nFinally reference migration matrix\n   ",
+        print self.matrix_str(ref_matrix)
+
+        sys_error_list = [0. for i in bins]
+        for i in bins:
+            for j in bins:
+                sys_error_list[j] += err_matrix[i][j] * tku_ref[i]
+        return sys_error_list
 
     def corrections_and_uncertainties(self, suffix):
         """
@@ -524,42 +545,30 @@ class AmplitudeAnalysis(AnalysisBase):
             is the migration matrix and Eff_i is the efficiency
         * statistical errors are given by sum in quadrature of binomial errors
             on each bin migration
-        * systematic errors are given by estimated momentum uncertainty (CHECK,
-            NEEDS WORK)
         * total errors are given by sum in quadrature of statistical errors and
           systematic errors
         """
         data = self.amplitudes[suffix]
         raw_pdf_list_tku = data["all_upstream"]["pdf"]
         raw_pdf_list_tkd = data["all_downstream"]["pdf"]
-        bins = range(len(raw_pdf_list_tku))
         migration_matrix = data["migration_matrix"]
         data["all_upstream"]["pdf_stats_errors"] = [0. for bin in raw_pdf_list_tku]
-        data["all_downstream"]["pdf_stats_errors"] = self.stats_errors(migration_matrix, suffix)
-        for key in ["all_upstream", "all_downstream"]:
-            if suffix == "reco":
-                pdf_list = self.do_migrations(key, None)
-            else:
-                pdf_list = raw_pdf_list_tku
-            sys_error_list = [0 for i in bins]
-            if len(self.amplitudes["systematics"]) > 0:
-                print "Systematic errors"
-                ref_pdf_list = self.do_migrations(key, 0)
-                for i in range(len(self.amplitudes["systematics"][1:])):
-                    i += 1
-                    scale = self.amplitudes["systematics"][i]["scale"]
-                    print " ", i, self.amplitudes["systematics"][i]["source"], "with scale", scale
-                    sys_pdf_list = self.do_migrations(key, i)
-                    print "    err: ",
-                    for j in bins:
-                        err = (sys_pdf_list[j] - ref_pdf_list[j])*scale
-                        print round(err),
-                        sys_error_list[j] = (sys_error_list[j]**2+err**2)**0.5
-                    print "\n    sum: ", [round(err) for err in sys_error_list]
-            data[key]["corrected_pdf"] = pdf_list
-            data[key]["pdf_sys_errors"] = sys_error_list
-            print "    sys errors:   ", data[key]["pdf_sys_errors"] 
-            print "    stats errors: ", data[key]["pdf_stats_errors"]
+        data["all_downstream"]["pdf_stats_errors"] = \
+                                     self.stats_errors(migration_matrix, suffix)
+        for us_ds in ["all_upstream", "all_downstream"]:
+            # apply basic migrations
+            print "Doing error correction for", suffix, us_ds
+            migrations = self.amplitudes
+            pdf_list = self.do_migrations(suffix, us_ds, migrations)
+            data[us_ds]["corrected_pdf"] = pdf_list
+            print "Finding systematic errors for", suffix, us_ds
+            reco_sys_list = self.calculate_detector_systematics(suffix, us_ds)
+            perf_sys_list = self.calculate_performance_systematics(suffix, us_ds)
+            sys_error_list = [(reco_sys_list[i]**2+perf_sys_list[i]**2)**0.5 \
+                                                  for i in range(len(pdf_list))]
+            data[us_ds]["pdf_sys_errors"] = sys_error_list
+            print "    sys errors:   ", data[us_ds]["pdf_sys_errors"] 
+            print "    stats errors: ", data[us_ds]["pdf_stats_errors"]
             print "    pdf:          ", pdf_list
         self.amplitudes[suffix] = data
 
@@ -623,291 +632,9 @@ class AmplitudeAnalysis(AnalysisBase):
                     if pdf_list_tkd[i] > 0.5:
                         err_list_tkd[i] = data["all_downstream"][err_key][i]/pdf_list_tkd[i]
                     data["ratio"][err_key][i] = (err_list_tku[i]**2+err_list_tkd[i]**2)**0.5*ratio_pdf[i]
-                    print key, err_key
-                    print "   ", err_list_tku[i], data["all_upstream"][err_key][i], pdf_list_tku[i]
-                    print "   ", err_list_tkd[i], data["all_downstream"][err_key][i], pdf_list_tkd[i]
-                    print data["ratio"][err_key][i], data["ratio"][key][i]
+                print "amplitude_analysis.ratio_data", suffix, key, err_key+":", data["ratio"][err_key]
 
         self.amplitudes[suffix] = data
-
-    def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, fill=None, name="Graph"):
-        graph = ROOT.TGraphAsymmErrors(len(points)-1)
-        for i, low_edge in enumerate(self.bin_edge_list[:-1]):
-            high_edge = self.bin_edge_list[i+1]
-            centre = (low_edge+high_edge)/2.
-            graph.SetPoint(i, centre, points[i]/norm)
-            if errors != None:
-                graph.SetPointError(i, centre-low_edge, high_edge-centre, errors[i]/norm, errors[i]/norm)
-        if style != None:
-            graph.SetMarkerStyle(style)
-        if color != None:
-            graph.SetMarkerColor(color)
-        if fill != None:
-            graph.SetFillColor(fill)
-            graph.SetFillStyle(3001);
-        graph.SetName(name)
-        self.root_objects.append(graph)
-        return graph
-
-    def get_hist(self, graph_list, x_axis, y_axis, min_x = None, max_x = None, min_y = None, max_y = None):
-        if min_x == None:
-            min_x = min([graph.GetXaxis().GetXmin() for graph in graph_list])
-        if max_x == None:
-            max_x = max([graph.GetXaxis().GetXmax() for graph in graph_list])
-        if min_y == None:
-            min_y = min([graph.GetYaxis().GetXmin() for graph in graph_list])
-        if max_y == None:
-            max_y = max([graph.GetYaxis().GetXmax() for graph in graph_list])
-        print "HIST", min_x, max_x, min_y, max_y
-        hist = ROOT.TH2D(graph_list[0].GetName()+"_hist", ";"+x_axis+";"+y_axis,
-                          1000, min_x, max_x, 1000, min_y, max_y)
-        hist.SetStats(False)
-        self.root_objects.append(hist)
-        return hist
-
-    def chi2_graph(self, suffix, distribution):
-        data = self.amplitudes[suffix]
-        pdf_list_tku = data[distribution]["pdf"]
-        bin_centre_list = data[distribution]["bin_centre_list"]
-        n_bins = len(bin_centre_list)
-        weighted_integral = [bin_centre_list[i]*pdf_list_tku[i] for i in range(n_bins)]
-        integral = sum(pdf_list_tku)#*(bin_centre_list[1]-bin_centre_list[0])
-        max_bin = max(pdf_list_tku)
-        emittance = sum(weighted_integral)/integral/4.
-        dummy, graph = utilities.chi2_distribution.chi2_graph(emittance, max_bin, 100, 0., 100.)
-        return graph
-
-    def text_box(self, graph_list):
-        legend = ROOT.TLegend(0.6, 0.65, 0.89, 0.89)
-        for graph in graph_list:
-            legend.AddEntry(graph, graph.GetName(), "lep")
-        legend.SetBorderSize(0)
-        legend.Draw()
-        self.root_objects.append(legend)
-        text_box = ROOT.TPaveText(0.6, 0.55, 0.89, 0.65, "NDC")
-        text_box.SetFillColor(0)
-        text_box.SetBorderSize(0)
-        text_box.SetTextSize(0.04)
-        text_box.SetTextAlign(12)
-        text_box.AddText("MICE INTERNAL")
-        text_box.Draw()
-        self.root_objects.append(text_box)
-        text_box = ROOT.TPaveText(0.6, 0.45, 0.89, 0.55, "NDC")
-        text_box.SetFillColor(0)
-        text_box.SetBorderSize(0)
-        text_box.SetTextSize(0.03)
-        text_box.SetTextAlign(12)
-        text_box.AddText(self.config_anal['name'])
-        text_box.Draw()
-        self.root_objects.append(text_box)
-
-    def pdf_plot(self, suffix):
-        data = self.amplitudes[suffix]
-        us_data = self.amplitudes[suffix]["all_upstream"]
-        ds_data = self.amplitudes[suffix]["all_downstream"]
-        name = "amplitude_pdf_"+suffix
-        canvas = common.make_root_canvas(name)
-        canvas.SetName(name)
-        raw_upstream_graph = self.get_asymm_error_graph(us_data["pdf"],
-                                                    style=24, color=self.us_color, name="Raw upstream")
-        raw_downstream_graph = self.get_asymm_error_graph(ds_data["pdf"],
-                                                    style=26, color=self.ds_color, name="Raw downstream")
-        scraped_graph = self.get_asymm_error_graph(data["upstream_scraped"]["pdf"],
-                                                    style=25, color=ROOT.kViolet+2, name="Raw scraped") # 25 for not raw
-        
-        if suffix == "reco":
-            upstream_graph_stats = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                        us_data["pdf_stats_errors"],
-                                                        style=20, color=self.us_color,
-                                                        name = "Upstream stats")
-            upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                        us_data["pdf_sys_errors"],
-                                                        fill=self.us_color,
-                                                        name = "Upstream sys")
-            downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                          ds_data["pdf_stats_errors"],
-                                                        style=22, color=self.ds_color,
-                                                        name = "Downstream stats")
-            downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                          ds_data["pdf_sys_errors"],
-                                                        fill=self.ds_color,
-                                                        name = "Downstream sys")
-            print "Plotting us sys", us_data["pdf_sys_errors"]
-            print "Plotting ds sys", ds_data["pdf_sys_errors"]
-            graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
-            draw_list = ["2", "2", "p", "p", "p", "p", "p"]
-        else:
-            graph_list = [scraped_graph, raw_upstream_graph, raw_downstream_graph]
-            draw_list = ["p", "p", "p"]
-        hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number")
-        hist.Draw()
-        same = "SAME "
-        for i, graph in enumerate(graph_list):
-            graph.Draw(same+draw_list[i])
-        self.text_box(graph_list)
-
-        if self.config_anal["amplitude_chi2"]:
-            upstream_chi2 = self.chi2_graph(suffix, "all_upstream")
-            upstream_chi2.SetLineColor(self.us_color) 
-            upstream_chi2.Draw("SAMEL")
-            downstream_chi2 = self.chi2_graph(suffix, "all_downstream")
-            downstream_chi2.SetLineColor(self.ds_color)
-            downstream_chi2.Draw("SAMEL")
-
-        canvas.Update()
-        for a_format in ["eps", "pdf", "root", "png"]:
-            canvas.Print(self.plot_dir+"amplitude_pdf_"+suffix+"."+a_format)
-        return canvas
-
-    def cdf_plot(self, suffix):
-        us_data = self.amplitudes[suffix]["all_upstream"]
-        ds_data = self.amplitudes[suffix]["all_downstream"]
-        name = "amplitude_cdf_"+suffix
-        canvas = common.make_root_canvas(name)
-        canvas.SetName(name)
-
-        upstream_graph = self.get_asymm_error_graph(us_data["corrected_cdf"],
-                                                    us_data["cdf_stats_errors"],
-                                                    style=24, color=self.us_color,
-                                                    name = "Upstream CDF stats")
-        downstream_graph = self.get_asymm_error_graph(ds_data["corrected_cdf"],
-                                                      ds_data["cdf_stats_errors"],
-                                                    style=26, color=self.ds_color,
-                                                    name = "Downstream CDF stats")
-        upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_cdf"],
-                                                    us_data["cdf_sys_errors"],
-                                                    fill=self.us_color,
-                                                    name = "Upstream CDF sys")
-        downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_cdf"],
-                                                      ds_data["cdf_sys_errors"],
-                                                    fill=self.ds_color, name = "Downstream CDF sys")
-        graph_list = [upstream_graph, downstream_graph, upstream_graph_sys, downstream_graph_sys]
-        draw_list = ["p", "p", "2", "2"]
-
-        hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Cumulative Number")
-        hist.Draw()
-        for i, graph in enumerate(graph_list):
-            graph.Draw("SAME "+draw_list[i])
-        self.text_box(graph_list)
-
-        canvas.Update()
-        for a_format in ["eps", "pdf", "root", "png"]:
-            canvas.Print(self.plot_dir+"amplitude_cdf_"+suffix+"."+a_format)
-        return canvas
-
-    def cdf_ratio_plot(self, suffix):
-        data = self.amplitudes[suffix]["ratio"]
-        name = "cdf_ratio_"+suffix
-        canvas = common.make_root_canvas(name)
-        canvas.SetName(name)
-
-        cdf_graph_stats = self.get_asymm_error_graph(data["corrected_cdf"],
-                                               data["cdf_stats_errors"],
-                                               style=20, name = "CDF Ratio stats")
-        cdf_graph_sys = self.get_asymm_error_graph(data["corrected_cdf"],
-                                               data["cdf_sys_errors"], fill=ROOT.kGray, 
-                                               name = "CDF Ratio sys")
-        print "CDF"
-        print data["corrected_cdf"]
-        print data["cdf_stats_errors"]
-        print data["cdf_sys_errors"]
-        graph_list = [cdf_graph_stats, cdf_graph_sys]
-        draw_list = ["p", "2"]
-        
-        hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Cumulative Number Ratio")
-        hist.Draw()
-        for i, graph in enumerate(graph_list):
-            graph.Draw("SAME "+draw_list[i])
-        self.text_box(graph_list)
-
-        canvas.Update()
-        for a_format in ["eps", "pdf", "root", "png"]:
-            canvas.Print(self.plot_dir+canvas.GetName()+"."+a_format)
-        return canvas
-
-    def pdf_ratio_plot(self, suffix):
-        data = self.amplitudes[suffix]["ratio"]
-        name = "pdf_ratio_"+suffix
-        canvas = common.make_root_canvas(name)
-        canvas.SetName(name)
-
-        pdf_graph_stats = self.get_asymm_error_graph(data["corrected_pdf"],
-                                               data["pdf_stats_errors"],
-                                               style=20, name = "PDF Ratio stats")
-        pdf_graph_sys = self.get_asymm_error_graph(data["corrected_pdf"],
-                                               data["pdf_sys_errors"], fill=ROOT.kGray,
-                                               name = "PDF Ratio sys")
-        graph_list = [pdf_graph_stats, pdf_graph_sys]
-        draw_list = ["p", "2"]
-
-        hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number Ratio")
-        hist.Draw()
-        for i, graph in enumerate(graph_list):
-            graph.Draw("SAME "+draw_list[i])
-        self.text_box(graph_list)
-        print "PDF"
-        print data["corrected_pdf"]
-        print data["pdf_stats_errors"]
-        print data["pdf_sys_errors"]
-
-        
-        canvas.Update()
-        for a_format in ["eps", "pdf", "root", "png"]:
-            canvas.Print(self.plot_dir+canvas.GetName()+"."+a_format)
-        return canvas
-
-
-    def amplitude_scatter_plot(self, suffix):
-        """
-        Make a scatter plot of upstream versus downstream data
-        """
-        amp_dict_ds = self.amplitudes[suffix]["amplitude_dict_downstream"]
-        amp_dict_us = self.amplitudes[suffix]["amplitude_dict_upstream"]
-        amp_list_us = []
-        amp_list_ds = []
-        amp_list_delta = []
-
-        suffix_label = self.get_suffix_label(suffix)
-        for key, amp_ds in amp_dict_ds.iteritems():
-            try:
-                amp_us = amp_dict_us[key]
-            except KeyError:
-                sys.excepthook(*sys.exc_info())
-                continue
-            amp_delta = amp_us-amp_ds
-            amp_list_us.append(amp_us)
-            amp_list_ds.append(amp_ds)
-            amp_list_delta.append(amp_delta)
-        canvas = common.make_root_canvas("delta_amplitude_scatter")
-        canvas.Draw()
-        n_points = min(len(amp_list_us), 10000) # no more than 10k points in the scatter
-        hist, graph = common.make_root_graph("delta amplitude scatter",
-                                             amp_list_us, "US "+suffix_label+" Amplitude [mm]",
-                                             amp_list_delta, suffix_label+" US Amplitude - DS Amplitude [mm]", xmin=0., xmax=100., ymin=-50., ymax=50.)
-        hist.SetTitle(self.config_anal['name'])
-        hist.Draw()
-        graph.Draw("P")
-        canvas.Update()
-        for format in ["eps", "png", "root"]:
-            canvas.Print(self.plot_dir+"amplitude_delta_"+suffix+"_scatter."+format)
-
-        canvas = common.make_root_canvas("delta_amplitude_hist")
-        canvas.Draw()
-        canvas.SetFrameFillColor(utilities.utilities.get_frame_fill())
-        hist = common.make_root_histogram("delta amplitude hist",
-                                          amp_list_us, suffix_label+" US Amplitude [mm]", 100,
-                                          amp_list_delta, suffix_label+" US Amplitude - DS Amplitude [mm]", 100,
-                                          xmin=0., xmax=100., ymin=-50., ymax=50.)
-        hist.SetTitle(self.config_anal['name'])
-        hist.Draw("COLZ")
-        canvas.Update()
-        for format in ["eps", "png", "root"]:
-            canvas.Print(self.plot_dir+"amplitude_delta_"+suffix+"_hist."+format)
-
-    def get_suffix_label(self, suffix):
-        return {"all_mc":"MC truth (all)",
-                "reco_mc":"MC truth (recon)",
-                "reco":"Reconstructed"}[suffix]
 
     def append_data(self):
         """
@@ -933,8 +660,8 @@ class AmplitudeAnalysis(AnalysisBase):
         hits_reco_mc_ds= []
 
         if self.config_anal["amplitude_mc"]:
-            station_us = self.config.mc_plots["mc_stations"]["tku"][0]
-            station_ds = self.config.mc_plots["mc_stations"]["tkd"][0]
+            station_us = self.config.mc_plots["mc_stations"]["tku_tp"][0]
+            station_ds = self.config.mc_plots["mc_stations"]["tkd_tp"][0]
 
         for event in self.data_loader.events:
             if event['upstream_cut']:
@@ -975,6 +702,9 @@ class AmplitudeAnalysis(AnalysisBase):
         return
 
     def print_data(self):
+        """
+        Write the amplitude distributions to disk.
+        """
         fout = open(self.plot_dir+"/amplitude.json", "w")
         for suffix in self.amplitudes:
             if type(self.amplitudes[suffix]) != type({}):
@@ -989,20 +719,12 @@ class AmplitudeAnalysis(AnalysisBase):
         fout.write(out_str)
         fout.close()
 
-    def empty_data(self):
+    def clear_amplitude_data(self):
         n_bins = 21
         diagonal = [[0. for i in range(n_bins)] for j in range(n_bins)]
         for i in range(n_bins):
             diagonal[i][i] = 1.
         self.amplitudes = {
-          "momentum_uncertainty":{
-              "all_upstream":{
-                  "migration_matrix":diagonal
-              },
-              "all_downstream":{
-                  "migration_matrix":diagonal
-              },
-          }, 
           "inefficiency":{
               "all_upstream":{
                   "pdf_ratio":[1. for i in range(n_bins)]
@@ -1018,43 +740,112 @@ class AmplitudeAnalysis(AnalysisBase):
               "all_downstream":{
                   "migration_matrix":diagonal
               },
-          }, 
-          "systematics":[],
+          },
           "source":"",
           "scale":1.,
         }
+        data = {
+            "performance_reference":None,
+            "detector_reference":None,
+            "all_upstream":{
+                "detector_systematics":[],
+                "performance_systematics":[],
+                "detector_systematics_output":{},
+                "performance_systematics_output":{},
+            },
+            "all_downstream":{
+                "detector_systematics":[],
+                "performance_systematics":[],
+                "detector_systematics_output":{},
+                "performance_systematics_output":{},
+            },
+            "pdf":[],
+            "cdf":[],
+            
+        }
+        for suffix in "reco", "all_mc", "reco_mc":
+            self.amplitudes[suffix] = copy.deepcopy(data)
+
+
+    def load_corrections(self, file_name):
+        """
+        Load the amplitude corrections to be applied during this amplitude
+        analysis. Loads the inefficiency and crossing_probability
+        """
+        fin = open(file_name)
+        amp_str = fin.read()
+        src_amplitudes = json.loads(amp_str)
+        src_amplitudes["source"] = file_name
+        for key in "inefficiency", "crossing_probability":
+            self.amplitudes[key] = src_amplitudes[key]
+        
 
     def load_one_error(self, file_name, scale):
+        """
+        Load the amplitude analysis output for a given uncertainty source
+        """
         fin = open(file_name)
         amp_str = fin.read()
         amplitudes = json.loads(amp_str)
         amplitudes["source"] = file_name
         amplitudes["scale"] = scale
-        # we only want to keep the errors; not the actual pdfs
-        del amplitudes["reco"]
-        del amplitudes["all_mc"]
-        del amplitudes["reco_mc"]
-        try:
-            del amplitudes["field_uncertainty"]
-        except KeyError:
-            pass
+        # for performance error we want the pdfs
+        # for recon error we want the corrections
+        # for storage concerns we don't store the amplitude dictionaries
+        for tgt_1 in "reco", "all_mc", "reco_mc":
+            for tgt_2 in "amplitude_dict_upstream", "amplitude_dict_downstream":
+                try:
+                    del amplitudes[tgt_1][tgt_2]
+                except KeyError:
+                    pass
+                    #print "Could not find", tgt_1, tgt_2, "while loading errors"
+        for key in "field_uncertainty", "momentum_uncertainty":
+            # legacy systematic corrections
+            try:
+                del amplitudes[key]
+            except KeyError:
+                pass
         return amplitudes
 
     def load_errors(self):
-        if self.config_anal["amplitude_source"] != None and self.config_anal["amplitude_mc"]:
-            raise RuntimeError("Conflicted - do I get errors from mc or from amplitude source?")
-        if self.config_anal["amplitude_source"] == None:
-            self.empty_data()
+        """
+        Two "classes" of systematic errors;
+        * systematic errors on the reconstruction are contained in the
+          correction factors. For these we store the correction factors and 
+          compare to the reference correction factors
+        * systematic errors on the performance are contained in the actual
+          amplitude pdfs. For these we store the bin-by-bin fractional
+          difference between the amplitude pdf and reference.
+        """
+        if self.calculate_corrections:
+            self.clear_amplitude_data()
             return
-        # base correction factors
-        self.amplitudes = self.load_one_error(self.config_anal["amplitude_source"], 1.)
-        # systematic uncertainties
-        self.amplitudes["systematics"] = []
-        err_src = self.config_anal["amplitude_systematic_reference"]
-        error = self.load_one_error(err_src, None)
-        self.amplitudes["systematics"].append(error)
-        for err_src, scale in self.config_anal["amplitude_systematic_sources"].iteritems():
-            error = self.load_one_error(err_src, scale)
-            self.amplitudes["systematics"].append(error)
-            
-    root_objects = []
+
+        # set base correction factors
+        self.load_corrections(self.config_anal["amplitude_corrections"])
+
+        systematics = self.config_anal["amplitude_systematics"]
+        for suffix in systematics:
+            print "Loading", suffix
+            if suffix not in self.amplitudes:
+                self.amplitudes[suffix] = {}
+            for ref_key in ["detector_reference", "performance_reference"]:
+                ref_src = systematics[suffix][ref_key]
+                if ref_src == None:
+                    self.amplitudes[suffix][ref_key] = None
+                else:
+                    self.amplitudes[suffix][ref_key] = \
+                                              self.load_one_error(ref_src, None)
+                print "  Loaded reference", suffix, ref_key, ref_src, \
+                                          type(self.amplitudes[suffix][ref_key])
+            for us_ds in ["all_upstream", "all_downstream"]:
+                if us_ds not in self.amplitudes[suffix]:
+                    self.amplitudes[suffix][us_ds] = {}
+                for key in ["detector_systematics", "performance_systematics"]:
+                    err_src_dict = systematics[suffix][us_ds][key]
+                    self.amplitudes[suffix][us_ds][key] = [
+                        self.load_one_error(err_src, scale) \
+                              for err_src, scale in err_src_dict.iteritems()
+                    ]
+                    print "  Loaded", len(self.amplitudes[suffix][us_ds][key]), us_ds, key, "systematics"
+
