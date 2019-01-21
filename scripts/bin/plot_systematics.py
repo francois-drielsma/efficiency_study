@@ -187,20 +187,24 @@ class Hacking(object):
         self.root_objects.append(hist)
         legend = ROOT.TLegend(0.65, 0.5, 0.85, 0.9)
         self.root_objects.append(legend)
+        index = 1
         for i, graph in enumerate(graph_list):
+            print "Plotting multi_graph", i, self.names[i]
             if "tku_base" in self.names[i]:
                 continue
+            index += 1
             graph.SetName(self.names[i])
             graph.SetTitle()
-            graph.SetMarkerStyle(26+i)
-            color = i/(len(graph_list)-1.)*ROOT.gStyle.GetNumberOfColors()
+            style = 26+index
+            print "    marker style", style
+            graph.SetMarkerStyle()
+            color = index/(len(graph_list)-1.)*ROOT.gStyle.GetNumberOfColors()
             color = ROOT.gStyle.GetColorPalette(int(color))
             graph.SetMarkerColor(color)
             graph.SetLineColor(color)
             graph.SetFillColor(10)
-            graph.SetLineStyle(i)
+            graph.SetLineStyle(index)
             graph.Draw(draw_option)
-            draw_option = "SAME P L"
             legend.AddEntry(graph, self.name_map[self.names[i]], "P L")
         legend.Draw()
 
@@ -259,15 +263,15 @@ class Hacking(object):
         "tku_density_plus":"TKU Density",
         "tku_pos_plus":"TKU Position",
         "tku_rot_plus":"TKU Rotation",
-        "tku_scale_C_plus":"TKU Centre Coil",
-        "tku_scale_E1_plus":"TKU End1 Coil",
-        "tku_scale_E2_plus":"TKU End2 Coil",
+        "tku_scale_SSUC_plus":"TKU Centre Coil",
+        "tku_scale_SSUE1_plus":"TKU End1 Coil",
+        "tku_scale_SSUE2_plus":"TKU End2 Coil",
         "tkd_density_plus":"TKD Density",
         "tkd_pos_plus":"TKD Position",
         "tkd_rot_plus":"TKD Rotation",
-        "tkd_scale_C_plus":"TKD Centre Coil",
-        "tkd_scale_E1_plus":"TKD End1 Coil",
-        "tkd_scale_E2_plus":"TKD End2 Coil",
+        "tkd_scale_SSDC_plus":"TKD Centre Coil",
+        "tkd_scale_SSDE1_plus":"TKD End1 Coil",
+        "tkd_scale_SSDE2_plus":"TKD End2 Coil",
     }
 
     graph_axis_range = {
@@ -366,13 +370,15 @@ def do_downstream(input_dir, emittance_list, output_dir):
         my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
                           ['all_downstream'], "graph")
 
-        #a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base")+\
-        #              file_list(input_dir, emittance, "lH2_empty", "tkd_*")
-        #my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
-        #                  ['all_downstream'],
-        #                  a_file_list)
-        #my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
-        #                  ['all_downstream'], "multigraph")
+        a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base")+\
+                      file_list(input_dir, emittance, "lH2_empty", "tkd_*")
+        print "A FILE LIST:"
+        print a_file_list
+        my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+                          ['all_downstream'],
+                          a_file_list)
+        my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+                          ['all_downstream'], "multigraph")
 
 
 def do_copy(input_dir, emittance_list, output_dir):
@@ -407,12 +413,13 @@ def copy_more(input_dir, output_dir):
 
 def main():
     utilities.root_style.setup_gstyle()
-    output_dir = "output/2017-02-7-Systematics-v1/systematics_summary/"
-    #do_copy("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir)# "4", "6", "10"
-    #copy_more("2017-02-7-Systematics-v1", output_dir)
-    #do_upstream("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) # 
-    #do_downstream("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) # 
-    do_correction_comparison("2017-02-7-Systematics-v1", ["3", "4", "6", "10"], output_dir) #
+    sys_dir = "2017-02-7-Systematics-v2/"
+    output_dir = "output/"+sys_dir+"systematics_summary/"
+    #do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
+    #copy_more(sys_dir, output_dir)
+    do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
+    #do_downstream(sys_dir, ["4"], output_dir) # , "6", "10"
+    #do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
 
     return
 

@@ -28,11 +28,22 @@ class DataPlotter(AnalysisBase):
         self.ellipse = {}
         self.reset_tof_eff_counter()
         self.root_objects = []
+        self.get_z_tof01()
+
+    def get_z_tof01(self):
+        for det in self.config.detectors:
+            if det[2] == "tof0":
+                z_tof0 = det[0]
+            elif det[2] == "tof1":
+                z_tof1 = det[0]
+                break
+        self.z_tof01 = z_tof1-z_tof0
 
     def birth(self):
         self.set_plot_dir("data_plots")
         self.run_numbers.update(self.data_loader.run_numbers)
         self.birth_tof("tof01", -5, 15)
+        self.birth_tof("tof01_alt", -5, 15)
         self.birth_tof("tof12", -5, 25)
         self.birth_tof_slabs()
         self.birth_tof_dt("tof0")
@@ -119,8 +130,8 @@ class DataPlotter(AnalysisBase):
             "normalise":False,
             "logy":True,
         }
-        self.birth_var_1d("refit", "tku", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
-        self.birth_var_1d("refit", "tkd", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
+        self.birth_var_1d("refit", "tku", None, None, min_max=[-0.5, 2.5], n_bins=4, options = refit_options)
+        self.birth_var_1d("refit", "tkd", None, None, min_max=[-0.5, 2.5], n_bins=4, options = refit_options)
         self.birth_var_1d("SP Res(x)", "tku", None, None, min_max=[-2.5, 2.5])
         self.birth_var_1d("SP Res(y)", "tku", None, None, min_max=[-2.5, 2.5])
         if self.config_anal["do_globals"]:
@@ -178,6 +189,7 @@ class DataPlotter(AnalysisBase):
     def process(self):
         self.run_numbers.update(self.data_loader.run_numbers)
         self.process_tof("tof01")
+        self.process_tof("tof01_alt")
         self.process_tof("tof12")
         self.process_tof_slabs()
         self.process_tof_dt("tof0")
@@ -311,6 +323,7 @@ class DataPlotter(AnalysisBase):
         self.death_var_2d("x", "tkd", "y", "tkd", "all", True)
 
         self.death_tof("tof01", -0.4, 0.4)
+        self.death_tof("tof01_alt", -0.4, 0.4)
         dtof2 = self.config.tof2_offset
         self.death_tof("tof12", -2.0, 2.0)
 
@@ -342,8 +355,12 @@ class DataPlotter(AnalysisBase):
         return tof_us_cut, tof_ds_cut, tof_all
 
     def birth_tof(self, tof, xmin, xmax):
-        axis = {"tof01":"tof1 - tof0 [ns]", "tof12":"tof2 - tof1 [ns]"}[tof]
+        axis = {"tof01":"tof1 - tof0 [ns]",
+                "tof12":"tof2 - tof1 [ns]",
+                "tof01_alt":"(tof1 - tof0)/1.024 [ns]",
+                }[tof]
         tof_us_cut, tof_ds_cut, tof_all = self.get_data_tof(tof)
+        print "DATA PLOTTER BIRTH TOF", tof
         if len(tof_us_cut) == 0:
             tof_us_cut.append(0.)
         if len(tof_ds_cut) == 0:
@@ -740,6 +757,15 @@ class DataPlotter(AnalysisBase):
         p_data = [event[tk]["p"] for event in self.data_loader.events if predicate(event)]
         return tof_data, p_data
 
+    def get_tof01_from_p(self, p):
+        mass = xboa.common.pdg_pid_to_mass[13]
+        velocity = xboa.common.constants["c_light"]*(1+(mass/p)**2)**-0.5
+        tof01 = self.z_tof01/velocity
+        tof01 = tof01 - self.config.tof0_offset + self.config.tof1_offset
+        print p, velocity, self.z_tof01/velocity, tof01
+        return tof01
+
+
     def birth_p_tot_vs_tof(self, tof, tk, cuts):
         tof_data, p_data = self.get_p_tot_vs_tof_data(tof, tk, cuts)
         hist = self.make_root_histogram("p_"+tk+"_vs_"+tof+"_"+cuts,
@@ -755,13 +781,36 @@ class DataPlotter(AnalysisBase):
         else:
             tk_low = self.config_anal["p_tot_ds_low"]
             tk_high = self.config_anal["p_tot_ds_high"]
+        hist.Draw("COLZ")
+        # Draw TOF and TK p cuts
         x_list = [tof_low, tof_low, tof_high, tof_high, tof_low]
         y_list = [tk_low, tk_high, tk_high, tk_low, tk_low]
-        hist.Draw("COLZ")
         hist, graph = self.make_root_graph("p_"+tk+"_vs_"+tof+"_"+cuts,
                                      "cuts_graph", x_list, "", y_list, "", False)
         graph.SetLineColor(ROOT.kRed)
         graph.Draw("SAMEL")
+
+        # Draw tramline cuts
+        if tof != "tof01":
+            return
+        y_list = [float(p) for p in range(100, 200, 10)]
+        p_lower = self.config_anal["tof01_tramline_lower"]
+        p_upper = self.config_anal["tof01_tramline_upper"]
+        x_list_1 = [self.get_tof01_from_p(p+p_lower) for p in y_list]
+        x_list_2 = [self.get_tof01_from_p(p+p_upper) for p in y_list]
+        print "Tramlines"
+        print "  p:          ", y_list
+        print "  tof01_upper:", x_list_1
+        print "  tof01_lower:", x_list_2
+        hist, graph = self.make_root_graph("p_"+tk+"_vs_"+tof+"_"+cuts,
+                                     "tramlines_upper", x_list_1, "", y_list, "", True)
+        graph.SetLineColor(ROOT.kBlue)
+        graph.Draw("SAMEL")
+        hist, graph = self.make_root_graph("p_"+tk+"_vs_"+tof+"_"+cuts,
+                                     "tramlines_lower", x_list_2, "", y_list, "", True)
+        graph.SetLineColor(ROOT.kBlue)
+        graph.Draw("SAMEL")
+
 
     def process_p_tot_vs_tof(self, tof, tk, cuts):
         tof_data, p_data = self.get_p_tot_vs_tof_data(tof, tk, cuts)

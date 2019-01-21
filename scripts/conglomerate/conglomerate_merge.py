@@ -25,7 +25,6 @@ class ConglomerateMerge(object):
         canvas_names = set()
         for cong_base in self.conglomerate_list:
             for cong in cong_base.conglomerations:
-                print "MERGE_ALL FILE NAME", cong.dir_path
                 canvas_names.add(cong.options["canvas_name"])
         for name in canvas_names:
             self.merge_one(name)
@@ -152,7 +151,7 @@ class ConglomerateMerge(object):
         source_graph_list = []
         source_legend_list = []
 
-        merge_canvas = ROOT.TCanvas(canvas_name+"_c1", canvas_name+"_c1", 1400, 1000)
+        merge_canvas = ROOT.TCanvas(canvas_name+"_c1_", canvas_name+"_c1_", 1400, 1000)
         merge_dict["canvas"] = merge_canvas
         merge_canvas.Draw()
         hist_index = 0

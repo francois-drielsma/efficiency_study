@@ -50,23 +50,23 @@ class CutsPlotter(AnalysisBase):
         self.birth_var_1d("tof", "tof01", "us cut", ["tof01"], [1., 7.], 160, self.fits_on("tof01_8_0_hist"), [tof01_min, tof01_max])
         self.birth_var_1d("tof", "tof0_n_sp", "us cut", ["tof_0_sp"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tof", "tof1_n_sp", "us cut", ["tof_1_sp"], [0.5, 4.5], 4, {}, [0.5, 1.5])
-        self.birth_var_1d("tku", "n_tracks", "us cut", ["scifi_tracks_us", "global_through_tof0"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
+        self.birth_var_1d("tku", "n_tracks", "us cut", ["scifi_tracks_us"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         # compare number of clusters in events with tracks to those without tracks; estimate impurity
         # number of clusters in all events in TKU that made a track
         self.birth_var_1d("tku", "scifi_n_planes_with_clusters", "us cut", [], [-0.5, 15.5], 16, {}, [])
         # number of clusters in all events in TKU with TOF (even those not making a track)
-        self.birth_var_1d("tku", "scifi_n_planes_with_clusters", "us cut", ["scifi_tracks_us", "global_through_tof0"], [-0.5, 15.5], 16, {}, [])
+        self.birth_var_1d("tku", "scifi_n_planes_with_clusters", "us cut", ["scifi_tracks_us"], [-0.5, 15.5], 16, {}, [])
         # number of clusters in TKU with TOF that DID NOT make a track
         # want to show that these events have few TKU clusters (hence impurity is unlikely)
-        wont_cut_list = self.get_cut_list("us cut", ["scifi_tracks_us", "global_through_tof0"])
+        wont_cut_list = self.get_cut_list("us cut", ["scifi_tracks_us"])
         will_cut_list = ["scifi_tracks_us"]
         self.birth_var_1d_cut_list("tku", "scifi_n_planes_with_clusters", wont_cut_list, will_cut_list, [-0.5, 15.5], 16, {}, [])
         # impurity end
 
         self.birth_var_1d("tku", "max_r", "us cut", ["scifi_fiducial_us"], [0., 300.], 100, {}, [150.])
-        delta_tof01_min = self.config_anal["delta_tof01_lower"]
-        delta_tof01_max = self.config_anal["delta_tof01_upper"]
-        self.birth_var_1d("tof", "delta_tof01", "us cut", ["delta_tof01"], [-10., 5.], 100, {}, [delta_tof01_min, delta_tof01_max])
+        #delta_tof01_min = self.config_anal["delta_tof01_lower"]
+        #delta_tof01_max = self.config_anal["delta_tof01_upper"]
+        #self.birth_var_1d("tof", "delta_tof01", "us cut", ["delta_tof01"], [-10., 5.], 100, {}, [delta_tof01_min, delta_tof01_max])
 
         p_min = min([min(a_bin) for a_bin in self.config_anal["p_bins"]])
         p_max = max([max(a_bin) for a_bin in self.config_anal["p_bins"]])
@@ -85,6 +85,9 @@ class CutsPlotter(AnalysisBase):
         self.birth_var_1d("tkd", "p", "ds cut", ["p_tot_ds"], [p_min-delta_p/2., p_max+delta_p/2], 100, {}, [p_min, p_max])
         chi2_max = self.config_anal["tkd_chi2_threshold"]
         self.birth_var_1d("tkd", "chi2", "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
+        for refit in [0, 1, 2]:
+            var = "chi2_refit_"+str(refit)
+            self.birth_var_1d("tkd", var, "ds cut", ["chi2_ds"], [0., chi2_max*2], 100, {}, [chi2_max])
         self.birth_var_1d("tkd", "n_tracks", "ds cut", ["scifi_tracks_ds"], [-0.5, 4.5], 5, {}, [0.5, 1.5])
         self.birth_var_1d("tkd", "max_r", "ds cut", ["scifi_fiducial_ds"], [0., 300.], 100, {}, [150.])
         # compare events with tracks to those without tracks; estimate noise impurity
@@ -157,12 +160,21 @@ class CutsPlotter(AnalysisBase):
 
     def get_tracker(self, detector, var, wont_cut_list, will_cut_list):
         data = []
+        if "chi2_refit" in var:
+            refit = int(var.split("_")[-1])
+            var = "chi2_refit"
         for event in self.data_loader.events:
             if self.will_cut_except(wont_cut_list, will_cut_list, event):
                 continue
             if var == "chi2":
                 for hit in event["data"]:
                     if hit["detector"] == detector+"_tp":
+                        data.append(hit["chi2"]/hit["ndf"])
+                        break
+            elif var == "chi2_refit":
+                for hit in event["data"]:
+                    if hit["detector"] == detector+"_tp" and \
+                       hit["refit"] == refit:
                         data.append(hit["chi2"]/hit["ndf"])
                         break
             elif var == "n_tracks":
@@ -319,12 +331,14 @@ class CutsPlotter(AnalysisBase):
 
     def process_var_1d(self, plot_name, detector, var, wont_cut_list, will_cut_list):
         data = self.get_data(detector, var, wont_cut_list, will_cut_list)
-        #if var == "max_r":
-        #    print "cuts_plotter process_var_1d", data
         hist = self.get_plot(plot_name)["histograms"][plot_name+"_hist"]
         for item in data:
             hist.Fill(item)
 
+    def subsample(self, chi2_list, refit_list, refit_target):
+        subsample = [chi2 for i, chi2 in enumerate(chi2_list) \
+                                              if refit_target == refit_list[i]]
+        return subsample
 
     def birth_cuts_summary(self):
         self.global_cut = {"upstream_cut":0, "downstream_cut":0, "extrapolation_cut":0, "all_events":0}

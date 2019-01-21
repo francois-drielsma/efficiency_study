@@ -54,7 +54,6 @@ class AmplitudeDataBinned(object):
             resource.setrlimit(resource.RLIMIT_NOFILE, (2048, file_limit[1]))
             print "Adjusted number of allowed file handles from (soft, hard)", \
                   file_limit, "to", resource.getrlimit(resource.RLIMIT_NOFILE)
-            # resource.getrusage(resource.RUSAGE_SELF) will probe the number of open files
 
     def __del__(self):
         pass

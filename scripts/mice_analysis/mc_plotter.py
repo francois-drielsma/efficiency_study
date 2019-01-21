@@ -338,6 +338,14 @@ class MCPlotter(AnalysisBase):
                     break # next event please
         return residual_dict
 
+    def efficiency_plot(self):
+        efficiency = Efficiency(self.amp.reco_mc_data_ds,
+                               self.amp.all_mc_data_ds,
+                               self.plot_dir)
+        efficiency.reco_cut_list
+        efficiency.plot()
+
+
     def process_data_detector_residuals(self):
         for detector, virtual_station_list in self.mc_stations.iteritems():
             virtual_station = virtual_station_list[0]
@@ -373,9 +381,10 @@ class MCPlotter(AnalysisBase):
             for var in sorted(residual_dict.keys()):
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]
-                if len(data) == 0:
-                    raise RuntimeError("Failed to find residual data for "+var+" "+detector+" "+virtual_station)
                 xmin, xmax = self.get_x_min_max(var)
+                if len(data) == 0:
+                    print "WARNING - Failed to find residual data for "+var+" "+detector+" "+virtual_station
+                    data = [xmax+(xmax-xmin)*100.]
                 dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
                 hist = self.make_root_histogram(canvas_name, var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()

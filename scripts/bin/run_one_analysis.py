@@ -25,13 +25,39 @@ import mice_analysis.cuts_plotter
 import mice_analysis.amplitude_analysis
 import mice_analysis.globals_plotter
 import mice_analysis.optics_plotter
+import mice_analysis.efficiency_plotter
 import mice_analysis.data_recorder
+import mice_analysis.fractional_emittance
 import utilities.root_style
 
 config_file = None
 
 class Analyser(object):
+    """
+    Class that drives the whole analysis
+    * __init__ loads configuration file and sets up maus global stuff (fields,
+               geometry, etc) for Analyser class.
+    * do_analysis runs the analysis (__init__, birth and process phases as below)
+    The analysis proceeds in a few different phases
+    __init__: here we initialise the analysis. The analysis is divided into
+              sub-analyses, each of which is a module in mice_analysis and 
+              usually inheriting from the mice_analysis.analyse_base class. The
+              sub-analyses are handed the configuration and a pointer to the
+              data file parser (data_loader). Config is split into two portions;
+              a generic config which is good for all analyses, and a 
+              beam/data-specific config where things like tof cuts can be 
+              stored, which might be different for different momenta etc.
+    birth: in the birth phase, we load a few spills and then hand these to each
+           mice_analysis class. Some of the classes use these for e.g. 
+           dynamically selecting plot axes.
+    process: we load more spills and hand these to mice_analysis classes for
+            processing
+    print/death phase: we do any calculation of global parameters, etc and then
+            plot anything that needs plotting
+    finalise: any final clean up
+    """
     def __init__(self):
+        """initialise the Analyser class"""
         config_mod = sys.argv[1].replace(".py", "")
         config_mod = config_mod.replace("scripts/", "")
         config_mod = config_mod.replace("/", ".")
@@ -46,6 +72,7 @@ class Analyser(object):
         self.analysis_list = []
 
     def do_analysis(self, analysis_indices = []):
+        """do the analysis, calling init, birth, process, print and finalise"""
         if analysis_indices == None:
             analysis_indices = range(len(self.config.analyses))
         for i in analysis_indices:
@@ -62,6 +89,7 @@ class Analyser(object):
                 sys.excepthook(*sys.exc_info())
 
     def maus_globals(self, config):
+        """set up the maus globals"""
         try:
             os.makedirs("logs/tmp") # location for magnet cached maps
         except OSError:
@@ -76,6 +104,11 @@ class Analyser(object):
         print maus_cpp.field.str(True)
 
     def file_mangle(self, config_file_name):
+        """
+        Clear any old plots out of the way and make a new set of plots. This is
+        done towards the end of the birth phase to give user a chance to back
+        out (Ctrl-C) before things start getting deleted.
+        """
         print "Clearing old data"
         try:
             if os.path.exists(self.config_anal["plot_dir"]):
@@ -86,12 +119,18 @@ class Analyser(object):
         shutil.copy(config_file_name, self.config_anal["plot_dir"])
 
     def init_phase(self):
+        """
+        Build the list of analyses and initialise
+        """
         self.data_loader = data_loader.load_all.LoadAll(self.config, self.config_anal)
         self.data_loader.get_file_list()
         self.analysis_list = [] # force kill any analysis scripts in case death(...) did not happen in previous round
         if self.config_anal["do_mc"]:
             print "Doing mc"
             self.analysis_list.append(mice_analysis.mc_plotter.MCPlotter(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_efficiency"]:
+            print "Doing efficiency"
+            self.analysis_list.append(mice_analysis.efficiency_plotter.EfficiencyPlotter(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_plots"]:
             print "Doing plots"
             self.analysis_list.append(mice_analysis.data_plotter.DataPlotter(self.config, self.config_anal, self.data_loader))
@@ -107,11 +146,17 @@ class Analyser(object):
         if self.config_anal["do_amplitude"]:
             print "Doing amplitude"
             self.analysis_list.append(mice_analysis.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
+        if self.config_anal["do_fractional_emittance"]:
+            print "Doing fractional emittance"
+            self.analysis_list.append(mice_analysis.fractional_emittance.FractionalEmittance(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_data_recorder"]:
             print "Doing data recorder"
             self.analysis_list.append(mice_analysis.data_recorder.DataRecorder(self.config, self.config_anal, self.data_loader))
 
     def birth_phase(self):
+        """
+        Load the first set of spills and start doing some analysis
+        """
         all_event_count = 0
         self.data_loader.load_spills(self.config.preanalysis_number_of_spills)
         self.config.maus_version = self.data_loader.maus_version
@@ -123,6 +168,9 @@ class Analyser(object):
         self.data_loader.clear_data()
 
     def process_phase(self):
+        """
+        More processing
+        """
         now = time.time()
         while self.data_loader.load_spills(self.config.analysis_number_of_spills) and \
               self.data_loader.check_spill_count():
@@ -133,10 +181,14 @@ class Analyser(object):
                 self.print_phase()
 
     def print_phase(self):
+        """
+        Finalise any plots and save them to disk in analysis.death
+        """
         for analysis in self.analysis_list:
             analysis.death()
 
     def finalise_phase(self):
+        """Any final close out"""
         self.analysis_list = []
         self.data_loader = None
         print "Finished ", self.config_anal["name"], "writing results to", self.config_anal["plot_dir"]

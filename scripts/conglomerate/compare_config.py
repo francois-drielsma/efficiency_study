@@ -7,18 +7,18 @@ class CompareConfig(object):
     def __init__(self):
         pass
   
-    def setup(self, beam, run_dir, src_plot_dir, target_plot_dir, will_do_data, will_do_mc):
+    def setup(self, beam, run_dir, src_plot_dir, target_plot_dir, dir_list):
         self.beam = beam
         self.name = beam.split("_")
         self.get_experiment_config()
         self.data_caption = ""
         self.mc_caption = ""
         self.cuts_tex = "cut_plots/cuts_summary_*.tex"
-        self.conglomerate_dir = []
-        if will_do_data:
-            self.conglomerate_dir.append(run_dir+"plots_"+beam+"/")
-        if will_do_mc:
-            self.conglomerate_dir.append(run_dir+"plots_Simulated_"+beam+"/")
+        self.conglomerate_dir = dir_list
+        #if will_do_data:
+        #    self.conglomerate_dir.append(run_dir+"plots_"+beam+"/")
+        #if will_do_mc:
+        #    self.conglomerate_dir.append(run_dir+"plots_Simulated_"+beam+"/")
         for a_dir in self.conglomerate_dir:
             if not os.path.exists(a_dir):
                 raise RuntimeError("Could not find "+str(a_dir))
@@ -41,6 +41,60 @@ class CompareConfig(object):
             self.channel = ""
             self.beamline = ""
             self.absorber = ""
+
+    def get_conglomerate_0(self, modifiers):
+        my_config = {
+                "file_name":"",
+                "canvas_name":"",
+                "histogram_names":[""],
+                "graph_names":[],
+                "rescale_x":None,
+                "rescale_y":None,
+                "normalise_hist":False,
+                "normalise_graph":False,
+                "calculate_errors":{
+                    "histograms":[0],
+                    "normalised":True,
+                },
+                "rebin":False,
+                "mice_logo":True,
+                "log_y":False,
+                "hist_title":"",
+                "replace_hist":False,
+                "redraw":{
+                    "draw_option":["P E1 PLC", ""],
+                    "fill_color":[1, ROOT.kOrange-2],
+                    "transparency":None,
+                    "line_color":[1, 1],
+                    "marker_style":[20, 20],
+                    "draw_order":[1, 0],
+                    "x_range":None,
+                    "y_range":None,
+                    "graph_draw_option":["P", "P"],
+                    "ignore_more_histograms":False,
+                },
+                "canvas_fill_color":None,
+                "extra_lines":False,
+                "extra_labels":False,
+                "legend":{
+                    "text":["data", "simulation"],
+                    "draw_option":["p e1", "f l"],
+                    "pos":None,
+                },
+                "defit":True,
+                "write_plots":{
+                    "dir":None,
+                    "file_name":None,
+                    "formats":["png", "root", "eps", "pdf"],
+                },
+                "axis_title":{
+                    "x":None,
+                    "y":None,
+                },
+            }
+        self.recursive_modify_dict(my_config, modifiers)
+        return my_config
+
 
     def get_conglomerate_1(self, canvas, hist, cut, axis_title, axis_range, normalise, legend_pos, rescale_y = True, modifiers = {}):
         hist_name = hist

@@ -32,6 +32,7 @@ cut_names = {
     "extrapolation_cut":"Extrapolation Sample",
     "mc_true_us_cut":"Upstream MC True Sample",
     "mc_true_ds_cut":"Downstream MC True Sample",
+    "tof01_tramlines":"ToF01 momentum - TKU momentum",
     "all events":"All Events",
 }
 max_length = max([len(name) for name in cut_names.values() if type(name) == type("")])

@@ -44,7 +44,10 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
             "tof01_cut_high":tof01_min_max[1], # TOF01 cut upper bound
+            "tof01_tramline_lower":2., # p_tof01 - p_tku
+            "tof01_tramline_upper":42., # p_tof01 - p_tku
             "p_bins":p_bins, # set of momentum bins; for now really it is just a lower and upper bound
+            "p_bins_alt":[[125, 155]], # alternative momentum cut
             "p_tot_ds_low":tkd_cut[0], # downstream momentum cut lower bound
             "p_tot_ds_high":tkd_cut[1], # downstream momentum cut upper bound
             "reco_files":rogers_mc_file_names(datasets), # list of strings to be handed to glob
@@ -53,7 +56,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "tkd_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_corrections":None,
             "amplitude_systematics":{},
             "field_uncertainty":0.02,
@@ -63,6 +66,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
             "amplitude_systematic_reference":None,
+            "amplitude_inefficiency_cutoff":50.,
             "amplitude_recon_systematic_sources":{},
             "amplitude_performance_systematic_sources":{},
             "tku_fiducial_radius":150.,
@@ -72,6 +76,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "amplitude_algorithm":"binned",
 
             "do_magnet_alignment":False,
+            "do_efficiency":True,
+            "do_fractional_emittance":True,
             "do_amplitude":True,
             "do_extrapolation":False,
             "do_globals":do_globals,
@@ -112,8 +118,10 @@ class Config(object):
           "pvalue_ds":False,
           "chi2_ds":False,
           "tof01":False,
+          "tof01_tramlines":False,
           "tof12":False,
           "p_tot_us":True,
+          "p_tot_us_alt":False,
           "p_tot_ds":False,
           "tof_0_sp":False,
           "tof_1_sp":False,
@@ -136,6 +144,7 @@ class Config(object):
           "mc_stations_ds":False,
           "mc_scifi_fiducial_ds":False,
     }
+    data_recorder_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = False
     downstream_cuts["tof2_sp"] = False
@@ -155,7 +164,7 @@ class Config(object):
     mc_true_ds_cuts = copy.deepcopy(mc_true_us_cuts)
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
-    mc_true_ds_cuts["mc_p_ds"] = True
+    mc_true_ds_cuts["mc_p_ds"] = False
     cut_report = [[], [], [], []]
 
     cut_report[0]  = ["hline", "all events", "hline",]
@@ -175,7 +184,7 @@ class Config(object):
     cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-Systematics-v1"
+    data_dir = "output/2017-02-7-Systematics-v3"
     analyses = []
 
 
@@ -197,20 +206,20 @@ class Config(object):
     ]
     cuts = {}
     suffix = None
-
+    vers = "v8"
     run_list = [
-        ["3",  "10069", [1.5, 6.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["4",  "10064", [1.5, 6.0], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["6",  "10051", [1.5, 5.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["10", "10052", [1.5, 4.5], "v8", "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["3",  "9971", [1.5, 6.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
-        ["4",  "9962", [1.5, 6.0], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
-        ["6",  "9966", [1.5, 5.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
-        ["10", "9970", [1.5, 4.5], "v8", "lH2 full", suffix, cuts, files, lh2_systematics_list],
-        ["3",  "10483", [1.5, 6.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
-        ["4",  "10484", [1.5, 6.0], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
-        ["6",  "10485", [1.5, 5.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
-        ["10", "10486", [1.5, 4.5], "v8", "LiH", suffix, cuts, files, lih_systematics_list],
+        ["4",  "10064", [1.5, 6.0], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["6",  "10051", [1.5, 5.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["10", "10052", [1.5, 4.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
+        ["4",  "9962", [1.5, 6.0], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["6",  "9966", [1.5, 5.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["10", "9970", [1.5, 4.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        ["4",  "10484", [1.5, 6.0], vers, "LiH", suffix, cuts, files, lih_systematics_list],
+        ["6",  "10485", [1.5, 5.5], vers, "LiH", suffix, cuts, files, lih_systematics_list],
+        ["10", "10486", [1.5, 4.5], vers, "LiH", suffix, cuts, files, lih_systematics_list],
+        #["3",  "10483", [1.5, 6.5], vers, "LiH", suffix, cuts, files, lih_systematics_list],
+        #["3",  "9971", [1.5, 6.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
+        #["3",  "10069", [1.5, 6.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
     ]
     tmp_run_list = []
     for a_run in run_list:
@@ -242,7 +251,6 @@ class Config(object):
     run_list += tmp_run_list
 
     for run_items in run_list:
-        print len(run_items)
         [emit, run, tof, vers, absorber, suffix, cuts, files, systematics_list] = run_items
         for sys in systematics_list:
             name = str(sys)

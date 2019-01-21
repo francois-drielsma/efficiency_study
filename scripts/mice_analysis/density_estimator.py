@@ -778,6 +778,7 @@ class AmplitudeAnalysis(AnalysisBase):
         for suffix in "reco", "all_mc", "reco_mc":
             self.amplitudes[suffix] = copy.deepcopy(data)
 
+
     def load_corrections(self, file_name):
         """
         Load the amplitude corrections to be applied during this amplitude

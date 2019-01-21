@@ -13,7 +13,8 @@ class ConglomerateContainer(object):
     def conglomerate(self):
         for item in self.config.conglomerate_list:
             cong = ConglomerateOne(item, self.config)
-            cong.dir_path = [a_dir+self.config.src_plot_dir for a_dir in self.config.conglomerate_dir]
+            cong.dir_path = [os.path.join(a_dir, self.config.src_plot_dir)
+                                      for a_dir in self.config.conglomerate_dir]
             cong.conglomerate()
             self.conglomerations.append(cong)
 
@@ -41,13 +42,14 @@ class ConglomerateOne(object):
 
     def get_hist_list(self, canvas):
         hist_list = []
+        other_types = [type(ROOT.TGraph()), type(ROOT.TFrame())]
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
             for hist_name in self.options["histogram_names"]:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
-                    if type(an_object) == type(ROOT.TGraph()):
+                    if type(an_object) in other_types:
                         continue
                     hist_list.append(an_object)
                     an_object.SetName(an_object.GetName()+self.uid())

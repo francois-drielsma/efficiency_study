@@ -2,8 +2,8 @@ import os
 import glob
 
 cwd = os.getcwd()
-source = os.path.join(cwd, "output/2017-02-7-Systematics-v1/*")
-target = os.path.join(cwd, "output/2017-02-Systematics-5")
+source = os.path.join(cwd, "output/2017-02-7-v3/*Simulated*")
+target = os.path.join(cwd, "output/2017-02-7-test")
 
 for source_filename in glob.glob(source):
     filename = os.path.split(source_filename)[1]

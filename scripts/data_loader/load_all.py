@@ -16,7 +16,57 @@ from load_mc import LoadMC
 from load_reco import LoadReco
 
 class LoadAll(object):
+    """
+    Top level data loader object. The aim is to:
+    * Load data into a source-independent format, so we don't have to have all
+       sorts of hacky functions dependent on what detector we want to study
+    * Load data from multiple files "invisibly". We don't want to have to
+       worry about file handling etc during the analysis.
+    The main method in this class is the "load_spills" function, which will load
+    a bunch of data.
+
+    The resultant data is stored in the "events" list. The events list is 
+    considered to be ephemeral, i.e. purged at every call to load_spills (to
+    avoid big memory footprint). The events list format goes like:
+      event = {
+        "tku":None or <Hit type> with hit from tku station 1
+        "tkd":None or <Hit type> with hit from tkd station 1
+        "data":list of all detector hits
+        "tof01":None or float
+        "tof12":None or float
+        "p_tof01":float estimate of momentum through tof01
+        "will_cut":{"<cut name>":True (will cut) or False (will not be cut)
+        # The following sample flags are found by logical OR of will_cut entries
+        # True means they should be cut from the sample (excluded)
+        "upstream_cut":<bool> cut from the upstream reconstructed sample
+        "data_recorder_cut":<bool> cut from the sample for hybrid mc
+        "downstream_cut":<bool> cut from the downstream reconstructed sample
+        "extrapolation_cut":<bool> cut from the sample for global extrapolation plots
+        "mc_true_us_cut":<bool> cut from the upstream truth sample
+        "mc_true_ds_cut":<bool> cut from the downstream truth sample
+      }
+    
+    The detector hits are stored in the "data" list. This has a format like
+      data = [
+        {
+          "detector":<string> name of the detector that made the hit
+          "hit":<Hit type>
+          <some detector specific data>
+        },
+        {
+          ...
+        }
+      ]
+    The Hit type is a (mainly) C object implemented in xboa.Hit/hitcore
+
+    load_all handles the overall file and spill loops. Parsing of the recon
+    event is delegated to reco_loader (of LoadReco type) and parsing of the mc
+    event is delegated to mc_loader (of LoadMC type).
+    """
     def __init__(self, config, config_anal):
+        """
+        Initialise empty data
+        """
         self.config = config
         self.config_anal = config_anal
         self.maus_version = ""
@@ -44,43 +94,17 @@ class LoadAll(object):
 
         self.events = []
 
-    def clear_data(self):
-        self.events = []
-
-    def load_data(self, min_daq_event, max_daq_event):
-        self.get_file_list()
-        self.root_event = min_daq_event
-        self.load_spills(max_daq_event - min_daq_event)
-
-    def get_file_list(self):
-        self.file_name_list = []
-        for fname in self.config_anal["reco_files"]:
-            self.file_name_list += glob.glob(fname)
-        self.file_name_list = sorted(self.file_name_list)
-        if len(self.file_name_list) == 0:
-            raise RuntimeError("No files from "+str(self.config_anal["reco_files"]))
-        print "Found", len(self.file_name_list), "files"
-        print "    ", self.file_name_list[0:3], "...", self.file_name_list[-3:]
-        self.next_file()
-        self.this_daq_event = 0
-        self.spill_count = 0
-
-    def next_file(self):
-        try:
-            self.this_file_name = self.file_name_list.pop(0)
-            self.this_file_number += 1
-            print "Loading ROOT file", self.this_file_name, self.this_file_number
-        except IndexError:
-            self.this_file_name = ""
-            print "No more files to load"
-        self.this_tree = None
-        self.this_daq_event = 0
-
-    def check_spill_count(self):
-        return self.spill_count < self.config.number_of_spills or \
-               self.config.number_of_spills == None
-
     def load_spills(self, number_of_daq_events):
+        """
+        Load a number of spills from the files
+        - number_of_daq_events: number of daq events to load (daq events, not
+                                physics_events)
+        If we run out of spills from this file, try the next file. If the file
+        won't load, keep on with the next one. Print status every 60 seconds or
+        every file, whichever is shorter.
+
+        Call "load_one_spill" subfunction to do the spill parsing.
+        """
         load_spills_daq_event = 0 # number of daq events loaded during this call
                                   # to load_spills
         self.load_new_file()
@@ -132,7 +156,61 @@ class LoadAll(object):
         #    print data[2], data[0], data[1]
         return self.this_file_name != ""
 
+    def clear_data(self):
+        """Clear any ephemeral data"""
+        self.events = []
+
+    def load_data(self, min_daq_event, max_daq_event):
+        """
+        Alternative to load_spills, enabling start at a particular daq event
+        """
+        self.get_file_list()
+        self.root_event = min_daq_event
+        self.load_spills(max_daq_event - min_daq_event)
+
+    def get_file_list(self):
+        """
+        Store the list of files, based on glob of config_anal["reco_files"] and 
+        do some pre-loading setup.
+        """
+        self.file_name_list = []
+        for fname in self.config_anal["reco_files"]:
+            self.file_name_list += glob.glob(fname)
+        self.file_name_list = sorted(self.file_name_list)
+        if len(self.file_name_list) == 0:
+            raise RuntimeError("No files from "+str(self.config_anal["reco_files"]))
+        print "Found", len(self.file_name_list), "files"
+        print "    ", self.file_name_list[0:3], "...", self.file_name_list[-3:]
+        self.next_file()
+        self.this_daq_event = 0
+        self.spill_count = 0
+
+    def next_file(self):
+        """
+        Move on to the next file
+        """
+        try:
+            self.this_file_name = self.file_name_list.pop(0)
+            self.this_file_number += 1
+            print "Loading ROOT file", self.this_file_name, self.this_file_number
+        except IndexError:
+            self.this_file_name = ""
+            print "No more files to load"
+        self.this_tree = None
+        self.this_daq_event = 0
+
+    def check_spill_count(self):
+        """
+        Helper function; check whether we have loaded the number of files 
+        specified in config
+        """
+        return self.spill_count < self.config.number_of_spills or \
+               self.config.number_of_spills == None
+
     def load_new_file(self):
+        """
+        Open a new file for reading
+        """
         while self.this_tree == None and self.this_file_name != "":
             self.all_root_files[0] = self.this_root_file
             self.this_root_file = ROOT.TFile(self.this_file_name, "READ") # pylint: disable = E1101
@@ -148,6 +226,11 @@ class LoadAll(object):
                 continue
 
     def load_one_spill(self, spill):
+        """
+        Load the contents of one spill. If physics_event, loop over reco_events
+        and mc_events; get reco_loader mc_loader to load the respective event
+        type. 
+        """
         old_this_run = self.this_run
         try:
             self.this_run = max(spill.GetRunNumber(), self.this_file_number) # mc runs all have run number 0
@@ -158,6 +241,8 @@ class LoadAll(object):
         self.run_numbers.add(self.this_run)
         self.this_spill = spill.GetSpillNumber()
         if old_this_run != None and old_this_run != self.this_run:
+            # Nb: Durga figured out this issue was related to DAQ saturating
+            # and failing to fill the "run number" int for some spills
             print "WARNING: run number changed from", old_this_run, "to", self.this_run,
             print "in file", self.this_file_name, "daq event", self.this_daq_event,
             print "spill", spill.GetSpillNumber(), "n recon events", spill.GetReconEvents().size(), "<------------WARNING"
@@ -190,8 +275,10 @@ class LoadAll(object):
 
 
     def update_cuts(self):
+        """For a given event, update the cuts based on MC and reco data"""
         for event in self.events:
             event["upstream_cut"] = False
+            event["data_recorder_cut"] = False
             event["downstream_cut"] = False
             event["extrapolation_cut"] = False
             event["mc_true_us_cut"] = False
@@ -199,6 +286,8 @@ class LoadAll(object):
             for key, value in event["will_cut"].iteritems():
                 if value and self.config.upstream_cuts[key]:
                     event["upstream_cut"] = True
+                if value and self.config.data_recorder_cuts[key]:
+                    event["data_recorder_cut"] = True
                 if value and self.config.downstream_cuts[key]:
                     event["downstream_cut"] = True
                 if value and self.config.extrapolation_cuts[key]:

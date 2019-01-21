@@ -299,15 +299,6 @@ class PlotAmplitudeAnalysis(object):
         for format in ["eps", "png", "root"]:
             canvas.Print(self.plot_dir+title+"."+format)
 
-    def efficiency_plot(self):
-        weighting = Weighting(self.amp.reco_mc_data_ds, self.amp.all_mc_data_ds, self.plot_dir)
-        weighting.plot_sum("x", 20, [-200., 200.], "y", 20, [-200., 200.])
-        weighting.plot_sum("x", 20, [-200., 200.], "px", 20, [-100., 100.])
-        weighting.plot_sum("x", 20, [-200., 200.], "py", 20, [-100., 100.])
-        weighting.plot_sum("y", 20, [-200., 200.], "px", 20, [-100., 100.])
-        weighting.plot_sum("y", 20, [-200., 200.], "py", 20, [-100., 100.])
-        weighting.plot_sum("px", 20, [-100., 100.], "py", 20, [-100., 100.])
-
     def systematics_plot(self, target):
         """
         Plot systematic corrections:

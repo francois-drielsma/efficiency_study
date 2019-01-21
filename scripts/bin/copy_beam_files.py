@@ -1,7 +1,7 @@
 import shutil
 import os
 
-source = "/home/astg/scarf148/work/amplitude/output/2017-02-drielsma"
+source = "/home/astg/scarf148/work/amplitude/output/2017-02-7-v4"
 target = "/home/astg/scarf148/work/systematics_mc/beams"
 analysis_path = "data_recorder/"
 file_name = "tku_5.json"
@@ -38,8 +38,8 @@ def main():
         except OSError:
             pass
         tgt_path = os.path.join(tgt_path, file_name)
-        print "Copying", tgt_path
-        print "     to", src_path
+        print "Copying", src_path
+        print "     to", tgt_path
         try:
             shutil.rmtree(tgt_path)
         except OSError:

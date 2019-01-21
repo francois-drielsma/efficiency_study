@@ -32,18 +32,11 @@ class DataRecorder(AnalysisBase):
         self.hits_file_dict = {
           self.upstream_detector:{
             "vars":self.hit_vars,
-            "cut":"upstream_cut",
+            "cut":"data_recorder_cut",
             "file_name":self.plot_dir+"/"+self.upstream_detector+".json",
             "detector":self.upstream_detector,
             "file":None
           },
-          self.downstream_detector:{
-            "vars":self.hit_vars,
-            "cut":"downstream_cut",
-            "file_name":self.plot_dir+"/"+self.downstream_detector+".json",
-            "detector":self.downstream_detector,
-            "file":None
-          }
         }
         for key, file_metadata in self.hits_file_dict.iteritems():
             file_name = file_metadata["file_name"]

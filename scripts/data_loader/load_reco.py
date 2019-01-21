@@ -10,7 +10,29 @@ import utilities.utilities
 import utilities.r_max
 
 class LoadReco(object):
+    """
+    Parse a reco event, building the events data. The top level load is done by
+    load(...) function, which takes a single reco_event and fills it into the
+    "event" structure. The load function calls load_reco_event in turn, which
+    extracts the individual detector events and hands them off to subfunctions
+    that load
+        - tof space points
+        - tracker track points
+        - tracker space points
+        - global track points
+    Probably some other stuff. Most of the functions that load individual 
+    detectors hand back a tuple like (list_of_hits, dict_of_cuts). The
+    list of hits is dumped into event["data"] and the dict of cuts is dumped into
+    event["will_cut"]
+    """
     def __init__(self, config, config_anal):
+        """
+        Initialise the loader
+        - get distance between tof0, tof1, tof2 from config for momentum 
+          calculation etc
+        - get tof0, tof1 and tof2 offsets from config (that offsets to the
+          electron peak).
+        """
         self.config = config
         self.config_anal = config_anal
 
@@ -20,13 +42,14 @@ class LoadReco(object):
                             "tof2":self.config.tof2_offset}
         self.do_rejects = True
         self.nan_count = [0, 0]
-
+        self.c_light = xboa.common.constants["c_light"]
+        self.get_z_tof01()
 
     def load(self, event, spill, ev_number):
+        """Top level load function; calls load_reco_event"""
         reco_event = spill.GetReconEvents()[ev_number]
         spill_number = spill.GetSpillNumber()
         self.load_reco_event(event, reco_event, spill_number)
-
 
     def load_tof_sp(self, tof_sp, station):
         xerr = tof_sp.GetGlobalPosXErr()
@@ -674,12 +697,19 @@ class LoadReco(object):
         return event
 
     def will_do_p_cut_us(self, event):
+        if event["tku"] == None:
+            return False, False
         p_bins = self.config_anal["p_bins"]
         p_low = min(min(p_bins))
         p_high = max(max(p_bins))
-        if event["tku"] == None:
-            return False
-        return event["tku"]["p"] < p_low or event["tku"]["p"] > p_high
+        p_bins_cut = event["tku"]["p"] < p_low or event["tku"]["p"] > p_high
+
+        p_bins = self.config_anal["p_bins_alt"]
+        p_low = min(min(p_bins))
+        p_high = max(max(p_bins))
+        p_bins_cut_alt = event["tku"]["p"] < p_low or event["tku"]["p"] > p_high
+
+        return p_bins_cut, p_bins_cut_alt
 
     def will_do_p_cut_ds(self, event):
         if event["tkd"] == None:
@@ -693,6 +723,13 @@ class LoadReco(object):
             return False
         return delta_tof01 < self.config_anal["delta_tof01_lower"] or \
                delta_tof01 > self.config_anal["delta_tof01_upper"]
+
+    def will_do_us_tramlines_cut(self, event):
+        p_tof01 = event["p_tof01"]
+        p_tku = event["tku"]["p"]
+        if p_tof01 == None:
+            return False
+        return abs(p_tof01-p_tku) < self.config_anal["us_tramlines"]
         
     def will_do_delta_tof12_cut(self, event):
         delta_tof12 = event["delta_tof12"]
@@ -709,6 +746,35 @@ class LoadReco(object):
                 raise ZeroDivisionError("Nan found in tracker: "+str(float_list))
             #if x > 150.:load_file
             #    raise ValueError("Tracker recon out of range: "+str(float_list))
+
+
+    def get_z_tof01(self):
+        for det in self.config.detectors:
+            if det[2] == "tof0":
+                z_tof0 = det[0]
+            elif det[2] == "tof1":
+                z_tof1 = det[0]
+                break
+        self.z_tof01 = z_tof1-z_tof0
+
+    def get_p_tof01(self, tof01):
+        beta_rel = self.z_tof01/tof01/self.c_light
+        if abs(beta_rel) > 0.999:
+            return 1000000.
+        p_tof01 = xboa.common.pdg_pid_to_mass[13]*beta_rel*((1-beta_rel**2)**(-0.5))
+        return p_tof01
+
+    def will_do_tof01_tramlines(self, event):
+        p_tof01 = event["p_tof01"]
+        tku = event["tku"]
+        if p_tof01 == None or tku == None:
+            return False
+        p_tku = tku["p"]
+        if p_tof01-p_tku > self.config_anal["tof01_tramline_upper"]:
+            return True
+        if p_tof01-p_tku < self.config_anal["tof01_tramline_lower"]:
+            return True
+        return False
 
     def tm_data(self, event):
         tku = None
@@ -744,8 +810,10 @@ class LoadReco(object):
             event["tof12"] = None
         try:
             event["tof01"] = tof1 - tof0
+            event["tof01_alt"] = (tof1 - tof0)*1000./1024.
         except TypeError:
             event["tof01"] = None
+            event["tof01_alt"] = None
         #
         try:
             # tof12 is tof relative to electron peak
@@ -759,21 +827,25 @@ class LoadReco(object):
             # global_tof01 is global tof between tof0 and tof1 relative to electron peak
             global_tof01 = (global_tof1 - global_tof0) - electron_tof01
             event["delta_tof01"] = global_tof01 - (tof1 - tof0)
+            event["p_tof01"] = self.get_p_tof01(tof1 - tof0 + electron_tof01)
         except TypeError:
             event["delta_tof01"] = None
+            event["p_tof01"] = None
         event["apertures_us"] = [] # list of apertures that the event hit upstream of tku
         event["apertures_ds"] = [] # list of apertures that the event hit downstream of tku
         event["tku"] = tku
         event["tkd"] = tkd
-        if tku == None: # BUG - some events are missing the tracks cut
+        if tku == None:
             event["will_cut"]["scifi_tracks_us"] = True
         if tkd == None:
             event["will_cut"]["scifi_tracks_ds"] = True
         event["will_cut"]["delta_tof01"] = self.will_do_delta_tof01_cut(event)
         event["will_cut"]["delta_tof12"] = self.will_do_delta_tof12_cut(event)
-        event["will_cut"]["p_tot_us"] = self.will_do_p_cut_us(event)
+        event["will_cut"]["p_tot_us"], event["will_cut"]["p_tot_us_alt"] = \
+                                                    self.will_do_p_cut_us(event)
         event["will_cut"]["p_tot_ds"] = self.will_do_p_cut_ds(event)
         event["will_cut"]["tof01_selection"] = False
+        event["will_cut"]["tof01_tramlines"] = self.will_do_tof01_tramlines(event)
         return event
 
     def get_det_pos(self):

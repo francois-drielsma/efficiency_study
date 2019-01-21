@@ -33,7 +33,9 @@ def material_to_colour(material):
         return 1
     if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
         return 8
-    if material in ("Zn", "Cu", "W", "Al", "ALUMINUM", "TUNGSTEN", "BRASS", "STEEL", "IRON", "TAM1000"):
+    if material in ("Al", "ALUMINUM"):
+        return ROOT.kOrange
+    if material in ("Zn", "Cu", "W", "TUNGSTEN", "BRASS", "STEEL", "IRON", "TAM1000"):
         return 2
     if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "TrackerGlue", "TUFNOL"):
         return 4
@@ -42,6 +44,21 @@ def material_to_colour(material):
 
 PRINT_VOLUMES = True
 THETA = math.pi/4.
+def get_material_start_recursive(x, y, z0, z1, mat0, mat1, z_tolerance):
+    if abs(z0-z1) < z_tolerance/2.:
+        #print "\n\n"
+        return z0
+    new_z = (z0+z1)/2.
+    maus_cpp.material.set_position(x, y, new_z)
+    new_material = maus_cpp.material.get_material_data()['name']
+    #print "    0:", z0, mat0, "** 1:", z1, mat1, "** new:", new_z, new_material,
+    if new_material == mat0:
+        z0 = new_z
+    else:
+        z1 = new_z
+    #print " ... ", z0, z1
+    return get_material_start_recursive(x, y, z0, z1, mat0, mat1, z_tolerance)
+
 def get_materials(radius, z_start, z_end, z_step):
     global PRINT_VOLUMES, THETA
     x = radius*math.cos(THETA)
@@ -57,11 +74,19 @@ def get_materials(radius, z_start, z_end, z_step):
         new_material = material_data['name']
         new_volume = material_data['volume']
         if new_material != material:
+            if material == None:
+                z_boundary = z
+            else:
+                z_boundary = get_material_start_recursive(x, y, z-z_step, z,
+                                                       material, new_material,
+                                                       1e-6)
             material = new_material
-            material_start.append({"x":x, "y":y, "z":z, "material":material})
+            material_start.append({"x":x, "y":y, "z":z_boundary,
+                                   "material":material,
+                                   "volume":new_volume})
         if PRINT_VOLUMES and new_volume != volume:
             volume = new_volume
-            print (volume+" "+material+" "+str(round(z, 1))+"  "),
+            print (volume+" "+material+" "+str(round(z_boundary, 4))+"  "),
     if PRINT_VOLUMES:
         print
     return material_start
@@ -79,6 +104,7 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
     hist.SetStats(False)
     hist.Draw()
     ROOT_GRAPHS.append(hist)
+    print "\n\n"+"*"*20, "Plotting materials", name, "*"*20
     for i in range(n_steps): # radial steps
         r = r_step*i+r_start
         materials = get_materials(r, z_start,z_end, z_step)
@@ -116,6 +142,52 @@ def plot_materials(r_start, r_end, r_step, z_start, z_end, z_step, name):
     for format in "png", "eps", "root":
         canvas.Print("plots/"+name+"."+format)
 
+def plot_thickness(volume_list, r_start, r_end, r_step, z_start, z_end, z_step, name):
+    print "\n\n"+"*"*20, "Plotting thickness", name, "*"*20
+    z_list = []
+    r_list = []
+    n_steps = int((r_end-r_start)/r_step)
+    for i in range(n_steps): # radial steps
+        r = r_step*i+r_start
+        materials = get_materials(r, z_start,z_end, z_step)
+        z_min, z_max = None, None
+        for i, material in enumerate(materials):
+            if material['volume'] in volume_list:
+                z_min = material['z']
+                break
+        if z_min == None:
+            continue
+        i += 1
+        if i >= len(material):
+            continue
+        z_max = materials[i]['z']
+        r_list.append(r)
+        z_list.append(z_max-z_min)
+        print r_list[-1], z_list[-1]
+    canvas = xboa.common.make_root_canvas(name)
+    hist, graph = xboa.common.make_root_graph(name,
+                                              z_list, "thickness [mm]",
+                                              r_list, "radius [mm]",
+                                              xmin=0.)
+    hist.SetTitle(name)
+    canvas.Draw()
+    hist.Draw()
+    graph.Draw("L SAME")
+    for format in "png", "eps", "root":
+        canvas.Print("plots/"+name+"."+format)
+    return canvas, hist, graph
+
+def analytical_tracker_window_thickness():
+    y_list = [float(i) for i in range(106)]
+    thickness_list = []
+    for y in y_list:
+        z_outer = (173.26**2-y**2)**0.5-2.76
+        z_inner = (170.33**2-y**2)**0.5
+        thickness_list.append(z_outer-z_inner)
+    hist, graph = xboa.common.make_root_graph("", thickness_list, "", y_list, "")
+    graph.SetLineColor(ROOT.kBlue)
+    return graph
+
 def get_z_tk():
     config = importlib.import_module("config.config_reco").Config
     z_list = [(det[0], det[2]) for det in config.detectors if "tku_tp" in det[2] or "tkd_tp" in det[2]]
@@ -132,7 +204,6 @@ def get_z_diffuser():
 
 
 def plot_trackers():
-    initialise_maus()
     old_time = time.time()
     #plot_materials(-250.1, 250.1, 1., 12000, 23000., 1., name = "materials")
     try:
@@ -148,8 +219,26 @@ def plot_trackers():
     print "Plotting took", time.time() - old_time, "seconds"
     print "Found the following materials", MATERIAL_LIST 
 
+def plot_tracker_windows():
+    #plot_materials(0., 200.1, 1., 15180., 15240., 0.1, name = "tku_window")
+    volumes = ["HeWindowOuterMaterial_phys", "HeWindowInnerMaterial_phys"]
+    canvas, hist, graph = plot_thickness(volumes, 0., 200.1, 1., 15180., 15240., 0.1, name = "tku_window_thickness")
+    graph = analytical_tracker_window_thickness()
+    graph.Draw("L SAME")
+    canvas.Update()
+    for format in "png", "eps", "root":
+        canvas.Print("plots/tku_window_thickness."+format)
+    #plot_materials(0., 200.1, 1., 18670., 18750., 0.1, name = "tkd_window")
+    canvas, hist, graph = plot_thickness(volumes, 0., 200.1, 1., 18670., 18750., 0.1, name = "tkd_window_thickness")
+    graph = analytical_tracker_window_thickness()
+    graph.Draw("L SAME")
+    canvas.Update()
+    for format in "png", "eps", "root":
+        canvas.Print("plots/tkd_window_thickness."+format)
+
 def main():
-    plot_trackers()
+    initialise_maus()
+    plot_tracker_windows()
     #raw_input()
 
 if __name__ == "__main__":
