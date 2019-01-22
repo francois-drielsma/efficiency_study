@@ -284,6 +284,9 @@ class Config(object):
     extrapolation_does_apertures = True # set to True in order to include apertures in track extrapolation
     maus_verbose_level = 5
 
+    fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
+    fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
+
     magnet_alignment = {
         "n_events":10,
         "max_iterations":100,

@@ -22,7 +22,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     return file_list
 
 def get_systematics_dir(emittance, suffix, absorber):
-    a_dir = "output/2017-02-7-Systematics-v2/plots_Simulated_2017-2.7_"+str(emittance)+\
+    a_dir = "output/2017-02-7-Systematics-v3/plots_Simulated_2017-2.7_"+str(emittance)+\
            "-140_"+absorber+"_Systematics_"+suffix+"/amplitude/amplitude.json"
     return a_dir
 
@@ -147,14 +147,14 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "do_extrapolation":False,
             "do_magnet_alignment":False,
             "do_fractional_emittance":True,
-            "do_amplitude":False, #True,
-            "do_efficiency":False, #True,
-            "do_globals":False, #True,
-            "do_mc":False, #True,
-            "do_plots":False, #True,
-            "do_cuts_plots":False, #True,
+            "do_amplitude":True,
+            "do_efficiency":True,
+            "do_globals":True,
+            "do_mc":True,
+            "do_plots":True,
+            "do_cuts_plots":True,
             "do_tof01_weighting":False,
-            "do_optics":False, #True,
+            "do_optics":True,
             "do_data_recorder":False,
         }
 
@@ -257,7 +257,7 @@ class Config(object):
     cut_report[4] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[4] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-test-2/"
+    data_dir = "output/2017-02-7-v5/"
     files = "*"
     analyses = []
     #analyses.append(get_analysis("10069_v400/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, 3, 25))

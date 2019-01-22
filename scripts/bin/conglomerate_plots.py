@@ -220,6 +220,34 @@ class CompareData2DConfig(CompareConfig):
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "radius [mm]", modifiers = mod),
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "y [mm]", modifiers = mod),
         ]
+        mod = {
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            },
+            "redraw":{
+                "draw_option":["COL"],
+                "graph":{
+                    "marker_style":None,
+                    "marker_color":None,
+                    "draw_option":["l"]*3,
+                    "transparency":None,
+                    "draw_order":None,
+                    "fill_color":None,
+                    "fill_style":None,
+                }
+            },
+            "rescale_x":[-1.5, 9.5],
+            "rescale_y":[81., 181.],
+            "graph_names":["tramlines_upper", "tramlines_lower", "cuts_graph"],
+            "canvas_fill_color":root_style.get_frame_fill(),
+        }
+        self.conglomerate_list += [
+            self.get_conglomerate_3("p_tku_vs_tof01_all", "p_tot_vs_tof", "ToF_{01} [ns]", "P(TKU) [MeV/c]", modifiers = mod),
+            self.get_conglomerate_3("p_tku_vs_tof01_us_cut", "p_tot_vs_tof", "ToF_{01} [ns]", "P(TKU) [MeV/c]", modifiers = mod),
+        ]
+
+
 
 class CompareData2DMCConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -248,6 +276,32 @@ class CompareData2DMCConfig(CompareConfig):
         self.conglomerate_list = [
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_r_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "radius [mm]", modifiers = mod),
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "y [mm]", modifiers = mod),
+        ]
+        mod = {
+            "extra_labels":{
+                "right":right_labels,
+                "top":top_labels
+            },
+            "redraw":{
+                "draw_option":["COL"],
+                "graph":{
+                    "marker_style":None,
+                    "marker_color":None,
+                    "draw_option":["l"]*3,
+                    "transparency":None,
+                    "draw_order":None,
+                    "fill_color":None,
+                    "fill_style":None,
+                }
+            },
+            "rescale_x":[-1.5, 9.5],
+            "rescale_y":[81., 181.],
+            "graph_names":["tramlines_upper", "tramlines_lower", "cuts_graph"],
+            "canvas_fill_color":root_style.get_frame_fill(),
+        }
+        self.conglomerate_list += [
+            self.get_conglomerate_3("p_tku_vs_tof01_all", "p_tot_vs_tof", "ToF_{01} [ns]", "P(TKU) [MeV/c]", modifiers = mod),
+            self.get_conglomerate_3("p_tku_vs_tof01_us_cut", "p_tot_vs_tof", "ToF_{01} [ns]", "P(TKU) [MeV/c]", modifiers = mod),
         ]
 
 
@@ -604,7 +658,7 @@ def main_paper(batch_level = 0):
     """
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-test/"
+    target_dir = "output/2017-02-7-v4/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
@@ -617,12 +671,13 @@ def main_paper(batch_level = 0):
         ["2017-2.7_4-140_LiH",       "2017-2.7_6-140_LiH",       "2017-2.7_10-140_LiH"],
     ]
     top_labels = ["4-140", "6-140", "10-140"]
-    right_labels = ["Empty\nLH2", "Full\nLH2", "LiH"] #"No\nabsorber", 
-    config_list = [CompareData1DConfig, CompareCutsConfig, 
+    right_labels = ["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
+    config_list = [CompareData2DConfig, CompareData2DMCConfig]
+    void_config_list = [CompareData1DConfig, CompareCutsConfig, 
                    CompareOpticsConfig, CompareOpticsMCConfig,
                    CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,]
-    config_list += [CompareAmplitudeConfigBoth,
+    void_config_list += [CompareAmplitudeConfigBoth,
                    CompareAmplitudeConfigMC,
                    CompareAmplitudeConfigData]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)

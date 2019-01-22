@@ -93,9 +93,8 @@ class FractionalEmittance(AnalysisBase):
             self.mc_planes[det].append_hits(mc_hits[det])
 
     def build_amplitude_dictionaries(self):
-        dict_tku = self.recon_planes['tku'].fractional_amplitude()
         self.dict_list = [
-            ('tku', dict_tku),
+            ('tku', self.recon_planes['tku'].fractional_amplitude()),
             ('tkd', self.recon_planes['tkd'].fractional_amplitude())
         ]
         for name, amp_data in self.mc_planes.iteritems():
@@ -106,7 +105,7 @@ class FractionalEmittance(AnalysisBase):
 
     def get_amplitude_bounds(self):
         if self.dict_list[0][0] != 'tku':
-            raise RuntimeError("Found event with no tku data while doing fractional emittance")
+            raise RuntimeError("First dict must be tku to do fractional emittance")
         n_events = len(self.dict_list[0][1])
         indices = [int(math.floor(n_events*frac)) for frac in self.fractions]
         for name, amp_values in self.dict_list:
@@ -155,14 +154,17 @@ class FractionalEmittance(AnalysisBase):
             print datum.keys()
         return
 
-    def make_graph(self, z_list, amp_list, err_list, color, style, plot_option, name):
-        n_points = len(z_list)
-        graph = ROOT.TGraphAsymmErrors(len(z_list))
-        for i in range(n_points):
-            graph.SetPoint(i, z_list[i], amp_list[i])
-            y_low = amp_list[i]-err_list[i][0]
-            y_high = err_list[i][1]-amp_list[i]
-            graph.SetPointError(i, 0, 0, y_low, y_high)
+    def make_graph(self, point_list, color, style, plot_option, name):
+        n_points = len(point_list)
+        point_list = sorted(point_list)
+        graph = ROOT.TGraphAsymmErrors(n_points)
+        for i, point in enumerate(point_list):
+            z = point[0]
+            amp = point[1]
+            err_low = amp-point[2][0]
+            err_high = point[2][1]-amp            
+            graph.SetPoint(i, z, amp)
+            graph.SetPointError(i, 0, 0, err_low, err_high)
         graph.SetLineColor(color)
         graph.SetMarkerColor(color)
         graph.SetMarkerStyle(style)
@@ -189,21 +191,15 @@ class FractionalEmittance(AnalysisBase):
         reco_predicate = lambda datum: datum['name'] == "tku" or datum['name'] == "tkd"
         for i in range(n_fractions):
             name = "Reco "+str(self.fractions[i]*100)+" %"
-            z_list = [datum['z_pos'] for datum in self.data if reco_predicate(datum)]
-            amp_list = [datum['amplitude_bounds'][i] for datum in self.data \
-                             if reco_predicate(datum)]
-            err_list = [datum['stats_error'][i] for datum in self.data \
-                             if reco_predicate(datum)]
-            self.make_graph(z_list, amp_list, err_list, 1, 20, "P SAME", name)
+            point_list = [(datum['z_pos'], datum['amplitude_bounds'][i], datum['stats_error'][i]) \
+                                for datum in self.data if reco_predicate(datum)]
+            self.make_graph(point_list, 1, 20, "P SAME", name)
 
         for i in range(n_fractions):
             name = "MC "+str(self.fractions[i]*100)+" %"
-            z_list = [datum['z_pos'] for datum in self.data if not reco_predicate(datum)]
-            amp_list = [datum['amplitude_bounds'][i] for datum in self.data \
-                             if not reco_predicate(datum)]
-            err_list = [datum['stats_error'][i] for datum in self.data \
-                             if not reco_predicate(datum)]
-            self.make_graph(z_list, amp_list, err_list, 4, 24, "P L SAME", name)
+            point_list = [(datum['z_pos'], datum['amplitude_bounds'][i], datum['stats_error'][i]) \
+                                for datum in self.data if not reco_predicate(datum)]
+            self.make_graph(point_list, 4, 24, "P L SAME", name)
 
         for fmt in ["pdf", "png", "root"]:
             canvas.Print(self.plot_dir+"/fractional_emittance."+fmt)

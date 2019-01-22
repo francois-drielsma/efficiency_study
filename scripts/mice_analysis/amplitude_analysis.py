@@ -430,7 +430,7 @@ class AmplitudeAnalysis(AnalysisBase):
         print "downstream errors\n", self.matrix_str(downstream_errors)
         return downstream_errors
 
-    def do_migrations(self, suffix, us_ds, migrations):
+    def do_migrations(self, suffix, us_ds, migrations, use_high_amp_average = True):
         """
         Calculate the pdf that results from applying the specified migrations.
         - suffix: Controls the source data and how the migration is applied.
@@ -446,8 +446,11 @@ class AmplitudeAnalysis(AnalysisBase):
             reco_mc_matrix = migrations["crossing_probability"][us_ds]["migration_matrix"]
             reco_mc_matrix = numpy.transpose(numpy.array(reco_mc_matrix))
             pdf = numpy.dot(reco_mc_matrix, pdf)
+        pdf_key = "pdf_ratio"
+        if use_high_amp_average:
+            pdf_key = "pdf_ratio_averaged"
         if suffix == "reco" or suffix == "reco_mc":
-            pdf = pdf*numpy.array(migrations["inefficiency"][us_ds]["pdf_ratio"])
+            pdf = pdf*numpy.array(migrations["inefficiency"][us_ds][pdf_key])
         return pdf.tolist()
 
     def calculate_detector_systematics(self, suffix, us_ds):

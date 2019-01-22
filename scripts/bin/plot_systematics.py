@@ -362,22 +362,32 @@ def do_downstream(input_dir, emittance_list, output_dir):
         a_file_list = sorted(a_file_list)
         my_hacking = Hacking(output_dir+emittance+"-downstream")
         my_hacking.clean_output_dir()
-        my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
-                          ['all_downstream'],
-                          a_file_list)
-        my_hacking.calculate_uncertainty([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        my_hacking.accumulate_corrections(
+                         [('crossing_probability', 'migration_matrix'),
+                           ('inefficiency','pdf_ratio_averaged')],
+                           ['all_downstream'],
+                           a_file_list)
+        my_hacking.calculate_uncertainty(
+                         [('crossing_probability', 'migration_matrix'),
+                          ('inefficiency','pdf_ratio_averaged')],
                           ['all_downstream'])
-        my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        my_hacking.plot_corrections(
+                         [('crossing_probability', 'migration_matrix'),
+                          ('inefficiency','pdf_ratio_averaged')],
                           ['all_downstream'], "graph")
 
         a_file_list = file_list(input_dir, emittance, "lH2_empty", "tku_base")+\
                       file_list(input_dir, emittance, "lH2_empty", "tkd_*")
         print "A FILE LIST:"
         print a_file_list
-        my_hacking.accumulate_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        my_hacking.accumulate_corrections(
+                         [('crossing_probability', 'migration_matrix'),
+                          ('inefficiency','pdf_ratio_averaged')],
                           ['all_downstream'],
                           a_file_list)
-        my_hacking.plot_corrections([('crossing_probability', 'migration_matrix'), ('inefficiency','pdf_ratio')],
+        my_hacking.plot_corrections(
+                         [('crossing_probability', 'migration_matrix'),
+                          ('inefficiency','pdf_ratio_averaged')],
                           ['all_downstream'], "multigraph")
 
 
@@ -413,13 +423,13 @@ def copy_more(input_dir, output_dir):
 
 def main():
     utilities.root_style.setup_gstyle()
-    sys_dir = "2017-02-7-Systematics-v2/"
+    sys_dir = "2017-02-7-Systematics-v3/"
     output_dir = "output/"+sys_dir+"systematics_summary/"
-    #do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
-    #copy_more(sys_dir, output_dir)
+    do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
+    copy_more(sys_dir, output_dir)
     do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
-    #do_downstream(sys_dir, ["4"], output_dir) # , "6", "10"
-    #do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
+    do_downstream(sys_dir, ["4",  "6", "10"], output_dir) # ,
+    do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
 
     return
 

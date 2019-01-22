@@ -50,8 +50,8 @@ class AmplitudeDataBinned(object):
         self.mass = mass # for emittance calculation
         self.state_list = [[], []]
         file_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        if file_limit[0] < 2048:
-            resource.setrlimit(resource.RLIMIT_NOFILE, (2048, file_limit[1]))
+        if file_limit[0] < 4096:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (4096, file_limit[1]))
             print "Adjusted number of allowed file handles from (soft, hard)", \
                   file_limit, "to", resource.getrlimit(resource.RLIMIT_NOFILE)
 

@@ -19,7 +19,7 @@ def reco_file_names(run_number_list, maus, do_globals):
     return file_list
 
 def get_systematics_dir(emittance, suffix, absorber):
-    a_dir = "output/2017-02-7-Systematics-v2/plots_Simulated_2017-2.7_"+str(emittance)+\
+    a_dir = "output/2017-02-7-Systematics-v3/plots_Simulated_2017-2.7_"+str(emittance)+\
            "-140_"+absorber+"_Systematics_"+suffix+"/amplitude/amplitude.json"
     return a_dir
 
@@ -257,6 +257,9 @@ class Config(object):
     residuals_plots_nbins = 100 # used for track extrapolation plots
     extrapolation_does_apertures = True # set to True in order to include apertures in track extrapolation
     maus_verbose_level = 5
+
+    fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
+    fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
 
     magnet_alignment = {
         "n_events":10,

@@ -64,14 +64,22 @@ class CompareCutsSystematicConfig(CompareConfig):
 
     labels = {
         "tku_p":"p at TKU Reference Plane [MeV/c]",
+        "tku_x":"x at TKU Reference Plane [mm]",
+        "tku_y":"y at TKU Reference Plane [mm]",
+        "tku_px":"px at TKU Reference Plane [MeV/c]",
+        "tku_py":"py at TKU Reference Plane [MeV/c]",
         "chi2_tku":"#chi^{2}/D.o.F. in TKU",
         "chi2_tkd":"#chi^{2}/D.o.F. in TKD",
         "p_res":"p(TKU) - p(TKD) [MeV/c]",
         "tkd_p":"p at TKD Reference Plane [MeV/c]",
+        "tkd_x":"x at TKD Reference Plane [mm]",
+        "tkd_y":"y at TKD Reference Plane [mm]",
+        "tkd_px":"px at TKD Reference Plane [MeV/c]",
+        "tkd_py":"py at TKD Reference Plane [MeV/c]",
     }
 
-def systematics():
-    target_dir = "output/2017-02-7-Systematics-test-2/"
+def systematics_cut_summary():
+    target_dir = "output/2017-02-7-Systematics-v3/"
     dir_list = [
         "2017-2.7_3-140_lH2_empty_Systematics_tku_base",  "2017-2.7_4-140_lH2_empty_Systematics_tku_base",
         "2017-2.7_6-140_lH2_empty_Systematics_tku_base",  "2017-2.7_10-140_lH2_empty_Systematics_tku_base", 
@@ -106,7 +114,7 @@ def systematics_conglomerate(dir_lists,
     dir_list = []
     for sub_list in dir_lists:
         dir_list += sub_list
-    sys_run = "output/2017-02-7-Systematics-test/"
+    sys_run = "output/2017-02-7-Systematics-v3/"
     sys_abs = "lH2_empty"
     systematic = "tku_base"
     sys_list =  []
@@ -114,6 +122,10 @@ def systematics_conglomerate(dir_lists,
                        "tku_scale_SSUE1_plus", "tku_pos_plus", "tku_rot_plus"]:
         sys_list += [
             (systematic, "lH2_empty", "tku_p", "tku_p", [130., 150.], False),
+            (systematic, "lH2_empty", "tku_x", "tku_x", [-150., 150.], False),
+            (systematic, "lH2_empty", "tku_y", "tku_y", [-150., 150.], False),
+            (systematic, "lH2_empty", "tku_px", "tku_px", [-100., 100.], False),
+            (systematic, "lH2_empty", "tku_py", "tku_py", [-100., 100.], False),
             (systematic, "lH2_empty", "chi2_tku", "chi2", [0., 20.], True),
             (systematic, "lH2_empty", "p_res", "p_res", [-50., 50.], True),
         ]
@@ -123,6 +135,10 @@ def systematics_conglomerate(dir_lists,
             (systematic, "lH2_empty", "chi2_tkd", "chi2", [0., 20.], True),
             (systematic, "lH2_empty", "p_res", "p_res", [-50., 50.], True),
             (systematic, "lH2_empty", "tkd_p", "tkd_p", [100., 160.], False),
+            (systematic, "lH2_empty", "tkd_x", "tkd_x", [-100., 100.], False),
+            (systematic, "lH2_empty", "tkd_y", "tkd_y", [-100., 100.], False),
+            (systematic, "lH2_empty", "tkd_px", "tkd_px", [-100., 100.], False),
+            (systematic, "lH2_empty", "tkd_py", "tkd_py", [-100., 100.], False),
         ]
 
     for systematic, sys_abs, fname, hist, x_range, normalise in sys_list:
@@ -149,7 +165,8 @@ def systematics_conglomerate(dir_lists,
             except Exception:
                 sys.excepthook(*sys.exc_info())
         try:
-            if len(dir_lists) > 1:
+            if len(dir_list) > 1:
+                print "Merging"
                 merge = ConglomerateMerge(conglomerate_list)
                 merge.merge_all(rows, cols)
         except Exception:
@@ -164,18 +181,18 @@ def mkdirs(target_dir, dir_list):
             os.makedirs(plot_dir)
 
 def main():
-    #systematics()
+    #systematics_cut_summary()
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-test/"
+    target_dir = "output/2017-02-7-v4/"
     my_dir_list = [
         #["2017-2.7_4-140_None",      "2017-2.7_6-140_None",      "2017-2.7_10-140_None",],
-        ["2017-2.7_4-140_lH2_empty"]#, "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
+        ["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
         #["2017-2.7_4-140_lH2_full",  "2017-2.7_6-140_lH2_full",  "2017-2.7_10-140_lH2_full",],
         #["2017-2.7_4-140_LiH",       "2017-2.7_6-140_LiH",       "2017-2.7_10-140_LiH"],
     ]
     top_labels = ["4-140", "6-140", "10-140"]
-    right_labels = ["Empty\nLH2", "Full\nLH2", "LiH"] #"No\nabsorber", 
+    right_labels = ["Empty\nLH2",]# "Full\nLH2", "LiH"] #"No\nabsorber", 
     mkdirs(target_dir, my_dir_list)
     systematics_conglomerate(my_dir_list,
                              target_dir,
