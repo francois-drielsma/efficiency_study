@@ -1,60 +1,60 @@
-import math
 import tempfile
-import xboa.common
 import json
-
 import ROOT
-import scipy.interpolate
+import numpy as np
 
 from mice_analysis.density_estimator.density_data import DensityData
 from mice_analysis.density_estimator.knn_density_estimator import kNNDensityEstimator
 from mice_analysis.analysis_base import AnalysisBase
 
-
 class DensityAnalysis(AnalysisBase):
 
     def __init__(self, config, config_anal, data_loader):
         """
-        Initialise the DensityData class for the basic amplitude calculation
-        * File name is the name of the (temporary) file to which the density data is written
-
-        Internally, we store using numpy.memmap (which is a buffered file-based 
-        array thingy). We have several memmaps:
-        * run_array stores the run number of each event
-        * spill_array stores the spill number of each event
-        * event_array stores the event number of each event
-        * ps_matrix stores the 4D phase space vector of each event
-        Each one is stored in a memmap file, based on "file_name"+suffix
-        During the amplitude calculation, for events whose amplitude we have
-        not yet finished counting:
-        * number of events in the covariance matrix
+        Initialise the DensityAnalysis class for the density estimation
+        * config and config_anal are the configuration files
+	* data_loader extracts the data from the MAUS ROOT files
         """
         super(DensityAnalysis, self).__init__(config, config_anal, data_loader)
+
+	# Initialize the configuration
         self.config = config
         self.config_anal = config_anal
         self.data_loader = data_loader
+
+	# Initialize the density estimator parameters
         self.nthreads = self.config.density_nthreads
-        self.knn_rotate = self.config.density_knn_rotate
+        self.rotate = self.config.density_knn_rotate
+	self.uncertainty = self.config.density_uncertainty
+	self.graph_npoints = self.config.density_graph_npoints
+
+	# Initialize the data containers
+	self.json_data = [] # data for plotting/storing on disk
         self.a_dir = tempfile.mkdtemp()
         file_name = self.a_dir+"/density_data_"
-        self.all_mc_data_us = DensityData(file_name+"mc_us")
-        self.reco_mc_data_us = DensityData(file_name+"reco_mc_us")
-        self.reco_data_us = DensityData(file_name+"recon_us")
-        self.all_mc_data_ds = DensityData(file_name+"mc_ds")
-        self.reco_mc_data_ds = DensityData(file_name+"reco_mc_ds")
-        self.reco_data_ds = DensityData(file_name+"recon_ds")
+        self.data_types = ("mc", "reco_mc", "recon")
+        self.locations = ("us", "ds")
+	self.data = {}
+        for typ in self.data_types:
+	    self.data[typ] = {}
+	    for loc in self.locations:
+		self.data[typ][loc] = DensityData(file_name+"_"+typ+"_"+loc)
 
     def birth(self):
+        """
+        Sets the output directory for the density plots
+	Resets all the data containers
+        """
         self.set_plot_dir("density")
-        self.all_mc_data_us.clear()
-        self.reco_mc_data_us.clear()
-        self.reco_data_us.clear()
-        self.all_mc_data_ds.clear()
-        self.reco_mc_data_ds.clear()
-        self.reco_data_ds.clear()
+        for typ in self.data_types:
+	    for loc in self.locations:
+		self.data[typ][loc].clear()
         self.append_data()
 
     def process(self):
+        """
+        Called on each spill
+        """
         self.append_data()
 
     def append_data(self):
@@ -73,12 +73,11 @@ class DensityAnalysis(AnalysisBase):
         We use "mc_true_us_cut"/"mc_true_ds_cut" for the all_mc sample and we
         use ("mc_true_us_cut" AND "upstream_cut") for the reco_mc sample
         """
-        hits_reco_us = []
-        hits_all_mc_us = []
-        hits_reco_mc_us = []
-        hits_reco_ds = []
-        hits_all_mc_ds = []
-        hits_reco_mc_ds= []
+	hits = {}
+        for typ in self.data_types:
+	    hits[typ] = {}
+	    for loc in self.locations:
+		hits[typ][loc] = []
 
         if self.config_anal["amplitude_mc"]:
             station_us = self.config.mc_plots["mc_stations"]["tku_tp"][0]
@@ -87,9 +86,9 @@ class DensityAnalysis(AnalysisBase):
         for event in self.data_loader.events:
             if event['upstream_cut']:
                 continue
-            hits_reco_us.append(event['tku'])
+            hits["recon"]["us"].append(event['tku'])
             if not event['downstream_cut']:
-                hits_reco_ds.append(event['tkd'])
+                hits["recon"]["ds"].append(event['tkd'])
 
             if self.config_anal["amplitude_mc"]:
                 hit_mc_us, hit_mc_ds = None, None
@@ -99,82 +98,124 @@ class DensityAnalysis(AnalysisBase):
                     if detector_hit["detector"] == station_ds:
                         hit_mc_ds = detector_hit["hit"]
                 if not event['mc_true_us_cut']:
-                    hits_all_mc_us.append(hit_mc_us)# no inefficiency upstream
-                    hits_reco_mc_us.append(hit_mc_us)
+                    hits["mc"]["us"].append(hit_mc_us)# no inefficiency upstream
+                    hits["reco_mc"]["us"].append(hit_mc_us)
                 if not event['mc_true_ds_cut']:
-                    hits_all_mc_ds.append(hit_mc_ds)
+                    hits["mc"]["ds"].append(hit_mc_ds)
                     if not event['downstream_cut']:
-                        hits_reco_mc_ds.append(hit_mc_ds)
+                        hits["reco_mc"]["ds"].append(hit_mc_ds)
 
-        self.all_mc_data_us.append_hits(hits_all_mc_us)
-        self.reco_mc_data_us.append_hits(hits_reco_mc_us)
-        self.reco_data_us.append_hits(hits_reco_us)
-        self.all_mc_data_ds.append_hits(hits_all_mc_ds)
-        self.reco_mc_data_ds.append_hits(hits_reco_mc_ds)
-        self.reco_data_ds.append_hits(hits_reco_ds)
-        print "Loaded upstream (density):"
-        print "    reco:   ", len(hits_reco_us)
-        print "    all mc: ", len(hits_all_mc_us)
-        print "    reco mc:", len(hits_reco_mc_us)
-        print "Loaded downstream (density):"
-        print "    reco:   ", len(hits_reco_ds)
-        print "    all mc: ", len(hits_all_mc_ds)
-        print "    reco mc:", len(hits_reco_mc_ds)
+        for typ in self.data_types:
+	    for loc in self.locations:
+		self.data[typ][loc].append_hits(hits[typ][loc])
+
+	for loc in self.locations:
+            print "Loaded %s (density):" % loc
+	    for typ in self.data_types:
+		print "    %s:   " % typ, len(hits[typ][loc])
+
         return
 
-    def make_graph(self, point_list, color, style, plot_option, name):
-        n_points = len(point_list)
-        point_list = sorted(point_list)
-        graph = ROOT.TGraphAsymmErrors(n_points)
-        for i, point in enumerate(point_list):
-            z = point[0]
-            amp = point[1]
-            err_low = amp-point[2][0]
-            err_high = point[2][1]-amp            
-            graph.SetPoint(i, z, amp)
-            graph.SetPointError(i, 0, 0, err_low, err_high)
-        graph.SetLineColor(color)
-        graph.SetMarkerColor(color)
-        graph.SetMarkerStyle(style)
-        graph.SetName(name)
-        graph.Draw(plot_option)
-        self.plots["fractional_amplitude"]["graphs"][name] = graph
-        return graph
+    def make_multigraph(self, typ, graphs, colors, plot_option, name):
+        """
+        Initialize a multigraph, draws it
+        * typ speficies the type of data (mc, reco_mc, recon)
+	* graphs is a dictionary containing the up and downstream graphs
+	* colors is a dictionary containing the up and downstream graph colors
+	* plot_option is the graph drawing option
+	* name of the type of graph being output
+        """
 
-    def calculate_stats_errors(self):
-	# Estimates the statistical uncertainty at each point of the graph (TODO)
-        return
+	mg = ROOT.TMultiGraph(name+"_"+typ, ";Fraction #alpha;#rho_{#alpha} [mm^{-2}(MeV/c)^{-2}]");
+	for loc in self.locations:
+	    graphs[loc].SetLineColor(colors[loc])
+            graphs[loc].SetFillColorAlpha(colors[loc], .25)
+	    mg.Add(graphs[loc], plot_option)
+            self.plots[name+"_"+typ]["graphs"][loc] = graphs[loc]
 
-    def make_axes(self, canvas_name):
-        hist = self.make_root_histogram(canvas_name, canvas_name,
-                                        [-1], "z [mm]", 1000,
-                                        [-1], "Amplitude [mm]", 1000, [],
-                                        15000., 19000.,
-                                        0., 100.)
-        hist.Draw()
+        mg.Draw("A")
+	return mg
 
-    def make_plot(self):
-        n_fractions = len(self.fractions)
-        mc_amp_list = []
-        reco_amp_list = []
-        canvas_name = 'fractional_amplitude'
-        canvas = self.get_plot(canvas_name)["pad"]
-        self.make_axes(canvas_name)
-        reco_predicate = lambda datum: datum['name'] == "tku" or datum['name'] == "tkd"
-        for i in range(n_fractions):
-            name = "Reco "+str(self.fractions[i]*100)+" %"
-            point_list = [(datum['z_pos'], datum['amplitude_bounds'][i], datum['stats_error'][i]) \
-                                for datum in self.data if reco_predicate(datum)]
-            self.make_graph(point_list, 1, 20, "P SAME", name)
+    def make_ratio(self, typ, graphs, color, plot_option, name):
+        """
+        Initialize a graph ratio, draws it
+        * typ speficies the type of data (mc, reco_mc, recon)
+	* graphs is a dictionary containing the up and downstream graphs
+	* color is the graph color
+	* plot_option is the graph drawing option
+	* name of the type of graph being output
+        """
+	gratio = ROOT.TGraphErrors(self.graph_npoints)
+	gratio.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
+	for i in range(self.graph_npoints):
+	    ratio = graphs["ds"].GetY()[i]/graphs["us"].GetY()[i]
+	    gratio.GetX()[i] = graphs["us"].GetX()[i]
+	    gratio.GetEX()[i] = graphs["us"].GetEX()[i]
+	    gratio.GetY()[i] = ratio
+	    gratio.GetEY()[i] = 0.
+	    if graphs["ds"].GetY()[i] > 0.:
+		gratio.GetEY()[i] = ratio*graphs["ds"].GetEY()[i]/graphs["ds"].GetY()[i]
 
-        for i in range(n_fractions):
-            name = "MC "+str(self.fractions[i]*100)+" %"
-            point_list = [(datum['z_pos'], datum['amplitude_bounds'][i], datum['stats_error'][i]) \
-                                for datum in self.data if not reco_predicate(datum)]
-            self.make_graph(point_list, 4, 24, "P L SAME", name)
+        self.plots[name+"_"+typ]["graphs"]["ratio"] = gratio
 
-        for fmt in ["pdf", "png", "root"]:
-            canvas.Print(self.plot_dir+"/density."+fmt)
+	gratio.SetLineColor(color)
+	gratio.SetFillColorAlpha(color, .25)
+
+	gratio.Draw("A"+plot_option)
+	return gratio
+
+    def make_profiles(self):
+        """
+        Produces density profile comparisons between upstream and downstream
+	for each of the categories of data
+        """
+	# For each type of data, extract a numpy ndarray that contains all of the
+        # phase space vectors, initialize the kNN density estimator and extract the
+        # density profile with its uncertainty
+	graphs = {}
+        for typ in self.data_types:
+	    # Skip if no data
+	    if not self.data[typ]["us"].get_n_events():
+		continue
+
+	    graphs[typ] = {}
+	    transmission = float(self.data[typ]["ds"].get_n_events())/self.data[typ]["us"].get_n_events()
+	    for loc in self.locations:
+		# Extract the data as a numpy array
+        	ps_data = np.ndarray((self.data[typ][loc].get_n_events(), 4))
+		for i, event in enumerate(self.data[typ][loc].retrieve()):
+	    	    ps_data[i] = event[-1].tolist()
+
+		# Use the kNN module to get a density profile
+		norm = 1.
+		if loc == "ds":
+		    norm = transmission
+		density_estimator = kNNDensityEstimator(ps_data, self.rotate, self.nthreads, norm)
+		graphs[typ][loc] = density_estimator.profile(self.graph_npoints, self.uncertainty)
+
+	# Produce plots that compare the density profiles upstream and downstream
+        # of the absorber. Produce one for each category of data
+        for typ in self.data_types:
+	    # Skip if no data
+	    if not self.data[typ]["us"].get_n_events():
+		continue
+
+	    # Print up/down comparison
+            canvas_name = 'density_profile_%s' % typ
+            canvas = self.get_plot(canvas_name)["pad"]
+
+	    mg = self.make_multigraph(typ, graphs[typ], {"us":1,"ds":4}, "LE3", "density_profile")
+            for fmt in ["pdf", "png", "root"]:
+                canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
+
+	    # Print ratios
+            canvas_name = 'density_ratio_%s' % typ
+            canvas = self.get_plot(canvas_name)["pad"]
+
+	    gratio = self.make_ratio(typ, graphs[typ], 1, "LE3", "density_ratio")
+            for fmt in ["pdf", "png", "root"]:
+                canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
+		
 
     def performance_sys_error(self):
         pass
@@ -183,14 +224,12 @@ class DensityAnalysis(AnalysisBase):
         pass
 
     def save(self):
-        for item in self.data:
+        for item in self.json_data:
             del item['values']
-        fout = open(self.plot_dir+"/amplitude.json", "w")
-        print >> fout, json.dumps(self.data)
+        fout = open(self.plot_dir+"/density.json", "w")
+        print >> fout, json.dumps(self.json_data)
 
     def death(self):
-	print "TODO"
-#        self.calculate_stats_errors()
-#        self.make_plot()
-#        self.save()
+        self.make_profiles()
+        self.save()
 
