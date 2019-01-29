@@ -79,6 +79,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "do_efficiency":True,
             "do_fractional_emittance":True,
             "do_amplitude":True,
+	    "do_density":True,
             "do_extrapolation":False,
             "do_globals":do_globals,
             "do_mc":True,
@@ -286,6 +287,10 @@ class Config(object):
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
+
+    density_nthreads = 2	# Number of threads used by the density estimator
+    density_knn_rotate = True	# Use the metric of the covariance matrix
+    density_graph_npoints = 100	# Number of points in the density profile
 
     magnet_alignment = {
         "n_events":10,
