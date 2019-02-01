@@ -118,7 +118,7 @@ class DensityAnalysis(AnalysisBase):
 
     def make_multigraph(self, typ, graphs, colors, plot_option, name):
         """
-        Initialize a multigraph, draws it
+        Initializes a multigraph, draws it
         * typ speficies the type of data (mc, reco_mc, recon)
 	* graphs is a dictionary containing the up and downstream graphs
 	* colors is a dictionary containing the up and downstream graph colors
@@ -136,9 +136,21 @@ class DensityAnalysis(AnalysisBase):
         mg.Draw("A")
 	return mg
 
+    def make_multigraph_legend(self, graphs):
+        """
+        Initializes a multigraph legend, draws it
+	* graphs is a dictionary containing the up and downstream graphs
+        """
+
+	leg = ROOT.TLegend(.6, .6, .8, .8)
+	leg.AddEntry(graphs["us"], "Upstream", "LF")
+	leg.AddEntry(graphs["ds"], "Downstream", "LF")
+	leg.Draw("SAME")
+	return leg
+
     def make_ratio(self, typ, graphs, color, plot_option, name):
         """
-        Initialize a graph ratio, draws it
+        Initializes a graph ratio, draws it
         * typ speficies the type of data (mc, reco_mc, recon)
 	* graphs is a dictionary containing the up and downstream graphs
 	* color is the graph color
@@ -205,6 +217,7 @@ class DensityAnalysis(AnalysisBase):
             canvas = self.get_plot(canvas_name)["pad"]
 
 	    mg = self.make_multigraph(typ, graphs[typ], {"us":1,"ds":4}, "LE3", "density_profile")
+	    leg = self.make_multigraph_legend(graphs[typ])
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
 
@@ -230,6 +243,11 @@ class DensityAnalysis(AnalysisBase):
         print >> fout, json.dumps(self.json_data)
 
     def death(self):
+        """
+        Called when all the data has been loaded
+	Feeds the data to the density estimator, extracts density profiles
+	Saves the profiles as a json file (TODO)
+        """
         self.make_profiles()
         self.save()
 
