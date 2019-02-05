@@ -36,7 +36,11 @@ class Hacking(object):
         list_of_lists = {}
         for target in test_targets:
             for key_1, key_2 in test_keys:
-                item = numpy.array(bias_json[key_1][target][key_2])
+                if key_2 == None:
+                    item = bias_json[key_1][target]
+                else:
+                    item = bias_json[key_1][target][key_2]
+                item = numpy.array(item)
                 list_of_lists[key_1] = {}
                 list_of_lists[key_1][target] = {}
                 new_item = numpy.zeros(item.shape).tolist()
@@ -108,12 +112,17 @@ class Hacking(object):
                 self.setup_lists(bias_json, test_keys, test_targets)
             for target in test_targets:
                 for key_1, key_2 in test_keys:
-                    item = bias_json[key_1][target][key_2]
+                    # if key_2 == None key_2 is ignored at read time; but left 
+                    # as None elsewhere for compatibility
+                    if key_2 == None:
+                        item = bias_json[key_1][target]
+                    else:
+                        item = bias_json[key_1][target][key_2]
                     lists = self.list_of_lists[key_1][target][key_2]
                     self.append_item(item, lists)
     
     def get_lists(self, key_1, target, key_2):
-        name = key_1+" "+target+" "+key_2
+        name = key_1+" "+target+" "+str(key_2)
         lists = self.list_of_lists[key_1]
         lists = lists[target]
         lists = lists[key_2]
@@ -132,7 +141,9 @@ class Hacking(object):
                         self.stats_errors[name][i] = numpy.std(a_list)/(len(a_list)-1.)**0.5
                 print "Uncertainties:", name, self.stats_errors[name]
 
-    def plot_corrections_hist(self, lists, name, axis):
+    def plot_corrections_hist(self, lists, name, axis, zero):
+        if not zero:
+            raise RuntimeError("GAG")
         canvas = xboa.common.make_root_canvas(name)
         canvas.Divide(*self.canvas_split)
         for i, a_list in enumerate(lists):
@@ -149,27 +160,31 @@ class Hacking(object):
         for fmt in ['.png', '.root', '.pdf']:
             canvas.Print(self.output_dir+plot_name+"_hist"+fmt)
 
-    def plot_corrections_multigraph(self, lists, name, axis):
+    def plot_corrections_multigraph(self, lists, name, axis, zero = True):
         canvas = xboa.common.make_root_canvas(name)
         graph_list = [ROOT.TGraphErrors(self.max_bin) for i in range(len(lists[0]))]
         x_min, x_max, y_min, y_max = 0., None, None, None
         for i, a_list in enumerate(lists):
             if i > self.max_bin:
                 continue
-            err = self.stats_errors[name][i]*(2.**0.5) #factor of sqrt(2) as we are looking at difference
+            err = 0.
+            if name in self.stats_errors:
+                err = self.stats_errors[name][i]*(2.**0.5) #factor of sqrt(2) as we are looking at difference
             print i, str(self.get_bin_centre(i)).ljust(6), str(round(err, 1)).ljust(6),
             for j, value in enumerate(a_list):
-                value = (value - a_list[0])
+                if zero:
+                    value = (value - a_list[0])
                 graph_list[j].SetPoint(i, self.get_bin_centre(i), value)
                 graph_list[j].SetPointError(i, 0., err)
                 print str(round(value, 1)).ljust(6),
-                y_min = max(-value+err, y_min) # use max(-y) to handle initial None
-                y_max = max(value+err, y_max)
+                #y_min = max(abs(value)+err, y_min) # use max(-y) to handle initial None
+                y_max = max(abs(value)+abs(err), y_max)
                 x_max = max(self.get_bin_centre(i), x_max)
-            print str(round(y_min, 2)).ljust(6)
-        y_min *= -1.
-        y_min -= (y_max-y_min)*0.1
-        y_max += (y_max-y_min)*0.1
+        y_max += y_max*0.1
+        print "Y MAX", y_max
+        y_min = -y_max
+        if not zero:
+            y_min = -y_max/10.
         x_max *= 1.5
         if name in self.multigraph_axis_range:
             [y_min, y_max] = self.multigraph_axis_range[name]
@@ -177,10 +192,10 @@ class Hacking(object):
         draw_option = "SAME P L"
         a_type = ""
         if "migration_matrix" in name:
-            a_type = "Matrix "
+            a_type = "Matrix Migration"
         elif "inefficiency" in name:
-            a_type = "Efficiency "
-        hist = ROOT.TH2D("", ";Amplitude [mm];Change in "+a_type+"Correction", 1000, x_min, x_max, 1000, y_min, y_max)
+            a_type = "Efficiency Correction"
+        hist = ROOT.TH2D("", ";Amplitude [mm];Change in "+a_type, 1000, x_min, x_max, 1000, y_min, y_max)
         hist.SetStats(False)
         hist.SetTitle(self.run_configuration)
         hist.Draw()
@@ -188,6 +203,8 @@ class Hacking(object):
         legend = ROOT.TLegend(0.65, 0.5, 0.85, 0.9)
         self.root_objects.append(legend)
         index = 1
+        print "NAMES"
+        print self.names
         for i, graph in enumerate(graph_list):
             print "Plotting multi_graph", i, self.names[i]
             if "tku_base" in self.names[i]:
@@ -215,7 +232,9 @@ class Hacking(object):
         for fmt in ['.png', '.root', '.pdf']:
             canvas.Print(self.output_dir+plot_name+"_multigraph"+fmt)
 
-    def plot_corrections_graph(self, lists, name, axis):
+    def plot_corrections_graph(self, lists, name, axis, zero):
+        if not zero:
+            raise RuntimeError("GAG")
         canvas = xboa.common.make_root_canvas(name)
         graph = ROOT.TGraphErrors(self.max_bin)
         print name, axis, "graph"
@@ -245,7 +264,7 @@ class Hacking(object):
             canvas.Print(self.output_dir+plot_name+"_graph"+fmt)
 
 
-    def plot_corrections(self, test_keys, test_targets, plot_routine_str):
+    def plot_corrections(self, test_keys, test_targets, plot_routine_str, zero=True):
         for target in test_targets:
             for key_1, key_2 in test_keys:
                 name, lists = self.get_lists(key_1, target, key_2)
@@ -257,7 +276,7 @@ class Hacking(object):
                     "graph":self.plot_corrections_graph,
                     "multigraph":self.plot_corrections_multigraph,
                 }[plot_routine_str]
-                plot_routine(lists, name, axis)
+                plot_routine(lists, name, axis, zero)
 
     name_map = {
         "tku_density_plus":"TKU Density",
@@ -272,6 +291,14 @@ class Hacking(object):
         "tkd_scale_SSDC_plus":"TKD Centre Coil",
         "tkd_scale_SSDE1_plus":"TKD End1 Coil",
         "tkd_scale_SSDE2_plus":"TKD End2 Coil",
+
+        "mc_base":"Base", 
+        "mc_beam_offset_minus":"Negative beam offset",
+        "mc_beam_offset_plus":"Positive beam offset",
+        "mc_fc_plus":"Focus coils",
+        "mc_lh2_plus":"lH2 density",
+        "mc_ssd_match_plus":"SSD Match coils",
+        "mc_ssu_match_plus":"SSU Match coils",
     }
 
     graph_axis_range = {
@@ -282,8 +309,8 @@ class Hacking(object):
 
 
     multigraph_axis_range = {
-        "crossing_probability all_downstream migration_matrix":[-0.12, 0.12],
-        "crossing_probability all_upstream migration_matrix":[-0.12, 0.12],
+        "crossing_probability all_downstream migration_matrix":[-0.5, 0.5],
+        "crossing_probability all_upstream migration_matrix":[-0.5, 0.5],
         "inefficiency all_downstream pdf_ratio":[-0.12, 0.12],
     }
 
@@ -390,6 +417,19 @@ def do_downstream(input_dir, emittance_list, output_dir):
                           ('inefficiency','pdf_ratio_averaged')],
                           ['all_downstream'], "multigraph")
 
+def do_performance_comparison(input_dir, emittance_list, output_dir):
+    for emittance in emittance_list:
+        a_file_list = file_list(input_dir, emittance, "lH2_full", "mc_*")
+        my_hacking = Hacking(output_dir+emittance+"-performance")
+        my_hacking.clean_output_dir()
+        my_hacking.accumulate_corrections(
+                         [('all_mc', None)],
+                           ['migration_matrix'],
+                           a_file_list)
+        my_hacking.plot_corrections(
+                           [('all_mc', None)],
+                           ['migration_matrix'], "multigraph", False)
+
 
 def do_copy(input_dir, emittance_list, output_dir):
     for emittance in emittance_list:
@@ -424,12 +464,14 @@ def copy_more(input_dir, output_dir):
 def main():
     utilities.root_style.setup_gstyle()
     sys_dir = "2017-02-7-Systematics-v3/"
-    output_dir = "output/"+sys_dir+"systematics_summary/"
-    do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
-    copy_more(sys_dir, output_dir)
-    do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
-    do_downstream(sys_dir, ["4",  "6", "10"], output_dir) # ,
-    do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
+    output_dir = "output/"+sys_dir+"recon_systematics_summary/"
+    #do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
+    #copy_more(sys_dir, output_dir)
+    #do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
+    #do_downstream(sys_dir, ["4",  "6", "10"], output_dir) # ,
+    #do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
+    output_dir = "output/"+sys_dir+"performance_systematics_summary/"
+    do_performance_comparison(sys_dir, ["4", "6", "10"], output_dir) #
 
     return
 

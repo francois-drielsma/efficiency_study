@@ -198,11 +198,11 @@ class Config(object):
       "mc_ssd_match_plus",
     ]
     empty_systematics_list = [
-      "tku_base",
+      "tku_base", "tku_wider-p",
       "tku_pos_plus", "tku_rot_plus", "tku_density_plus",
-      "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
+      "tku_scale_SSUC_neg", "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
       "tkd_pos_plus", "tkd_rot_plus", "tkd_density_plus",
-      "tkd_scale_SSDC_plus", "tkd_scale_SSDE1_plus", "tkd_scale_SSDE2_plus",
+      "tkd_scale_SSDC_neg", "tkd_scale_SSDC_plus", "tkd_scale_SSDE1_plus", "tkd_scale_SSDE2_plus",
     ]
     cuts = {}
     suffix = None
@@ -285,7 +285,7 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
+    fractional_emittance_fractions = [0.09, (1-0.91**2), (1-0.91**3), 0.5]
 
     magnet_alignment = {
         "n_events":10,

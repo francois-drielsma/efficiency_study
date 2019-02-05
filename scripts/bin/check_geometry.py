@@ -30,15 +30,15 @@ def material_to_colour(material):
     elif material in ("He"):
         return ROOT.kYellow+1
     if material in ("Fe"): # "kill volumes"
-        return 1
+        return 1 # black
     if material in ("MYLAR", "POLYSTYRENE", "NYLON-6-6", "POLYCARBONATE", "POLYVINYL_TOLUENE", "POLYURETHANE", "G10"):
-        return 8
+        return 8 # dark green
     if material in ("Al", "ALUMINUM"):
-        return ROOT.kOrange
+        return ROOT.kOrange # orange/mustard
     if material in ("Zn", "Cu", "W", "TUNGSTEN", "BRASS", "STEEL", "IRON", "TAM1000"):
-        return 2
+        return 2 # red
     if material in ("lH2", "MICE_LITHIUM_HYDRIDE", "LITHIUM_HYDRIDE", "TrackerGlue", "TUFNOL"):
-        return 4
+        return 4 # blue
     print "UNRECOGNISED MATERIAL", material
     return 1
 
@@ -236,9 +236,13 @@ def plot_tracker_windows():
     for format in "png", "eps", "root":
         canvas.Print("plots/tkd_window_thickness."+format)
 
+def plot_apertures():
+    plot_materials( 0., 300.1, 1., 16500., 17500., 0.1, name = "absorber")
+    plot_materials( 0., 300.1, 1., 17500., 18500., 0.1, name = "ssd_aperture")
+
 def main():
     initialise_maus()
-    plot_tracker_windows()
+    plot_apertures()
     #raw_input()
 
 if __name__ == "__main__":

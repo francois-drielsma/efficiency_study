@@ -341,6 +341,10 @@ class ConglomerateOne(object):
                     hist.SetFillColor(redraw["fill_color"][i])
                 hist.SetLineWidth(1)
                 hist.SetMarkerStyle(redraw["marker_style"][i])
+                marker_color = 1
+                if "marker_color" in redraw:
+                    marker_color = redraw["marker_color"][i]
+                hist.SetMarkerColor(marker_color)
                 for axis in hist.GetXaxis(), hist.GetYaxis():
                     axis.SetNdivisions(5, 5, 0)
                     axis.SetLabelSize(self.label_size)

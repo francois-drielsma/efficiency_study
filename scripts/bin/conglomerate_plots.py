@@ -77,6 +77,73 @@ class CompareMCConfig(CompareConfig):
                                     right_labels, top_labels, [-2, 0, 2])),
         ]
 
+def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, right_labels):
+    output_dir = "compare_fractional_emittance/"
+    modifiers = {
+        "extra_labels":{
+            "right":right_labels,
+            "top":top_labels
+        },
+        "hist_title":"",
+        "file_name":"fractional_emittance",
+        "canvas_name":"fractional_amplitude",
+        "normalise_hist":False,
+        "histogram_names":["fractional_amplitude"],
+        "graph_names":["Reco "+str(fraction), "MC "+str(fraction)],
+        "mice_logo":False,
+        "legend":False,
+        "calculate_errors":[],
+        "redraw":{
+            "draw_option":["P"]*2, #E1 PLC
+            "fill_color":[1]*2,
+            "transparency":None,
+            "line_color":[1]*2,
+            "marker_style":[1]*2,
+            "marker_color":[1]*2,
+            "draw_order":[1]*2,
+            "x_range":[15010, 18990],
+            "y_range":y_range,
+            "graph":{
+                    "draw_option":["P", "P", "P", "P L"], # reco, extrap reco, reco mc, mc truth
+                    "marker_style":[20, 1, 21, 25],
+                    "marker_color":[1, 0, 4, 4],
+                    "fill_color":None,
+                    "fill_style":None,
+                    "transparency":None,
+                    "draw_order":[1, 3, 2, 0],
+            },
+            "ignore_more_histograms":False,
+        },
+        "write_plots":{
+            "dir":target_dir+"/"+output_dir+"/"+beam,
+            "file_name":"fractional_emittance_"+str(fraction)
+        },
+        "axis_title":{
+            "x":"z [mm]",
+            "y":"Amplitude [mm]",
+        },
+
+    }
+    return modifiers
+
+class CompareFractionalEmittanceConfig(CompareConfig):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
+        dir_list = [
+            target_dir+"plots_"+beam+"/",
+            target_dir+"plots_Simulated_"+beam
+        ]
+        output_dir = "compare_fractional_emittance/"
+        self.setup(beam, target_dir, "fractional_emittance/", output_dir, dir_list)
+        self.conglomerate_list = []
+        for frac, y_range in [
+            #("9.0", [0., 15.]),
+            ("50.0", [12, 36])
+            ]:
+            mods = fractional_emittance_mod(frac, y_range, beam, target_dir, top_labels, right_labels)
+            self.conglomerate_list.append(
+                self.get_conglomerate_0(modifiers = mods),
+            )
+        self.data_caption = [[],]
 
 def vertical(x_value_list, modifier):
     verticals = [
@@ -672,14 +739,15 @@ def main_paper(batch_level = 0):
     ]
     top_labels = ["4-140", "6-140", "10-140"]
     right_labels = ["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
-    config_list = [CompareData2DConfig, CompareData2DMCConfig]
-    void_config_list = [CompareData1DConfig, CompareCutsConfig, 
+    config_list = [CompareData1DConfig, CompareCutsConfig, 
                    CompareOpticsConfig, CompareOpticsMCConfig,
                    CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,]
-    void_config_list += [CompareAmplitudeConfigBoth,
+    config_list += [CompareAmplitudeConfigBoth,
                    CompareAmplitudeConfigMC,
                    CompareAmplitudeConfigData]
+    config_list = [CompareFractionalEmittanceConfig]
+
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
 
 if __name__ == "__main__":
