@@ -75,6 +75,12 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
+            "density_mc":True,			# True if pure Monte Carlo
+    	    "density_correction_cutoff":.5,	# Cutoff above which correction is averaged
+    	    "density_corrections":None,		# Path to the correction file
+            "density_systematics":{},		# Density systematic uncertainty dictionary
+            "density_sections":True,		# True if density sections are to be printed
+
             "do_magnet_alignment":False,
             "do_efficiency":True,
             "do_fractional_emittance":True,
@@ -288,10 +294,10 @@ class Config(object):
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
 
-    density_nthreads = 2		# Number of threads used by the density estimator
-    density_knn_rotate = True		# Use the metric of the covariance matrix
-    density_uncertainty = 0		# 0: theoretical, 1: bootstrapped
-    density_graph_npoints = 1000	# Number of points in the density profile
+    density_nthreads = 2	# Number of threads used by the density estimator
+    density_knn_rotate = True	# Use the metric of the covariance matrix
+    density_uncertainty = 0	# 0: theoretical, 1: bootstrapped
+    density_npoints = 1000	# Number of points in the density profiles
 
     magnet_alignment = {
         "n_events":10,
