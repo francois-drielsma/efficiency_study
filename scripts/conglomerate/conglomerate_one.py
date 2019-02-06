@@ -42,19 +42,25 @@ class ConglomerateOne(object):
 
     def get_hist_list(self, canvas):
         hist_list = []
-        other_types = [type(ROOT.TGraph()), type(ROOT.TFrame())]
+        hist_names = self.options["histogram_names"]
+        if hist_names == None:
+            hist_names = []
+        other_types = [type(ROOT.TGraph()), type(ROOT.TFrame()),
+                       type(ROOT.TLegend())] #, type(ROOT.TMultiGraph())]
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
-            for hist_name in self.options["histogram_names"]:
+            for hist_name in hist_names:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
                     if type(an_object) in other_types:
                         continue
+                    if type(an_object) == type(ROOT.TMultiGraph()):
+                        an_object = an_object.GetHistogram().Clone()
                     hist_list.append(an_object)
                     an_object.SetName(an_object.GetName()+self.uid())
                     break # we can only add each object once
-        if len(hist_list) == 0:
+        if len(hist_list) == 0 and hist_names:
             print "Did not find a histogram from list", self.options["histogram_names"]
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
@@ -64,7 +70,7 @@ class ConglomerateOne(object):
     def get_graph_list(self, canvas):
         graph_list = []
         pad = self.get_pad(canvas)
-        graph_types = [type(ROOT.TGraph()), type(ROOT.TGraphAsymmErrors())]
+        graph_types = [type(ROOT.TGraph()), type(ROOT.TGraphAsymmErrors()), type(ROOT.TGraphErrors())]
         graph_name_list = copy.deepcopy(self.options["graph_names"])
         graph_name_list = [name.replace(" ", "_").lower() for name in graph_name_list]
         canvas_objects = [an_object for an_object in pad.GetListOfPrimitives()]
@@ -72,13 +78,17 @@ class ConglomerateOne(object):
             for an_object in canvas_objects:
                 name = str(an_object.GetName()).replace(" ", "_").lower()
                 if graph_name in name:
-                    if type(an_object) not in graph_types:
+                    if type(an_object) == type(ROOT.TMultiGraph()):
+                        for item in an_object.GetListOfGraphs():
+                            graph_list.append(item.Clone())
+                        continue
+                    elif type(an_object) not in graph_types:
                         print name, "matches", graph_name, "but type", type(an_object), "not a graph - skipping"
                         continue
                     graph_list.append(an_object)
                     canvas_objects.remove(an_object)
                     break # we can only add each object once
-        if len(graph_name_list) != len(graph_list):
+        if len(graph_name_list) > len(graph_list):
             print "Did not find graphs", graph_name_list, "from:"
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
@@ -323,39 +333,42 @@ class ConglomerateOne(object):
         redraw = self.options["redraw"]
         draw_option = ["" for hist in hist_list]
         draw_order = [i for i, hist in enumerate(hist_list)]
-        if redraw:
-            print "Will redraw", redraw["x_range"], redraw["y_range"]
-            if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
-                print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
-                print json.dumps(redraw, indent=2)
-                raise RuntimeError("Failed to find all histograms for redraw")
-            for i, hist in enumerate(hist_list):
-                if type(hist) == type(ROOT.TGraph()):
-                    continue
-                if i >= len(redraw["line_color"]):
-                    continue # ignore
-                hist.SetLineColor(redraw["line_color"][i])
-                if redraw["transparency"] != None:
-                    hist.SetFillColorAlpha(redraw["fill_color"][i], redraw["transparency"][i])
-                else:
-                    hist.SetFillColor(redraw["fill_color"][i])
-                hist.SetLineWidth(1)
+        if not redraw:
+            return
+        print "Will redraw", redraw["x_range"], redraw["y_range"]
+        if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
+            print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
+            print json.dumps(redraw, indent=2)
+            raise RuntimeError("Failed to find all histograms for redraw")
+        for i, hist in enumerate(hist_list):
+            if type(hist) == type(ROOT.TGraph()) or  type(hist) == type(ROOT.TMultiGraph()):
+                continue
+            if i >= len(redraw["line_color"]):
+                continue # ignore
+            hist.SetLineColor(redraw["line_color"][i])
+            if redraw["transparency"] != None:
+                print "Doing transparency"
+                hist.SetFillColorAlpha(redraw["fill_color"][i], redraw["transparency"][i])
+            else:
+                hist.SetFillColor(redraw["fill_color"][i])
+            hist.SetLineWidth(1)
+            if redraw["marker_style"] != None:
                 hist.SetMarkerStyle(redraw["marker_style"][i])
-                marker_color = 1
-                if "marker_color" in redraw:
-                    marker_color = redraw["marker_color"][i]
-                hist.SetMarkerColor(marker_color)
-                for axis in hist.GetXaxis(), hist.GetYaxis():
-                    axis.SetNdivisions(5, 5, 0)
-                    axis.SetLabelSize(self.label_size)
-                hist.SetName(hist.GetName()+"_"+self.uid())
-            draw_option = redraw["draw_option"]
-            draw_order = redraw["draw_order"]
-            # nb if redraw range is wider than original, can draw overflow and underflow bins
-            if redraw["x_range"] != None:
-                hist.GetXaxis().SetRangeUser(redraw["x_range"][0], redraw["x_range"][1])
-            if redraw["y_range"] != None:
-                hist.GetYaxis().SetRangeUser(redraw["y_range"][0], redraw["y_range"][1])
+            marker_color = 1
+            if "marker_color" in redraw:
+                marker_color = redraw["marker_color"][i]
+            hist.SetMarkerColor(marker_color)
+            for axis in hist.GetXaxis(), hist.GetYaxis():
+                axis.SetNdivisions(5, 5, 0)
+                axis.SetLabelSize(self.label_size)
+            hist.SetName(hist.GetName()+"_"+self.uid())
+        draw_option = redraw["draw_option"]
+        draw_order = redraw["draw_order"]
+        # nb if redraw range is wider than original, can draw overflow and underflow bins
+        if redraw["x_range"] != None:
+            hist.GetXaxis().SetRangeUser(redraw["x_range"][0], redraw["x_range"][1])
+        if redraw["y_range"] != None:
+            hist.GetYaxis().SetRangeUser(redraw["y_range"][0], redraw["y_range"][1])
         same = ""
         for i in draw_order:
             hist_list[i].Draw(same+draw_option[i])

@@ -109,16 +109,17 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
 
             "do_mc":False,
             "do_magnet_alignment":False,
-            "do_fractional_emittance":True,
+            "do_fractional_emittance":False, #True,
             "do_efficiency":False,
             "do_extrapolation":False,
-            "do_globals":do_globals,
-            "do_amplitude":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_globals":False, #do_globals,
+            "do_amplitude":False, #True,
+            "do_plots":False, #True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
-            "do_optics":True,
-            "do_data_recorder":True,
+            "do_optics":False, #True,
+            "do_data_recorder":False, #True,
+            "do_density":True,
     }
     return analysis_variables
 
@@ -210,7 +211,7 @@ class Config(object):
     cut_report[2] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-7-v4/"
+    data_dir = "output/2017-02-7-v5/"
     src_dir = "MAUS-Drielsma-ReFit"
     correct_amplitude = True
     analyses = []
@@ -260,6 +261,11 @@ class Config(object):
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fractions = [0.09, (1-0.91**2), (1-0.91**3), 0.5]
+
+    density_nthreads = 1
+    density_knn_rotate = True # rotate to eigenvector system
+    density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
+    density_graph_npoints = 100
 
     magnet_alignment = {
         "n_events":10,

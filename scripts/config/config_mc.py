@@ -44,8 +44,7 @@ def get_systematics(emittance, name):
             get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full"):1.,
             # disabled as this dupes the mc_beam_offset_plus
             #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full"):1.,
-            # BUG disabled as 10 mm setting didn't run
-            #get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
           }
         }
       },
@@ -63,7 +62,7 @@ def get_systematics(emittance, name):
       },
       "reco":{
         "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "performance_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
+        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full"),
         "all_upstream":{
           "detector_systematics":{
             get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty"):1.,
@@ -85,8 +84,13 @@ def get_systematics(emittance, name):
             get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty"):1.,
           },
           "performance_systematics":{
-            get_systematics_dir(emittance, "tku_base_tkd_fiducial_radius", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_base_tkd_chi2_threshold", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full"):1.,
+            # disabled as this dupes the mc_beam_offset_plus
+            #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
           }
         }
       },
@@ -146,16 +150,17 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
 
             "do_extrapolation":False,
             "do_magnet_alignment":False,
-            "do_fractional_emittance":True,
-            "do_amplitude":True,
-            "do_efficiency":True,
-            "do_globals":True,
-            "do_mc":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_fractional_emittance":False, #True,
+            "do_amplitude":False, #True,
+            "do_efficiency":False, #True,
+            "do_globals":False, #True,
+            "do_mc":False, #True,
+            "do_plots":False, #True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
-            "do_optics":True,
+            "do_optics":False, #True,
             "do_data_recorder":False,
+            "do_density":True,
         }
 
 class Config(object):
@@ -301,6 +306,11 @@ class Config(object):
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fractions = [0.09, (1-0.91**2), (1-0.91**3), 0.5]
+
+    density_nthreads = 1
+    density_knn_rotate = True # rotate to eigenvector system
+    density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
+    density_graph_npoints = 100
 
     magnet_alignment = {
         "n_events":10,

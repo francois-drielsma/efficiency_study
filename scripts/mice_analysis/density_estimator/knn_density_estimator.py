@@ -217,7 +217,7 @@ class kNNDensityEstimator(object):
 	# Single-threaded approach
 	if self.nthreads == 1:
 	    for i in range(self.n):
-	        set_level(i)
+	        self.set_level(i)
 
 	# Multi-threaded approach
 	else:

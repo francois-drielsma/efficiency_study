@@ -136,7 +136,7 @@ class CompareFractionalEmittanceConfig(CompareConfig):
         self.setup(beam, target_dir, "fractional_emittance/", output_dir, dir_list)
         self.conglomerate_list = []
         for frac, y_range in [
-            #("9.0", [0., 15.]),
+            ("9.0", [0., 15.]),
             ("50.0", [12, 36])
             ]:
             mods = fractional_emittance_mod(frac, y_range, beam, target_dir, top_labels, right_labels)
@@ -144,6 +144,97 @@ class CompareFractionalEmittanceConfig(CompareConfig):
                 self.get_conglomerate_0(modifiers = mods),
             )
         self.data_caption = [[],]
+
+def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
+    output_dir = "compare_density/"
+    modifiers = {
+        "extra_labels":{
+            "right":right_labels,
+            "top":top_labels
+        },
+        "hist_title":"",
+        "file_name":name,
+        "canvas_name":name,
+        "normalise_hist":False,
+        "histogram_names":[name],
+        "graph_names":[name],
+        "mice_logo":False,
+        "legend":False,
+        "calculate_errors":[],
+        "redraw":{
+            "draw_option":["p", "p"],
+            "fill_color":[0, 0],
+            "transparency":None,
+            "line_color":[0, 0],
+            "marker_style":None,
+            "marker_color":[0, 0],
+            "draw_order":[0, 1],
+            "x_range":None,
+            "y_range":[1e-9, 109e-9],
+            "graph":{
+                    "draw_option":["L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
+                    "marker_style":None,
+                    "marker_color":None,
+                    "fill_color":[ROOT.kOrange+4, ROOT.kGreen+3],
+                    "fill_style":[1001, 1001],
+                    "transparency":[0.5, 0.5],
+                    "draw_order":[0, 1],
+            },
+            "ignore_more_histograms":False,
+        },
+        "write_plots":{
+            "dir":target_dir+"/"+output_dir+"/"+beam,
+            "file_name":name,
+        },
+        "defit":False,
+    }
+    return modifiers
+
+def density_ratio_mod(name, beam, target_dir, top_labels, right_labels):
+    output_dir = "compare_density/"
+    modifiers = {
+        "extra_labels":{
+            "right":right_labels,
+            "top":top_labels
+        },
+        "hist_title":"",
+        "file_name":name,
+        "canvas_name":name,
+        "normalise_hist":False,
+        "histogram_names":None,
+        "graph_names":["Graph"],
+        "mice_logo":False,
+        "legend":False,
+        "calculate_errors":[],
+        "redraw":False,
+        "write_plots":{
+            "dir":target_dir+"/"+output_dir+"/"+beam,
+            "file_name":name,
+        },
+        "defit":False,
+    }
+    return modifiers
+
+
+class CompareDensityConfig(CompareConfig):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
+        dir_list = [
+            target_dir+"plots_"+beam+"/",
+            target_dir+"plots_Simulated_"+beam
+        ]
+        output_dir = "compare_density/"
+        self.setup(beam, target_dir, "density/", output_dir, dir_list)
+        self.conglomerate_list = []
+        mods = density_recon_mod("density_profile_recon", beam, target_dir, top_labels, right_labels)
+        self.conglomerate_list.append(
+            self.get_conglomerate_0(modifiers = mods),
+        )
+        #mods = density_ratio_mod("density_ratio_recon", beam, target_dir, top_labels, right_labels)
+        #self.conglomerate_list.append(
+        #    self.get_conglomerate_0(modifiers = mods),
+        #)
+        self.data_caption = [[],]
+
 
 def vertical(x_value_list, modifier):
     verticals = [
@@ -486,10 +577,20 @@ class CompareGlobalsConfig(CompareConfig):
             self.get_conglomerate_2("global_through_residual_tof2_t", "res_ex_cut", "Residual t in ToF2 [ns]", [-2, 2], False, [0.5, 0.5, 0.9, 0.9], modifiers = mod2),
         ]
 
+def amplitude_x_range(beam):
+    x_range = [1., 99.9]
+    if "4-140" in beam:
+        x_range = [1., 49.9]
+    elif "6-140" in beam:
+        x_range = [1., 59.9]
+    elif "10-140" in beam:
+        x_range = [1., 79.9]
+    return x_range
+
+
 class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
     def __init__(self, beam, target_dir, top_labels, right_labels):
         dir_list = [
-            #target_dir+"plots_"+beam+"/",
             target_dir+"plots_Simulated_"+beam
         ]
         self.setup(beam, target_dir, "amplitude/", "compare_amplitude_mc/", dir_list)
@@ -503,7 +604,8 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
             "extra_labels":{
                 "right":right_labels,
                 "top":top_labels
-            }
+            },
+            "rescale_x":amplitude_x_range(beam),
         }
         absolute_modifiers = {
             "extra_labels":{
@@ -513,44 +615,44 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
             "normalise_graph":True,
             "redraw":{
                     "graph":{
-                        "draw_option":["p", "2", "p", "2"],
+                        "draw_option":["p", "3", "p", "3"],
                         "marker_style":[20, 20, 22, 22],
                         "marker_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
                         "fill_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
+                        "fill_style":[1001, 1001, 1001, 1001],
+                        "transparency":[0.5, 0.5, 0.5, 0.5],
                         "draw_order":[0, 1, 2, 3],
                     }
             },
-
+            "rescale_x":amplitude_x_range(beam),
         }
 
         self.conglomerate_list = [
-            #self.get_conglomerate_3("crossing_probability_downstream", "crossing_probability_downstream", None, None),
-            #self.get_conglomerate_3("crossing_probability_upstream", "crossing_probability_upstream", None, None),
-            #self.get_conglomerate_graph("amplitude_inefficiency_all_upstream", "US True Amplitude [mm]",
-            #                            "#frac{Number in MC True (all)}{Number in MC True (reco)}",
-            #                            "inefficiency_all_upstream", ["inefficiency"], ["inefficiency"]), 
-            #self.get_conglomerate_graph("amplitude_inefficiency_all_downstream", "DS True Amplitude [mm]",
-            #                            "#frac{MC True (all) Number}{MC True (reco) Number}", 
-            #                            "inefficiency_all_downstream", ["inefficiency"], ["inefficiency"]), 
-            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("amplitude_pdf_all_mc", "Amplitude [mm]",
+                                        "Number",
+                                        "amplitude_pdf_all_mc", ["Upstream sys hist"],
+                                        ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
+                                        y_range = [0.001, 1.099], x_range = [0.01, 99.9], replace_hist = True,
+                                        modifiers = absolute_modifiers),
+            self.get_conglomerate_graph("amplitude_pdf_reco", "Amplitude [mm]",
                                         "Number",
                                         "amplitude_pdf_reco", ["Upstream sys hist"],
                                         ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
-                                        y_range = [0.001, 1.399], x_range = [0.01, 99.9], replace_hist = True,
+                                        y_range = [0.001, 1.099], x_range = [0.01, 99.9], replace_hist = True,
                                         modifiers = absolute_modifiers),
-            self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("amplitude_cdf_reco", "Amplitude [mm]",
                                         "Cumulative density",
                                         "amplitude_cdf_reco", ["Upstream CDF stats hist"],
                                         ["Upstream CDF stats", "Upstream CDF sys", "Downstream CDF stats", "Downstream CDF sys"],
-                                        y_range = [0.001, 1.399], x_range = [0.01, 99.9], replace_hist = True,
+                                        y_range = [0.001, 1.099], x_range = [0.01, 99.9], replace_hist = True,
                                         modifiers = absolute_modifiers),
 
-            self.get_conglomerate_graph("pdf_ratio*", "Reconstructed amplitude [mm]",
+            self.get_conglomerate_graph("pdf_ratio*", "Amplitude [mm]",
                                         "P_{Amp}",
                                         "pdf_ratio", ["PDF Ratio stats hist"],
                                         ["PDF Ratio stats", "PDF Ratio sys"], x_range = [0.01, 99.9], y_range = [0.501, 2.499], replace_hist = True,
                                         graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[ROOT.kRed, ROOT.kRed], graph_draw_order=[1,0], modifiers=ratio_modifiers),
-            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
+            self.get_conglomerate_graph("cdf_ratio*", "amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio stats hist"],
                                         ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.801, 1.399], replace_hist = True,
@@ -575,6 +677,7 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                 "right":right_labels,
                 "top":top_labels
             },
+            "rescale_x":amplitude_x_range(beam),
         }
         absolute_modifiers = {
             "extra_labels":{
@@ -584,35 +687,37 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
             "normalise_graph":True,
             "redraw":{
                     "graph":{
-                        "draw_option":["p", "2", "p", "2"],
+                        "draw_option":["p", "3", "p", "3"],
                         "marker_style":[20, 20, 22, 22],
                         "marker_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
                         "fill_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
+                        "fill_style":[1001, 1001, 1001, 1001],
+                        "transparency":[0.5, 0.5, 0.5, 0.5],
                         "draw_order":[0, 1, 2, 3],
                     }
             },
-
+            "rescale_x":amplitude_x_range(beam),
         }
 
         self.conglomerate_list = [
-            self.get_conglomerate_graph("amplitude_pdf_reco", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("amplitude_pdf_reco", "Amplitude [mm]",
                                         "Number",
                                         "amplitude_pdf_reco", ["Upstream sys hist"],
                                         ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
-                                        y_range = [0.001, 1.399], x_range = [0.01, 99.9], replace_hist = True,
+                                        x_range = [0.01, 99.9], y_range = [0.001, 1.09], replace_hist = True,
                                         modifiers = absolute_modifiers),
-            self.get_conglomerate_graph("amplitude_cdf_reco", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("amplitude_cdf_reco", "Amplitude [mm]",
                                         "Cumulative density",
                                         "amplitude_cdf_reco", ["Upstream CDF stats hist"],
                                         ["Upstream CDF stats", "Upstream CDF sys", "Downstream CDF stats", "Downstream CDF sys"],
                                         y_range = [0.001, 1.399], x_range = [0.01, 99.9], replace_hist = True,
                                         modifiers = absolute_modifiers),
-            self.get_conglomerate_graph("pdf_ratio*", "Reconstructed amplitude [mm]",
+            self.get_conglomerate_graph("pdf_ratio*", "Amplitude [mm]",
                                         "P_{Amp}",
                                         "pdf_ratio", ["PDF Ratio stats hist"],
                                         ["PDF Ratio stats", "PDF Ratio sys"], x_range = [0.01, 99.9], y_range = [0.501, 2.499], replace_hist = True,
                                         graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[1, 1], graph_draw_order=[1,0], modifiers=ratio_modifiers),
-            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
+            self.get_conglomerate_graph("cdf_ratio*", "Amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
                                         ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.601, 1.399], replace_hist = True,
@@ -638,24 +743,24 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                 "top":top_labels
             },
             "redraw":{
-                "transparency":[0.5, 0.5, 0.5, 0.5],
                 "graph":{
-                    #"fill_style":[4050, 4050, 4050, 4050],
+                    "fill_style":[1001, 1001, 1001, 1001],
                     "fill_color":[ROOT.kBlack, ROOT.kBlack, ROOT.kRed, ROOT.kRed],
-                    "transparency":[0.5, 0.5, 0.5, 0.5],
+                    "transparency":[0.5, 0.3, 0.5, 0.5],
                 }
-            }
+            },
+            "rescale_x":amplitude_x_range(beam),
         }
 
         self.conglomerate_list = [
-            self.get_conglomerate_graph("pdf_ratio*", "Reconstructed Amplitude [mm]",
+            self.get_conglomerate_graph("pdf_ratio*", "Amplitude [mm]",
                                         "#frac{Number out}{Number in}",
                                         "pdf_ratio", ["PDF Ratio stats_hist"],
-                                        ["PDF_Ratio stats", "PDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.01, 2.001], replace_hist = True,
-                                        graph_draw_option = ["p 3", "3", "p 3", "3"], graph_marker_style=[20, 20, 22, 22], 
+                                        ["PDF_Ratio stats", "PDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.01, 1.49], replace_hist = True,
+                                        graph_draw_option = ["p", "3", "p", "3"], graph_marker_style=[20, 20, 22, 22], 
                                         graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
                                         modifiers=ratio_modifiers),
-            self.get_conglomerate_graph("cdf_ratio*", "Reconstructed amplitude [mm]",
+            self.get_conglomerate_graph("cdf_ratio*", "Amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
                                         ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.601, 1.399], replace_hist = True,
@@ -725,7 +830,7 @@ def main_paper(batch_level = 0):
     """
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-v4/"
+    target_dir = "output/2017-02-7-v5/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
@@ -743,10 +848,11 @@ def main_paper(batch_level = 0):
                    CompareOpticsConfig, CompareOpticsMCConfig,
                    CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,]
-    config_list += [CompareAmplitudeConfigBoth,
+    config_list = [CompareAmplitudeConfigBoth,
                    CompareAmplitudeConfigMC,
-                   CompareAmplitudeConfigData]
-    config_list = [CompareFractionalEmittanceConfig]
+                   CompareAmplitudeConfigData,
+                   CompareFractionalEmittanceConfig]
+    config_list = [CompareDensityConfig]
 
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
 
