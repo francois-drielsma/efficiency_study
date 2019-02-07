@@ -63,6 +63,10 @@ class DensityAnalysis(AnalysisBase):
             os.mkdir(self.plot_dir+"/phase_space")
         except OSError:
             pass
+        try:
+            os.mkdir(self.plot_dir+"/corrections")
+        except OSError:
+            pass
 
     def process(self):
         """
@@ -175,12 +179,11 @@ class DensityAnalysis(AnalysisBase):
 		    plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
 		    plotter.plot_phase_space(density_estimator)
 
-	# Compute the corrections if necessary
-	for loc in self.locations:
-	    self.corrections_calc(loc)
-
 	# Save the density profiles to a text file
 	self.set_levels(graphs)
+
+	# Compute the corrections if necessary
+	self.set_corrections()
 
 	# Produce plots that compare the density profiles upstream and downstream
         # of the absorber. Produce one for each category of data
@@ -287,33 +290,39 @@ class DensityAnalysis(AnalysisBase):
 		for i in range(self.npoints):
 		    self.density_data[typ][loc]["levels"][i] = graphs[typ][loc].GetY()[i]
 
-    def corrections_calc(self, loc):
+    def set_corrections(self):
         """
         Calculate the profile corrections
         
         Uses the MC to generate corrections
         """
-        all_mc_levels = self.density_data["all_mc"][loc]["levels"]
-        reco_levels = self.density_data["reco"][loc]["levels"]
-        correction = []
-        for i in range(len(all_mc_levels)):
-            if reco_levels[i] == 0:
-                correction.append(1.)
-            else:
-                correction.append(float(all_mc_levels[i])/reco_levels[i])
+	for loc in self.locations:
+            all_mc_levels = self.density_data["all_mc"][loc]["levels"]
+            reco_levels = self.density_data["reco"][loc]["levels"]
+            corrections = []
+            for i in range(len(all_mc_levels)):
+                if reco_levels[i] == 0:
+                    corrections.append(1.)
+                else:
+                    corrections.append(float(all_mc_levels[i])/reco_levels[i])
 
-        cutoff = self.config_anal["density_correction_cutoff"]
-        cutoff_index = int(cutoff*(self.npoints+1.))
-        all_mc_sum = sum(all_mc_levels[cutoff_index:])
-        reco_sum = sum(reco_levels[cutoff_index:])
-        correction_averaged = copy.deepcopy(correction)
-        for i in range(cutoff_index, len(correction_averaged)):
-            correction_averaged[i] = all_mc_sum/reco_sum
+            cutoff = self.config_anal["density_corrections_cutoff"]
+            cutoff_index = int(cutoff*(self.npoints+1.))
+            all_mc_sum = sum(all_mc_levels[cutoff_index:])
+            reco_sum = sum(reco_levels[cutoff_index:])
+            corrections_averaged = copy.deepcopy(corrections)
+            for i in range(cutoff_index, len(corrections_averaged)):
+                corrections_averaged[i] = all_mc_sum/reco_sum
 
-        self.density_data["correction"][loc] = {
-            "level_ratio":correction,
-            "level_ratio_averaged":correction_averaged,
-        }
+            self.density_data["correction"][loc] = {
+                "level_ratio":corrections,
+                "level_ratio_averaged":corrections_averaged,
+            }
+
+	    if self.config_anal["density_corrections_draw"]:
+		plotter = DensityPlotter(self.plot_dir, loc)
+		plotter.plot_corrections(corrections)
+		    
 
     def clear_density_data(self):
         """

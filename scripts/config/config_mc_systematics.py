@@ -76,8 +76,9 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "amplitude_algorithm":"binned",
 
             "density_mc":True,			# True if pure Monte Carlo
-    	    "density_correction_cutoff":.5,	# Cutoff above which correction is averaged
+    	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged
     	    "density_corrections":None,		# Path to the correction file
+            "density_corrections_draw":True,	# True if density correctoins are to be drawn
             "density_systematics":{},		# Density systematic uncertainty dictionary
             "density_sections":True,		# True if density sections are to be printed
 
