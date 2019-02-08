@@ -308,20 +308,22 @@ class DensityAnalysis(AnalysisBase):
 
             cutoff = self.config_anal["density_corrections_cutoff"]
             cutoff_index = int(cutoff*(self.npoints+1.))
-            all_mc_sum = sum(all_mc_levels[cutoff_index:])
-            reco_sum = sum(reco_levels[cutoff_index:])
-            corrections_averaged = copy.deepcopy(corrections)
-            for i in range(cutoff_index, len(corrections_averaged)):
-                corrections_averaged[i] = all_mc_sum/reco_sum
+	    corr_cap = all_mc_levels[cutoff_index]/reco_levels[cutoff_index]
+            corrections_capped = copy.deepcopy(corrections)
+            for i in range(cutoff_index, len(corrections_capped)):
+                corrections_capped[i] = corr_cap
 
             self.density_data["correction"][loc] = {
                 "level_ratio":corrections,
-                "level_ratio_averaged":corrections_averaged,
+                "level_ratio_capped":corrections_capped,
             }
 
 	    if self.config_anal["density_corrections_draw"]:
 		plotter = DensityPlotter(self.plot_dir, loc)
 		plotter.plot_corrections(corrections)
+
+		plotter = DensityPlotter(self.plot_dir, "capped_"+loc)
+		plotter.plot_corrections(corrections_capped)
 		    
 
     def clear_density_data(self):
@@ -333,11 +335,11 @@ class DensityAnalysis(AnalysisBase):
           "correction":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
-            	  "level_ratio_averaged":1.
+            	  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
               "ds":{
                   "level_ratio":[1. for i in range(self.npoints)],
-            	  "level_ratio_averaged":1.
+            	  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
           },
           "source":"",
