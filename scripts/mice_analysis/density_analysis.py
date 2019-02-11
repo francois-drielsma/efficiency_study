@@ -91,10 +91,10 @@ class DensityAnalysis(AnalysisBase):
 	    self.set_corrections()
 
 	# Apply the corrections, evaluate the systematic uncertainties (TODO)
-#	self.corrections_and_uncertainties("reco")
-#        if self.config_anal["density_mc"]:
-#            self.corrections_and_uncertainties("all_mc")
-#            self.corrections_and_uncertainties("reco_mc")
+	self.corrections_and_uncertainties("reco")
+        if self.config_anal["density_mc"]:
+            self.corrections_and_uncertainties("all_mc")
+            self.corrections_and_uncertainties("reco_mc")
 
 	# Draw the density profiles
 	self.draw_profiles()
@@ -195,6 +195,62 @@ class DensityAnalysis(AnalysisBase):
 		plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
 		plotter.plot_phase_space(density_estimator)
 
+    def corrections_and_uncertainties(self, typ):
+        """
+        Calculate corrected profiles and uncertainties
+        * typ specifies the type of data (all_mc, reco_mc, reco)
+        * corrected profiles is given by rho(alpha) = c(alpha)*rho(alpha) where c(alpha)
+            is the inverse reconstruction response function
+        * statistical errors are provided by the density estimator
+        * total errors are given by sum in quadrature of statistical errors and
+          systematic errors
+        """
+	# Set the upstream statistical uncertainty to 0 as it is the given
+	# profile to which to compare the downstream profile
+        data = self.density_data[typ]
+        data["us"]["levels_stat_errors"] = [0. for bin in range(self.npoints)]
+
+	# Do the correction for each of the tracker locations
+        for loc in self.locations:
+            print "Doing density level correction for", typ, loc
+            levels = self.do_corrections(typ, loc)
+            data[loc]["corrected_levels"] = levels
+
+	# Evaluate the systematic uncertainties for each of the tracker locations
+        for loc in self.locations:
+	    continue # TODO
+            print "Finding systematic errors for", typ, loc
+            reco_sys_list = self.calculate_detector_systematics(typ, loc)
+            perf_sys_list = self.calculate_performance_systematics(typ, loc)
+            sys_error_list = [(reco_sys_list[i]**2+perf_sys_list[i]**2)**0.5 \
+                                                  for i in range(len(pdf_list))]
+            data[loc]["pdf_sys_errors"] = sys_error_list
+            print "    sys errors:   ", data[loc]["pdf_sys_errors"] 
+            print "    stats errors: ", data[loc]["pdf_stats_errors"]
+            print "    pdf:          ", pdf_list
+
+        self.density_data[loc] = data
+
+    def do_corrections(self, typ, loc, use_capped = True):
+        """
+        Applies the corrections to the requested density profile
+	Only applies response correction to the reconstructed sample
+        * typ specifies the type of data (all_mc, reco_mc, reco)
+	* loc specifies the location of the tracker (us, ds)
+        """
+	levels = np.array(self.density_data[typ][loc]["levels"])
+	corr_key = "level_ratio"
+        if use_capped:
+            corr_key = "level_ratio_capped"
+        if typ == "reco":
+            response = np.array(self.density_data["response"][loc][corr_key])
+            levels = levels*response
+        if typ == "reco" or typ == "reco_mc":
+            inefficiency = np.array(self.density_data["inefficiency"][loc][corr_key])
+            levels = levels*inefficiency
+
+        return levels.tolist()
+
     def draw_profiles(self):
         """
         Produce plots that compare the density profiles upstream and downstream
@@ -208,7 +264,7 @@ class DensityAnalysis(AnalysisBase):
 	    # Initialize the graphs
 	    graphs = {}
 	    for loc in self.locations:
-	        graphs[loc] = self.make_graph(typ, loc)
+	        graphs[loc] = self.make_graph(typ, loc, True)
 
 	    # Print up/down comparison
             canvas_name = 'density_profile_%s' % typ
@@ -227,16 +283,21 @@ class DensityAnalysis(AnalysisBase):
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
 
-    def make_graph(self, typ, loc):
+    def make_graph(self, typ, loc, corr):
         """
         Builds a TGraphErrors for the requested data type and location
         * typ specifies the type of data (all_mc, reco_mc, reco)
 	* loc specifies the location of the tracker (us, ds)
+        * corr is True if the corrected levels are to be represented
         """
+	level_type = "levels"
+	if corr:
+	    level_type = "corrected_levels"
+
 	graph = ROOT.TGraphErrors(self.npoints)
 	for i in range(self.npoints):
 	    alpha = (float(i+1.)/(self.npoints+1.))
-	    graph.SetPoint(i, alpha, self.density_data[typ][loc]["levels"][i])
+	    graph.SetPoint(i, alpha, self.density_data[typ][loc][level_type][i])
 	    graph.SetPointError(i, 0., self.density_data[typ][loc]["levels_stat_errors"][i])
 
 	return graph
@@ -267,7 +328,7 @@ class DensityAnalysis(AnalysisBase):
 	* graphs is a dictionary containing the up and downstream graphs
         """
 
-	leg = ROOT.TLegend(.6, .6, .8, .8)
+	leg = ROOT.TLegend(.6, .65, .8, .85)
 	leg.AddEntry(graphs["us"], "Upstream", "LF")
 	leg.AddEntry(graphs["ds"], "Downstream", "LF")
 	leg.Draw("SAME")
@@ -302,43 +363,67 @@ class DensityAnalysis(AnalysisBase):
 	return gratio
 
     def save(self):
+        """
+        Saves the data dictionary to a json file
+        """
         fout = open(self.plot_dir+"/density.json", "w")
         print >> fout, json.dumps(self.density_data, sort_keys=True, indent=4)
 
     def set_corrections(self):
         """
-        Calculate the profile corrections
-        
-        Uses the MC to generate corrections
+        Calculate the profile corrections, i.e. the inefficiency and response function
+        * uses the Monte Carlo to generate corrections
         """
 	for loc in self.locations:
+	    # Initialize the data	
             all_mc_levels = self.density_data["all_mc"][loc]["levels"]
+	    reco_mc_levels = self.density_data["reco_mc"][loc]["levels"]
             reco_levels = self.density_data["reco"][loc]["levels"]
-            corrections = []
-            for i in range(len(all_mc_levels)):
-                if reco_levels[i] == 0:
-                    corrections.append(1.)
-                else:
-                    corrections.append(float(all_mc_levels[i])/reco_levels[i])
 
+	    # Calculate the corrections
+            inefficiency, response = [], []
+            for i in range(len(all_mc_levels)):
+		# Inherent detector inefficiency
+		if reco_mc_levels[i] == 0:
+                    inefficiency.append(1.)
+	        else:
+                    inefficiency.append(float(all_mc_levels[i])/reco_mc_levels[i])
+
+		# Detector response function
+                if reco_levels[i] == 0:
+                    response.append(1.)
+                else:
+                    response.append(float(reco_mc_levels[i])/reco_levels[i])
+
+	    # Produce a capped version of the corrections
             cutoff = self.config_anal["density_corrections_cutoff"]
             cutoff_index = int(cutoff*(self.npoints+1.))
-	    corr_cap = all_mc_levels[cutoff_index]/reco_levels[cutoff_index]
-            corrections_capped = copy.deepcopy(corrections)
-            for i in range(cutoff_index, len(corrections_capped)):
-                corrections_capped[i] = corr_cap
+	    ineff_cap = all_mc_levels[cutoff_index]/reco_mc_levels[cutoff_index]
+	    resp_cap = reco_mc_levels[cutoff_index]/reco_levels[cutoff_index]
 
-            self.density_data["correction"][loc] = {
-                "level_ratio":corrections,
-                "level_ratio_capped":corrections_capped,
+            inefficiency_capped = copy.deepcopy(inefficiency)
+            response_capped = copy.deepcopy(response)
+            for i in range(cutoff_index, len(inefficiency_capped)):
+                inefficiency_capped[i] = ineff_cap
+                response_capped[i] = resp_cap
+
+	    # Store the correction factors
+            self.density_data["inefficiency"][loc] = {
+                "level_ratio":inefficiency,
+                "level_ratio_capped":inefficiency_capped,
+            }
+            self.density_data["response"][loc] = {
+                "level_ratio":response,
+                "level_ratio_capped":response_capped,
             }
 
+	    # Draw the corrections, if requested
 	    if self.config_anal["density_corrections_draw"]:
 		plotter = DensityPlotter(self.plot_dir, loc)
-		plotter.plot_corrections(corrections)
+		plotter.plot_corrections(inefficiency, response)
 
 		plotter = DensityPlotter(self.plot_dir, "capped_"+loc)
-		plotter.plot_corrections(corrections_capped)
+		plotter.plot_corrections(inefficiency_capped, response_capped)
 
     def clear_density_data(self):
         """
@@ -346,7 +431,17 @@ class DensityAnalysis(AnalysisBase):
 	used to make corrections down the line
         """
         self.density_data = {
-          "correction":{
+          "inefficiency":{
+              "us":{
+                  "level_ratio":[1. for i in range(self.npoints)],
+            	  "level_ratio_capped":[1. for i in range(self.npoints)]
+              },
+              "ds":{
+                  "level_ratio":[1. for i in range(self.npoints)],
+            	  "level_ratio_capped":[1. for i in range(self.npoints)]
+              },
+          },
+          "response":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
             	  "level_ratio_capped":[1. for i in range(self.npoints)]
@@ -398,29 +493,29 @@ class DensityAnalysis(AnalysisBase):
         # set base correction factors
         self.load_corrections(self.config_anal["density_corrections"])
         systematics = self.config_anal["density_systematics"]
-        for suffix in systematics:
-            print "Loading", suffix
-            if suffix not in self.density_data:
-                self.density_data[suffix] = {}
+        for typ in systematics:
+            print "Loading", typ
+            if typ not in self.density_data:
+                self.density_data[typ] = {}
             for ref_key in ["detector_reference", "performance_reference"]:
-                ref_src = systematics[suffix][ref_key]
+                ref_src = systematics[typ][ref_key]
                 if ref_src == None:
-                    self.density_data[suffix][ref_key] = None
+                    self.density_data[typ][ref_key] = None
                 else:
-                    self.density_data[suffix][ref_key] = \
+                    self.density_data[typ][ref_key] = \
                                               self.load_one_error(ref_src, None)
-                print "  Loaded reference", suffix, ref_key, ref_src, \
-                                          type(self.density_data[suffix][ref_key])
+                print "  Loaded reference", typ, ref_key, ref_src, \
+                                          type(self.density_data[typ][ref_key])
             for loc in ["us", "ds"]:
-                if loc not in self.density_data[suffix]:
-                    self.density_data[suffix][loc] = {}
+                if loc not in self.density_data[typ]:
+                    self.density_data[typ][loc] = {}
                 for key in ["detector_systematics", "performance_systematics"]:
-                    err_src_dict = systematics[suffix][loc][key]
-                    self.density_data[suffix][loc][key] = [
+                    err_src_dict = systematics[typ][loc][key]
+                    self.density_data[typ][loc][key] = [
                         self.load_one_error(err_src, scale) \
                               for err_src, scale in err_src_dict.iteritems()
                     ]
-                    print "  Loaded", len(self.density_data[suffix][loc][key]), loc, key, "systematics"
+                    print "  Loaded", len(self.density_data[typ][loc][key]), loc, key, "systematics"
 
     def load_one_error(self, file_name, scale):
         """

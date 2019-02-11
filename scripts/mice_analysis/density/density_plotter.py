@@ -50,24 +50,40 @@ class DensityPlotter(object):
         for fmt in ["root", "png", "pdf"]:
             canvas.Print(self.plot_dir+"/phase_space/"+title+"."+fmt)
 
-    def plot_corrections(self, corrections):
+    def plot_corrections(self, inefficiency, response):
         """
-        Plots a single 2D Poincare section of phase space
+        Plots the correction factors
 	* Array of corrections
         """
-	# Initialize a graph
-	npoints = len(corrections)
-	graph = ROOT.TGraph(npoints)
+	# Initialize a graph for each correction category
+	npoints = len(inefficiency)
+	graph_ineff = ROOT.TGraph(npoints)
+	graph_ineff.SetLineColor(2)
+	graph_resp = ROOT.TGraph(npoints)
+	graph_resp.SetLineColor(4)
+	graph_corr = ROOT.TGraph(npoints)
 	for i in range(npoints):
 	    x = float(i+1.)/(npoints+1)
-	    graph.SetPoint(i, x, corrections[i])
+	    graph_ineff.SetPoint(i, x, inefficiency[i])
+	    graph_resp.SetPoint(i, x, response[i])
+	    graph_corr.SetPoint(i, x, inefficiency[i]*response[i])
 
+	# Initialize a legend
+	leg = ROOT.TLegend(.6, .65, .8, .85)
+	leg.AddEntry(graph_ineff, "Inefficiency", "l")
+	leg.AddEntry(graph_resp, "Response", "l")
+	leg.AddEntry(graph_corr, "Combined", "l")
+
+	# Draw the graphs, the legend, print
         title = "density_corrections_"+self.name
         canvas = xboa.common.make_root_canvas(title)
-	graph.SetTitle(";Fraction #alpha;#rho_{#alpha}^{tru} /#rho_{#alpha}^{rec}")
-	graph.Draw("AL")
-	graph.SetMinimum(.9)
-	graph.SetMaximum(1.2)
+	graph_ineff.SetTitle(";Fraction #alpha;Correction factor")
+	graph_ineff.Draw("AL")
+	graph_ineff.SetMinimum(.9)
+	graph_ineff.SetMaximum(1.3)
+	graph_resp.Draw("LSAME")
+	graph_corr.Draw("LSAME")
+	leg.Draw("SAME")
 
         for fmt in ["root", "png", "pdf"]:
             canvas.Print(self.plot_dir+"/corrections/"+title+"."+fmt)
