@@ -74,6 +74,34 @@ class DensityAnalysis(AnalysisBase):
         """
         self.append_data()
 
+    def death(self):
+        """
+        Called when all the data has been loaded
+        """
+	# First, build the profiles, store the corresponding arrays
+	# If requested, draw Poincare sections of phase space in density/phase_space
+	self.make_profiles("reco")
+        if self.config_anal["density_mc"]:
+            self.make_profiles("all_mc")
+            self.make_profiles("reco_mc")
+
+	# Evaluate corrections if necessary
+	# If requested, draw the corrections in density/corrections
+        if self.calculate_corrections:
+	    self.set_corrections()
+
+	# Apply the corrections, evaluate the systematic uncertainties (TODO)
+#	self.corrections_and_uncertainties("reco")
+#        if self.config_anal["density_mc"]:
+#            self.corrections_and_uncertainties("all_mc")
+#            self.corrections_and_uncertainties("reco_mc")
+
+	# Draw the density profiles
+	self.draw_profiles()
+
+	# Save everything to a json file
+        self.save()
+
     def append_data(self):
         """
         Add data to the density calculation (done at death time)
@@ -133,71 +161,61 @@ class DensityAnalysis(AnalysisBase):
 
         return
 
-    def death(self):
+    def make_profiles(self, typ):
         """
-        Called when all the data has been loaded
-	Feeds the data to the density estimator, extracts density profiles
-	Saves the profiles as a json file (TODO)
+        Produces density profiles. Extract a numpy ndarray that contains all of 
+	the phase space vectors, initialize the kNN density estimator and extract
+	the density profile with its uncertainty
+        * typ specifies the type of data (all_mc, reco_mc, reco)
         """
-	# Initialize the plotter, use it to produce the requested elements
-        self.make_profiles()
+	# Skip if no data
+	if not self.data[typ]["us"].get_n_events():
+	    return
 
-	# Save the density profiles to a json file
-        self.save()
+	transmission = float(self.data[typ]["ds"].get_n_events())/self.data[typ]["us"].get_n_events()
+	for loc in self.locations:
+	    # Extract the data as a numpy array
+	    ps_data = np.ndarray((self.data[typ][loc].get_n_events(), 4))
+	    for i, event in enumerate(self.data[typ][loc].retrieve()):
+		ps_data[i] = event[-1].tolist()
 
-    def make_profiles(self):
+	    # Use the kNN module to get a density profile
+	    norm = 1.
+	    if loc == "ds":
+		norm = transmission
+	    density_estimator = kNNDensityEstimator(ps_data, self.rotate, self.nthreads, norm)
+	    levels, errors = density_estimator.profile(self.npoints, self.uncertainty)
+
+	    # Store the profiles and their statistical uncertainties
+	    self.density_data[typ][loc]["levels"] = levels
+	    self.density_data[typ][loc]["levels_stat_errors"] = errors
+
+	    # Plot the Poincare sections if requested
+	    if self.config_anal["density_sections"]:
+		plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
+		plotter.plot_phase_space(density_estimator)
+
+    def draw_profiles(self):
         """
-        Produces density profile comparisons between upstream and downstream
-	for each of the categories of data
+        Produce plots that compare the density profiles upstream and downstream
+	of the absorber. Produce one for each category of data
         """
-	# For each type of data, extract a numpy ndarray that contains all of the
-        # phase space vectors, initialize the kNN density estimator and extract the
-        # density profile with its uncertainty
-	graphs = {}
         for typ in self.data_types:
 	    # Skip if no data
 	    if not self.data[typ]["us"].get_n_events():
 		continue
 
-	    graphs[typ] = {}
-	    transmission = float(self.data[typ]["ds"].get_n_events())/self.data[typ]["us"].get_n_events()
+	    # Initialize the graphs
+	    graphs = {}
 	    for loc in self.locations:
-		# Extract the data as a numpy array
-        	ps_data = np.ndarray((self.data[typ][loc].get_n_events(), 4))
-		for i, event in enumerate(self.data[typ][loc].retrieve()):
-	    	    ps_data[i] = event[-1].tolist()
-
-		# Use the kNN module to get a density profile
-		norm = 1.
-		if loc == "ds":
-		    norm = transmission
-		density_estimator = kNNDensityEstimator(ps_data, self.rotate, self.nthreads, norm)
-		graphs[typ][loc] = density_estimator.profile(self.npoints, self.uncertainty)
-
-		# Plot the Poincare sections if requested
-		if self.config_anal["density_sections"]:
-		    plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
-		    plotter.plot_phase_space(density_estimator)
-
-	# Save the density profiles to a text file
-	self.set_levels(graphs)
-
-	# Compute the corrections if necessary
-	self.set_corrections()
-
-	# Produce plots that compare the density profiles upstream and downstream
-        # of the absorber. Produce one for each category of data
-        for typ in self.data_types:
-	    # Skip if no data
-	    if not self.data[typ]["us"].get_n_events():
-		continue
+	        graphs[loc] = self.make_graph(typ, loc)
 
 	    # Print up/down comparison
             canvas_name = 'density_profile_%s' % typ
             canvas = self.get_plot(canvas_name)["pad"]
 
-	    mg = self.make_multigraph(typ, graphs[typ], {"us":1,"ds":4}, "LE3", "density_profile")
-	    leg = self.make_multigraph_legend(graphs[typ])
+	    mg = self.make_multigraph(typ, graphs, {"us":1,"ds":4}, "LE3", "density_profile")
+	    leg = self.make_multigraph_legend(graphs)
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
 
@@ -205,14 +223,28 @@ class DensityAnalysis(AnalysisBase):
             canvas_name = 'density_ratio_%s' % typ
             canvas = self.get_plot(canvas_name)["pad"]
 
-	    gratio = self.make_ratio(typ, graphs[typ], 1, "LE3", "density_ratio")
+	    gratio = self.make_ratio(typ, graphs, 1, "LE3", "density_ratio")
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
+
+    def make_graph(self, typ, loc):
+        """
+        Builds a TGraphErrors for the requested data type and location
+        * typ specifies the type of data (all_mc, reco_mc, reco)
+	* loc specifies the location of the tracker (us, ds)
+        """
+	graph = ROOT.TGraphErrors(self.npoints)
+	for i in range(self.npoints):
+	    alpha = (float(i+1.)/(self.npoints+1.))
+	    graph.SetPoint(i, alpha, self.density_data[typ][loc]["levels"][i])
+	    graph.SetPointError(i, 0., self.density_data[typ][loc]["levels_stat_errors"][i])
+
+	return graph
 
     def make_multigraph(self, typ, graphs, colors, plot_option, name):
         """
         Initializes a multigraph, draws it
-        * typ speficies the type of data (all_mc, reco_mc, reco)
+        * typ specifies the type of data (all_mc, reco_mc, reco)
 	* graphs is a dictionary containing the up and downstream graphs
 	* colors is a dictionary containing the up and downstream graph colors
 	* plot_option is the graph drawing option
@@ -244,7 +276,7 @@ class DensityAnalysis(AnalysisBase):
     def make_ratio(self, typ, graphs, color, plot_option, name):
         """
         Initializes a graph ratio, draws it
-        * typ speficies the type of data (all_mc, reco_mc, reco)
+        * typ specifies the type of data (all_mc, reco_mc, reco)
 	* graphs is a dictionary containing the up and downstream graphs
 	* color is the graph color
 	* plot_option is the graph drawing option
@@ -269,26 +301,9 @@ class DensityAnalysis(AnalysisBase):
 	gratio.Draw("A"+plot_option)
 	return gratio
 
-    def performance_sys_error(self):
-        pass
-
-    def reco_sys_error(self):
-        pass
-
     def save(self):
         fout = open(self.plot_dir+"/density.json", "w")
         print >> fout, json.dumps(self.density_data, sort_keys=True, indent=4)
-
-    def set_levels(self, graphs):
-        """
-        Sets the levels in the dictionary to be output
-        """
-	self.density_data["npoints"] = self.npoints
-        for typ in self.data_types:
-	    for loc in self.locations:
-		self.density_data[typ][loc]["levels"] = [1. for i in range(self.npoints)]
-		for i in range(self.npoints):
-		    self.density_data[typ][loc]["levels"][i] = graphs[typ][loc].GetY()[i]
 
     def set_corrections(self):
         """
@@ -324,7 +339,6 @@ class DensityAnalysis(AnalysisBase):
 
 		plotter = DensityPlotter(self.plot_dir, "capped_"+loc)
 		plotter.plot_corrections(corrections_capped)
-		    
 
     def clear_density_data(self):
         """
