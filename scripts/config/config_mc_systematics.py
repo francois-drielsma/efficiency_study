@@ -80,7 +80,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
     	    "density_corrections":None,		# Path to the correction file
             "density_corrections_draw":True,	# True if density correctoins are to be drawn
             "density_systematics":{},		# Density systematic uncertainty dictionary
-            "density_sections":True,		# True if density sections are to be printed
+            "density_sections":False,		# True if density sections are to be printed
 
             "do_magnet_alignment":False,
             "do_efficiency":True,

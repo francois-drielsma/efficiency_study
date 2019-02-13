@@ -21,72 +21,74 @@ def reco_file_names(run_number_list, maus, do_globals):
     print file_list
     return file_list
 
-def get_systematics_dir(emittance, suffix, absorber):
+def get_systematics_dir(emittance, suffix, absorber, analysis="amplitude"):
     a_dir = "output/2017-02-7-Systematics-v3/plots_Simulated_2017-2.7_"+str(emittance)+\
-           "-140_"+absorber+"_Systematics_"+suffix+"/amplitude/amplitude.json"
+           "-140_"+absorber+"_Systematics_"+suffix+"/"+analysis+"/"+analysis+".json"
     return a_dir
 
-def get_systematics(emittance, name):
+def get_systematics(emittance, name, analysis="amplitude"):
+    us_name = {"amplitude":"all_upstream", "density":"us"}[analysis]
+    ds_name = {"amplitude":"all_downstream", "density":"ds"}[analysis]
     systematics = {
       "all_mc":{
-        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full"),
-        "all_upstream":{
+        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
+        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full", analysis),
+        us_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{},
           "performance_systematics":{
-            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full", analysis):1.,
             # disabled as this dupes the mc_beam_offset_plus
-            #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full"):1.,
+            #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full", analysis):1.,
             # BUG disabled as 10 mm setting didn't run
-            #get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
+            #get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full", analysis):1.,
           }
         }
       },
       "reco_mc":{
         "detector_reference":None,
         "performance_reference":None,
-        "all_upstream":{
+        us_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         }
       },
       "reco":{
-        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "performance_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "all_upstream":{
+        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
+        "performance_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
+        us_name:{
           "detector_systematics":{
-            get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUE1_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUC_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUE2_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_density_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUE1_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUE2_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_density_plus", "lH2_empty", analysis):1.,
           },
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{
-            get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDE1_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDE2_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDE1_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDE2_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty", analysis):1.,
           },
           "performance_systematics":{
-            get_systematics_dir(emittance, "tku_base_tkd_fiducial_radius", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_base_tkd_chi2_threshold", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_base_tkd_fiducial_radius", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_base_tkd_chi2_threshold", "lH2_empty", analysis):1.,
           }
         }
       },
@@ -144,10 +146,18 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
 
+            "density_mc":True,			# True if Monte Carlo data
+    	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged
+            "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
+            "density_systematics":get_systematics(emittance, name, "density"),
+            "density_corrections_draw":True,	# True if density correctoins are to be drawn
+            "density_sections":False,		# True if density sections are to be printed
+
             "do_extrapolation":False,
             "do_magnet_alignment":False,
             "do_fractional_emittance":True,
             "do_amplitude":True,
+            "do_density":True,
             "do_efficiency":True,
             "do_globals":True,
             "do_mc":True,
@@ -301,6 +311,11 @@ class Config(object):
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
+
+    density_nthreads = 2	# Number of threads used by the density estimator
+    density_knn_rotate = True	# Use the metric of the covariance matrix
+    density_uncertainty = 0	# 0: theoretical, 1: bootstrapped
+    density_npoints = 1000	# Number of points in the density profiles
 
     magnet_alignment = {
         "n_events":10,
