@@ -151,6 +151,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
             "density_systematics":get_systematics(emittance, name, "density"),
             "density_corrections_draw":True,	# True if density correctoins are to be drawn
+            "density_systematics_draw":True,	# True if density systematics are to be drawn
             "density_sections":False,		# True if density sections are to be printed
 
             "do_extrapolation":False,

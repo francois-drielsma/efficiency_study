@@ -45,6 +45,14 @@ class DensityAnalysis(AnalysisBase):
 	# Calculate corrections if required
         self.calculate_corrections = self.config_anal["density_corrections"] == None
 
+	# Initialize the systematics graphs if necessary
+	if self.config_anal["density_systematics_draw"]:
+	    self.syst_graphs = {}
+	    for typ in self.data_types:
+	    	self.syst_graphs[typ] = {}
+	        for loc in self.locations:
+		    self.syst_graphs[typ][loc] = {}
+
     def birth(self):
         """
         Sets the output directory for the density plots
@@ -65,6 +73,10 @@ class DensityAnalysis(AnalysisBase):
             pass
         try:
             os.mkdir(self.plot_dir+"/corrections")
+        except OSError:
+            pass
+        try:
+            os.mkdir(self.plot_dir+"/systematics")
         except OSError:
             pass
 
@@ -92,11 +104,14 @@ class DensityAnalysis(AnalysisBase):
 	if self.config_anal["density_corrections_draw"]:
 	    self.draw_corrections()
 
-	# Apply the corrections, evaluate the systematic uncertainties (TODO)
+	# Apply the corrections, evaluate the systematic uncertainties
+	# If requested, draw the systematics in density/systematics
 	self.corrections_and_uncertainties("reco")
         if self.config_anal["density_mc"]:
             self.corrections_and_uncertainties("all_mc")
             self.corrections_and_uncertainties("reco_mc")
+	if self.config_anal["density_systematics_draw"]:
+	    self.draw_systematics()
 
 	# Draw the density profiles
 	self.draw_profiles()
@@ -284,6 +299,11 @@ class DensityAnalysis(AnalysisBase):
 	    # Evaluate the levels with the corresponding systematic shift
             syst_levels = self.do_corrections(typ, loc, source)
 
+	    # Initialize a graph that contains the deviation from the reference
+            name = self.get_syst_name(source["source"])
+	    if self.config_anal["density_systematics_draw"]:
+	        self.syst_graphs[typ][loc][name] = ROOT.TGraph(self.npoints)
+
 	    # Add in quadrature an uncertainty that corresponds to the level shift due
 	    # to the use of a different set of corrections
             scale = source["scale"]
@@ -291,7 +311,22 @@ class DensityAnalysis(AnalysisBase):
                 err = (syst_levels[j] - ref_levels[j])*scale
                 syst_error_list[j] = (syst_error_list[j]**2+err**2)**0.5
 
+	    	if self.config_anal["density_systematics_draw"]:
+	    	    alpha = (float(j+1.)/(self.npoints+1.))
+		    val = 0.
+		    if ref_levels[j] > 0:
+			val = err/ref_levels[j]
+		    self.syst_graphs[typ][loc][name].SetPoint(j, alpha, val)
+
         return syst_error_list
+
+    def get_syst_name(self, path):
+	"""
+	Convert systematic path to a systematic name
+	"""
+	suffix = path.split("Systematics_",1)[1]
+	name = suffix.split("/")[0]
+	return name
 
     def calculate_performance_systematics(self, typ, loc):
         """
@@ -323,6 +358,11 @@ class DensityAnalysis(AnalysisBase):
             syst_ratio = np.array(source[typ]["ds"]["levels"])/np.array(source[typ]["us"]["levels"])
 	    syst_ratio = syst_ratio.tolist()
 
+	    # Initialize a graph that contains the deviation from the reference
+            name = self.get_syst_name(source["source"])
+	    if self.config_anal["density_systematics_draw"]:
+	        self.syst_graphs[typ][loc][name] = ROOT.TGraph(self.npoints)
+
 	    # Add in quadrature an uncertainty that corresponds to the ratio shift due
 	    # to the use of a different cooling channel
             scale = source["scale"]
@@ -330,12 +370,32 @@ class DensityAnalysis(AnalysisBase):
                 err = (syst_ratio[j] - ref_ratio[j])*scale
                 ratio_error_list[j] = (ratio_error_list[j]**2+err**2)**0.5
 
+	    	if self.config_anal["density_systematics_draw"]:
+	    	    alpha = (float(j+1.)/(self.npoints+1.))
+		    self.syst_graphs[typ][loc][name].SetPoint(j, alpha, err)
+
 	# Convert the uncertainties in terms of density
         ref_levels_us = data["us"]["levels"]
         for i in range(self.npoints):
             syst_error_list[i] = ratio_error_list[i] * ref_levels_us[i]
 
         return syst_error_list
+
+    def draw_systematics(self):
+        """
+        Draws the systematic errors. The uncertainty on each level corresponds to the 
+	residuals between the reference reconstruction set and the data sets that 
+	are shifted from the reference set
+        * typ specifies the type of data (all_mc, reco_mc, reco)
+	* loc specifies the location of the tracker (us, ds)
+        """
+	# Feed the systematics graphs to the drawer
+        for typ in self.data_types:
+	    for loc in self.locations:
+		print typ, loc, len(self.syst_graphs[typ][loc])
+		if len(self.syst_graphs[typ][loc]):
+	    	    plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
+		    plotter.plot_systematics(self.syst_graphs[typ][loc])
 
     def draw_profiles(self):
         """
