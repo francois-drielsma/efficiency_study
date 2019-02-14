@@ -11,11 +11,11 @@ class FractionalAnalysis(AnalysisBase):
 
     def __init__(self, config, config_anal, data_loader):
         """
-        Initialise the FractionalEmittance class for the fractional emittance analysis
+        Initialise the FractionalAnalysis class for the fractional emittance analysis
         * config and config_anal are the configuration files
 	* data_loader extracts the data from the MAUS ROOT files
         """
-        super(FractionalEmittance, self).__init__(config, config_anal, data_loader)
+        super(FractionalAnalysis, self).__init__(config, config_anal, data_loader)
 
 	# Initialize the configuration and the data loader
         self.config = config
