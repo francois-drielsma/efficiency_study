@@ -294,7 +294,8 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fractions = [0.09, (1-0.91)**2, (1-0.91)**3, 0.5]
+    fractional_emittance_fraction = 0.09	# Fraction at which to evaluate the quantiles
+    fractional_emittance_uncertainty = 0	# 0: theoretical, 1: bootstrapped
 
     density_nthreads = 2	# Number of threads used by the density estimator
     density_knn_rotate = True	# Use the metric of the covariance matrix

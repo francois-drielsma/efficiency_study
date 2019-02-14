@@ -20,7 +20,7 @@ class DensityAnalysis(AnalysisBase):
         """
         super(DensityAnalysis, self).__init__(config, config_anal, data_loader)
 
-	# Initialize the configuration
+	# Initialize the configuration and the data loader
         self.config = config
         self.config_anal = config_anal
         self.data_loader = data_loader
@@ -56,17 +56,23 @@ class DensityAnalysis(AnalysisBase):
     def birth(self):
         """
         Sets the output directory for the density plots
-	Resets all the data containers
+	Resets all the data containers and loads the uncertainties
         """
+	# Create directory, clear the data containers
         self.set_plot_dir("density")
         for typ in self.data_types:
 	    for loc in self.locations:
 		self.data[typ][loc].clear()
 
 	self.clear_density_data()
+
+	# Load the systematic corrections/uncertainties from the file if they are provided
 	self.load_errors()
+
+	# Load the data
         self.append_data()
 
+	# Create the subdirectories
         try:
             os.mkdir(self.plot_dir+"/phase_space")
         except OSError:
@@ -121,9 +127,9 @@ class DensityAnalysis(AnalysisBase):
 
     def append_data(self):
         """
-        Add data to the density calculation (done at death time)
+        Add data to the fractional amplitude calculation (done at death time)
         
-        If density_mc is false, we take 'tku' data from upstream_cut sample 
+        If amplitude_mc is false, we take 'tku' data from upstream_cut sample 
         and 'tkd' data from downstream_cut sample
         
         If density_mc is true, then we build a couple of additional samples
@@ -243,11 +249,6 @@ class DensityAnalysis(AnalysisBase):
             syst_error_list = [(reco_syst_list[i]**2+perf_syst_list[i]**2)**0.5 \
                                                   for i in range(self.npoints)]
             data[loc]["levels_syst_errors"] = syst_error_list
-
-	    # Print the results
-#            print "    levels:          ", data[loc]["corrected_levels"]
-#            print "    stats errors: ", data[loc]["levels_stat_errors"]
-#            print "    syst errors:   ", data[loc]["levels_syst_errors"] 
 
         self.density_data[typ] = data
 
@@ -605,8 +606,8 @@ class DensityAnalysis(AnalysisBase):
 
     def clear_density_data(self):
         """
-        Initializes the dictionary that contains all the information
-	used to make corrections down the line
+        Initializes the dictionary that is used to store
+	data and make corrections down the line
         """
         self.density_data = {
           "inefficiency":{
