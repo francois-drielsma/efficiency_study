@@ -26,7 +26,7 @@ import mice_analysis.globals_plotter
 import mice_analysis.optics_plotter
 import mice_analysis.efficiency_plotter
 import mice_analysis.data_recorder
-import mice_analysis.fractional_emittance_analysis
+import mice_analysis.fractional_analysis
 import mice_analysis.density_analysis
 import utilities.root_style
 
@@ -148,7 +148,7 @@ class Analyser(object):
             self.analysis_list.append(mice_analysis.amplitude_analysis.AmplitudeAnalysis(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_fractional_emittance"]:
             print "Doing fractional emittance"
-            self.analysis_list.append(mice_analysis.fractional_emittance_analysis.FractionalEmittance(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.fractional_analysis.FractionalAnalysis(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_density"]:
             print "Doing kNN density estimation"
 	    self.analysis_list.append(mice_analysis.density_analysis.DensityAnalysis(self.config, self.config_anal, self.data_loader))

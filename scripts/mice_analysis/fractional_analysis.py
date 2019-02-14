@@ -7,7 +7,7 @@ from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
 from mice_analysis.fractional_emittance.amplitude_quantile import AmplitudeQuantile
 from mice_analysis.analysis_base import AnalysisBase
 
-class FractionalEmittance(AnalysisBase):
+class FractionalAnalysis(AnalysisBase):
 
     def __init__(self, config, config_anal, data_loader):
         """
