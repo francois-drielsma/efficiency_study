@@ -80,7 +80,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
             "tof01_cut_high":tof01_min_max[1], # TOF01 cut upper bound
             "p_bins":p_bins, # set of momentum bins; for now really it is just a lower and upper bound
-            "p_bins_alt":[[125, 155]], # alternative momentum cut
+            "p_bins_alt":[[100, 180]], # alternative momentum cut
             "p_tot_ds_low":tkd_cut[0], # downstream momentum cut lower bound
             "p_tot_ds_high":tkd_cut[1], # downstream momentum cut upper bound
             "reco_files":reco_file_names(run_list, maus_version, do_globals), # list of strings to be handed to glob
@@ -88,7 +88,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tku_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "tku_fiducial_radius":150.,
             "tkd_fiducial_radius":150.,
@@ -109,16 +109,16 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
 
             "do_mc":False,
             "do_magnet_alignment":False,
-            "do_fractional_emittance":False, #True,
+            "do_fractional_emittance":True,
             "do_efficiency":False,
             "do_extrapolation":False,
-            "do_globals":False, #do_globals,
-            "do_amplitude":False, #True,
-            "do_plots":False, #True,
-            "do_cuts_plots":False, #True,
+            "do_globals":do_globals,
+            "do_amplitude":True,
+            "do_plots":True,
+            "do_cuts_plots":True,
             "do_tof01_weighting":False,
-            "do_optics":False, #True,
-            "do_data_recorder":False, #True,
+            "do_optics":True,
+            "do_data_recorder":True,
             "do_density":True,
     }
     return analysis_variables
@@ -180,7 +180,7 @@ class Config(object):
     }
     data_recorder_cuts = copy.deepcopy(upstream_cuts)
     data_recorder_cuts["p_tot_us"] = False
-    data_recorder_cuts["p_tot_us_alt"] = True
+    data_recorder_cuts["p_tot_us_alt"] = False
     downstream_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts["p_tot_ds"] = False
     downstream_cuts["tof2_sp"] = False
@@ -266,6 +266,7 @@ class Config(object):
     density_knn_rotate = True # rotate to eigenvector system
     density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
     density_graph_npoints = 100
+    density_graph_scaling = 1e9
 
     magnet_alignment = {
         "n_events":10,

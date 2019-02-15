@@ -3,6 +3,7 @@ import sys
 import shutil
 
 import ROOT
+import numpy
 
 import utilities.utilities as utilities
 import utilities.root_style as root_style
@@ -15,9 +16,9 @@ from conglomerate.merge_cuts_summary_tex import MergeCutsSummaryTex
 
 def mc_mod(file_name, axis_range, right_labels, top_labels, verticals = None):
     modifiers = {
-        "extra_labels":{
-            "right":right_labels,
-            "top":top_labels
+        "merge_options":{
+            "right_labels":right_labels,
+            "top_labels":top_labels
         },
         "redraw":{
             "draw_option":[""],
@@ -32,6 +33,14 @@ def mc_mod(file_name, axis_range, right_labels, top_labels, verticals = None):
         modifiers = vertical(verticals, modifiers)
     return modifiers
   
+EMIT_COLORS = [ROOT.TColor(10000, 255, 255, 255),
+               ROOT.TColor(10001, 245, 245, 255),
+               ROOT.TColor(10002, 235, 235, 255)]
+def emit_colors():
+    # must be the same as EMIT_COLORS declaration
+    # risk of collision with existing colors in the palette (need ROOT>6 to
+    # avoid) so set index to high number and pray
+    return [0, 0, 0]
 
 class CompareMCConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -80,9 +89,10 @@ class CompareMCConfig(CompareConfig):
 def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, right_labels):
     output_dir = "compare_fractional_emittance/"
     modifiers = {
-        "extra_labels":{
-            "right":right_labels,
-            "top":top_labels
+        "merge_options":{
+            "right_labels":top_labels, # intentionally reversed
+            "top_labels":right_labels,
+            "row_fill":emit_colors(),
         },
         "hist_title":"",
         "file_name":"fractional_emittance",
@@ -116,7 +126,7 @@ def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, ri
         },
         "write_plots":{
             "dir":target_dir+"/"+output_dir+"/"+beam,
-            "file_name":"fractional_emittance_"+str(fraction)
+            "file_name":"fractional_emittance_"+str(int(fraction)).rjust(3, '0')
         },
         "axis_title":{
             "x":"z [mm]",
@@ -125,6 +135,20 @@ def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, ri
 
     }
     return modifiers
+
+def frac_y_range(fraction, beam):
+    print "Finding y_range for", fraction, beam
+    if abs(fraction-50.0) < 0.1:
+        return [12, 36]
+    elif abs(fraction-9.0) < 0.1:
+        if "4-140" in beam:
+            return [3.1, 5.9]
+        elif "6-140" in beam:
+            return [5.1, 7.9]
+        elif "10-140" in beam:
+            return [9.1, 11.9]
+    print "Failed to find a y range, applying default", fraction, beam
+    return [0., 100.]
 
 class CompareFractionalEmittanceConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -135,22 +159,33 @@ class CompareFractionalEmittanceConfig(CompareConfig):
         output_dir = "compare_fractional_emittance/"
         self.setup(beam, target_dir, "fractional_emittance/", output_dir, dir_list)
         self.conglomerate_list = []
-        for frac, y_range in [
-            ("9.0", [0., 15.]),
-            ("50.0", [12, 36])
-            ]:
+        for frac in [9.0, 50.0]:
+            y_range = frac_y_range(frac, beam)
             mods = fractional_emittance_mod(frac, y_range, beam, target_dir, top_labels, right_labels)
             self.conglomerate_list.append(
                 self.get_conglomerate_0(modifiers = mods),
             )
         self.data_caption = [[],]
 
+
+def density_y_range(beam):
+    y_range = [1e-9, 109e-9]
+    if "4-140" in beam:
+        y_range = [1e-9, 109e-9]
+    elif "6-140" in beam:
+        y_range = [1e-9, 59e-9]
+    elif "10-140" in beam:
+        y_range = [1e-9, 24e-9]
+    return y_range
+
+
 def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
     output_dir = "compare_density/"
     modifiers = {
-        "extra_labels":{
-            "right":right_labels,
-            "top":top_labels
+        "merge_options":{
+            "right_labels":top_labels, # intentionally transposed!
+            "top_labels":right_labels,
+            "row_fill":emit_colors(),
         },
         "hist_title":"",
         "file_name":name,
@@ -170,15 +205,15 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
             "marker_color":[0, 0],
             "draw_order":[0, 1],
             "x_range":None,
-            "y_range":[1e-9, 109e-9],
+            "y_range":density_y_range(beam),
             "graph":{
-                    "draw_option":["L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
+                    "draw_option":["", "L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
                     "marker_style":None,
                     "marker_color":None,
-                    "fill_color":[ROOT.kOrange+4, ROOT.kGreen+3],
-                    "fill_style":[1001, 1001],
-                    "transparency":[0.5, 0.5],
-                    "draw_order":[0, 1],
+                    "fill_color":[1, ROOT.kOrange+4, ROOT.kGreen+3],
+                    "fill_style":[1001, 1001, 1001],
+                    "transparency":[0, 0.5, 0.5],
+                    "draw_order":[0, 1, 2],
             },
             "ignore_more_histograms":False,
         },
@@ -187,15 +222,19 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
             "file_name":name,
         },
         "defit":False,
+        "axis_title":{
+            "x":"Fraction of upstream sample",
+            "y":"Density #times 10^{-9} [(mm MeV/c)^{-2}]",
+        },
     }
     return modifiers
 
 def density_ratio_mod(name, beam, target_dir, top_labels, right_labels):
     output_dir = "compare_density/"
     modifiers = {
-        "extra_labels":{
-            "right":right_labels,
-            "top":top_labels
+        "merge_options":{
+            "right_labels":right_labels,
+            "top_labels":top_labels
         },
         "hist_title":"",
         "file_name":name,
@@ -255,9 +294,9 @@ class CompareCutsConfig(CompareConfig):
         ]
         self.setup(beam, target_dir, "cut_plots/", "compare_cuts/", dir_list)
         mod = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "mice_logo":False,
             "legend":False,
@@ -326,9 +365,9 @@ class CompareData1DConfig(CompareConfig):
         ]
         self.setup(beam, target_dir, "data_plots/", "compare_data/", dir_list)
         modifiers = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             }
         }
       
@@ -358,9 +397,9 @@ class CompareData2DConfig(CompareConfig):
         ]
         self.setup(beam, target_dir, "data_plots/", "compare_data_2d/", dir_list)
         mod = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "draw_option":["COL"],
@@ -379,9 +418,9 @@ class CompareData2DConfig(CompareConfig):
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "y [mm]", modifiers = mod),
         ]
         mod = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "draw_option":["COL"],
@@ -415,9 +454,9 @@ class CompareData2DMCConfig(CompareConfig):
         ]
         self.setup(beam, target_dir, "data_plots/", "compare_data_2d_mc/", dir_list)
         mod = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "draw_option":["COL"],
@@ -436,9 +475,9 @@ class CompareData2DMCConfig(CompareConfig):
             self.get_conglomerate_3("p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "p_res_vs_global_through_virtual_absorber_centre_y_ds_cut", "P(TKU) - P(TKD) [MeV/c]", "y [mm]", modifiers = mod),
         ]
         mod = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "draw_option":["COL"],
@@ -478,9 +517,9 @@ class CompareOpticsConfig(CompareConfig):
             for station in range(2, 6)+["tp"]:
                 graphs.append(tracker+"_"+str(station))
         modifiers = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "graph":{
@@ -516,9 +555,9 @@ class CompareOpticsMCConfig(CompareConfig):
             for station in range(2, 6)+["tp"]:
                 graphs.append(tracker+"_"+str(station))
         modifiers = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "redraw":{
                 "graph":{
@@ -551,9 +590,9 @@ class CompareGlobalsConfig(CompareConfig):
             "legend":False,
             "rebin":10,
             "write_fit":False,
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "extra_lines":{
                     "verticals":[{"x_value":0., "line_color":1, "line_style":2, "line_width":2}],
@@ -601,16 +640,18 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
                 ],
                 "verticals":[],
             },
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels,
+                "col_fill":emit_colors(),
             },
             "rescale_x":amplitude_x_range(beam),
         }
         absolute_modifiers = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels,
+                "col_fill":emit_colors(),
             },
             "normalise_graph":True,
             "redraw":{
@@ -673,16 +714,17 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                 ],
                 "verticals":[],
             },
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels,
+                "col_fill":emit_colors(),
             },
             "rescale_x":amplitude_x_range(beam),
         }
         absolute_modifiers = {
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
             },
             "normalise_graph":True,
             "redraw":{
@@ -738,9 +780,10 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                 ],
                 "verticals":[],
             },
-            "extra_labels":{
-                "right":right_labels,
-                "top":top_labels
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels,
+                "col_fill":emit_colors(),
             },
             "redraw":{
                 "graph":{
@@ -848,13 +891,14 @@ def main_paper(batch_level = 0):
                    CompareOpticsConfig, CompareOpticsMCConfig,
                    CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,]
-    config_list = [CompareAmplitudeConfigBoth,
+    config_list += [CompareAmplitudeConfigBoth,
                    CompareAmplitudeConfigMC,
-                   CompareAmplitudeConfigData,
-                   CompareFractionalEmittanceConfig]
-    config_list = [CompareDensityConfig]
-
+                   CompareAmplitudeConfigData]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    my_dir_list = numpy.array(my_dir_list).transpose().tolist()
+    config_list = [CompareFractionalEmittanceConfig, CompareDensityConfig]
+    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+
 
 if __name__ == "__main__":
     main_paper()

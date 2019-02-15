@@ -76,6 +76,17 @@ class ConglomerateMerge(object):
         if cong.legend != None:
             legend_size = cong.options["legend"]["pos"]
         frame_color = cong.pad.GetFrameFillColor()
+        if "row_fill" in cong.options["merge_options"]:
+            try:
+                frame_color = cong.options["merge_options"]["row_fill"][i]
+            except Exception:
+                print "Failed to fill column", i, j, cong.options["merge_options"]["row_fill"]
+        elif "col_fill" in cong.options["merge_options"]:
+            try:
+                frame_color = cong.options["merge_options"]["col_fill"][j]
+            except Exception:
+                print "Failed to fill column", i, j, cong.options["merge_options"]["col_fill"]
+        print "Setting frame color", frame_color
         pad.SetFrameFillColor(frame_color)
         if j != 0:
             for hist in cong.hist_list:
@@ -88,7 +99,7 @@ class ConglomerateMerge(object):
             self.do_legend(i, j, cong.legend, legend_size, pad)
 
     def extra_labels(self, cong_list):
-        extra_labels = cong_list[0].conglomerations[0].options["extra_labels"]
+        extra_labels = cong_list[0].conglomerations[0].options["merge_options"]
         if not extra_labels:
             return
         left_m = 0.13
@@ -97,21 +108,22 @@ class ConglomerateMerge(object):
         bottom_m = 0.12
         text_height = 0.05
         x_step = (1.0-left_m-right_m)/self.cols
-        for i, item in enumerate(extra_labels["top"]):
+        for i, item in enumerate(extra_labels["top_labels"]):
+            lines = item.split("\n")
             row_btm = 1.0-top_m
-            row_top = row_btm+text_height
+            row_top = row_btm+text_height*len(lines)
             text_box = ROOT.TPaveText(left_m+x_step*i, row_btm,
                                       left_m+x_step*(i+1), row_top, "NDC")
             text_box.SetTextSize(0.04)
             text_box.SetFillColor(0)
             text_box.SetBorderSize(0)
             print "Setting text", item
-            for line in item.split("\n"):
+            for line in lines:
                 text_box.AddText(line)
             text_box.Draw()
             self.root_objects.append(text_box)
         y_step = (1.0-top_m-bottom_m)/self.rows
-        for i, item in enumerate(extra_labels["right"]):
+        for i, item in enumerate(extra_labels["right_labels"]):
             lines = item.split("\n")
             row_btm = 1.0-top_m-y_step*(i+0.5)-len(lines)/2.*text_height
             row_top = row_btm + len(lines)*text_height

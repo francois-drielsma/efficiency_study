@@ -130,8 +130,8 @@ class DataPlotter(AnalysisBase):
             "normalise":False,
             "logy":True,
         }
-        self.birth_var_1d("refit", "tku", None, None, min_max=[-0.5, 2.5], n_bins=4, options = refit_options)
-        self.birth_var_1d("refit", "tkd", None, None, min_max=[-0.5, 2.5], n_bins=4, options = refit_options)
+        self.birth_var_1d("refit", "tku", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
+        self.birth_var_1d("refit", "tkd", None, None, min_max=[-0.5, 3.5], n_bins=4, options = refit_options)
         self.birth_var_1d("SP Res(x)", "tku", None, None, min_max=[-2.5, 2.5])
         self.birth_var_1d("SP Res(y)", "tku", None, None, min_max=[-2.5, 2.5])
         if self.config_anal["do_globals"]:

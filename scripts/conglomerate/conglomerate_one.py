@@ -56,7 +56,7 @@ class ConglomerateOne(object):
                     if type(an_object) in other_types:
                         continue
                     if type(an_object) == type(ROOT.TMultiGraph()):
-                        an_object = an_object.GetHistogram().Clone()
+                        an_object = an_object.GetHistogram()
                     hist_list.append(an_object)
                     an_object.SetName(an_object.GetName()+self.uid())
                     break # we can only add each object once
@@ -79,8 +79,9 @@ class ConglomerateOne(object):
                 name = str(an_object.GetName()).replace(" ", "_").lower()
                 if graph_name in name:
                     if type(an_object) == type(ROOT.TMultiGraph()):
+                        graph_list.append(an_object)
                         for item in an_object.GetListOfGraphs():
-                            graph_list.append(item.Clone())
+                            graph_list.append(item)
                         continue
                     elif type(an_object) not in graph_types:
                         print name, "matches", graph_name, "but type", type(an_object), "not a graph - skipping"
@@ -335,6 +336,7 @@ class ConglomerateOne(object):
         draw_order = [i for i, hist in enumerate(hist_list)]
         if not redraw:
             return
+        #### hist
         print "Will redraw", redraw["x_range"], redraw["y_range"]
         if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
             print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
@@ -373,6 +375,9 @@ class ConglomerateOne(object):
         for i in draw_order:
             hist_list[i].Draw(same+draw_option[i])
             same = "SAME "
+
+        #### graph
+
         if "graph" in redraw:
             graph_draw = redraw["graph"]
         else:
@@ -389,6 +394,10 @@ class ConglomerateOne(object):
             graph_draw["draw_order"] = range(len(graph_list))
         for i in graph_draw["draw_order"]:
             graph = graph_list[i]
+            if type(graph) == type(ROOT.TMultiGraph()) and redraw["y_range"] != None:
+                graph.SetMinimum(redraw["y_range"][0])
+                graph.SetMaximum(redraw["y_range"][1])
+                continue
             graph.SetName(graph.GetName()+"_"+self.uid())
             if graph_draw["marker_style"] != None:
                 graph.SetMarkerStyle(graph_draw["marker_style"][i])

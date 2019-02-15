@@ -73,7 +73,7 @@ class kNNDensityEstimator(object):
     #  -npoints	Number of points contained in the graph (number of steps)
     #  -bsr	Use bootstrap resampling to evaluate uncertainties
     #  -bsr_n	Number of iterations of the bootstrap resampling
-    def profile(self, npoints=1000, bsr=False, bsr_n=10):
+    def profile(self, npoints=1000, bsr=False, bsr_n=10, scaling=1.):
 	if not len(self.levels):
 	    self.set_levels()
 
@@ -88,8 +88,8 @@ class kNNDensityEstimator(object):
 		level = 0.
 		if alpha < self.norm:
 	    	    level = np.quantile(self.levels, 1.-alpha/self.norm)
-	    	profile.SetPoint(i, alpha, level)
-	    	profile.SetPointError(i, 0., level*self.level_uncertainty(alpha))
+	    	profile.SetPoint(i, alpha, level*scaling)
+	    	profile.SetPointError(i, 0., level*self.level_uncertainty(alpha)*scaling)
 	else:
 	    # Bootstrap the data, evaluate the profiles for each new sample
 	    baseline = self.data

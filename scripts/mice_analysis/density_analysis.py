@@ -27,6 +27,7 @@ class DensityAnalysis(AnalysisBase):
         self.rotate = self.config.density_knn_rotate
 	self.uncertainty = self.config.density_uncertainty
 	self.graph_npoints = self.config.density_graph_npoints
+        self.graph_scaling = self.config.density_graph_scaling
 
 	# Initialize the data containers
 	self.json_data = [] # data for plotting/storing on disk
@@ -203,7 +204,9 @@ class DensityAnalysis(AnalysisBase):
 		if loc == "ds":
 		    norm = transmission
 		density_estimator = kNNDensityEstimator(ps_data, self.rotate, self.nthreads, norm)
-		graphs[typ][loc] = density_estimator.profile(self.graph_npoints, self.uncertainty)
+		graphs[typ][loc] = density_estimator.profile(self.graph_npoints,
+                                                             self.uncertainty,
+                                                             scaling=self.graph_scaling)
 
 	# Produce plots that compare the density profiles upstream and downstream
         # of the absorber. Produce one for each category of data

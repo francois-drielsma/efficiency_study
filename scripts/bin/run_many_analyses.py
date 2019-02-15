@@ -26,13 +26,13 @@ def run_analysis(jobs, cards_list, logs):
     analysis_pool.run_many()
 
 def main_mc_analysis():
-    job_list = range(16)
+    job_list = range(12)
     cards_list = ["scripts/config/config_mc.py",]
     logs = 'logs/mc-logs'
     run_analysis(job_list, cards_list, logs)
 
 def main_reco_analysis():
-    job_list = range(16)
+    job_list = range(12)
     cards_list = ["scripts/config/config_reco.py",]
     logs = 'logs/reco-logs'
     run_analysis(job_list, cards_list, logs)

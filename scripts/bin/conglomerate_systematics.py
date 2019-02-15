@@ -60,9 +60,9 @@ class CompareCutsSystematicConfig(CompareConfig):
                 sys_styles[i+1] = 1
         title = (self.beam+" "+self.absorber+"    "+self.systematic[0]).replace("_", " ")
         modifiers = {
-            "extra_labels":{
-                "top":self.top_labels,
-                "right":self.right_labels,
+            "merge_options":{
+                "top_labels":self.top_labels,
+                "right_labels":self.right_labels,
             },
             "hist_title":title,
             "file_name":self.plot,
@@ -272,7 +272,7 @@ def main():
     #systematics_cut_summary()
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-v4/"
+    target_dir = "output/2017-02-7-v5/"
     systematics_source_dir = "output/2017-02-7-Systematics-v3/"
     top_labels = ["4-140", "6-140", "10-140"]
 

@@ -44,10 +44,10 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
             "tof01_cut_high":tof01_min_max[1], # TOF01 cut upper bound
-            "tof01_tramline_lower":2., # p_tof01 - p_tku
-            "tof01_tramline_upper":42., # p_tof01 - p_tku
+            "tof01_tramline_lower":-15.+70, # p_tof01 - p_tku
+            "tof01_tramline_upper":+15.+70, # p_tof01 - p_tku 
             "p_bins":p_bins, # set of momentum bins; for now really it is just a lower and upper bound
-            "p_bins_alt":[[125, 155]], # alternative momentum cut
+            "p_bins_alt":[[100, 180]], # alternative momentum cut
             "p_tot_ds_low":tkd_cut[0], # downstream momentum cut lower bound
             "p_tot_ds_high":tkd_cut[1], # downstream momentum cut upper bound
             "reco_files":rogers_mc_file_names(datasets), # list of strings to be handed to glob
@@ -55,7 +55,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
+            "tku_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "amplitude_corrections":None,
             "amplitude_systematics":{},
@@ -77,18 +77,18 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
 
             "do_magnet_alignment":False,
             "do_efficiency":True,
-            "do_fractional_emittance":True,
-            "do_amplitude":True,
-	    "do_density":True,
+            "do_fractional_emittance":False, #True,
+            "do_amplitude":False, #True,
+	    "do_density":False, #True,
             "do_extrapolation":False,
-            "do_globals":do_globals,
-            "do_mc":True,
+            "do_globals":False, #do_globals,
+            "do_mc":False, #True,
             "do_plots":True,
-            "do_cuts_plots":True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
             "do_optics":False,
             "do_data_recorder":False,
-            "do_density":True,
+            "do_density":False, #True,
 
         }
 
@@ -186,11 +186,11 @@ class Config(object):
     cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-Systematics-v3"
+    data_dir = "output/2017-02-7-Systematics-test"
     analyses = []
 
 
-    files = "*"
+    files = "00??"
     lih_systematics_list = [
       "mc_base", "mc_lih_plus"
     ]
@@ -200,7 +200,7 @@ class Config(object):
       "mc_ssd_match_plus",
     ]
     empty_systematics_list = [
-      "tku_base", "tku_wider-p",
+      "tku_base", "tku_full-p",
       "tku_pos_plus", "tku_rot_plus", "tku_density_plus",
       "tku_scale_SSUC_neg", "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
       "tkd_pos_plus", "tkd_rot_plus", "tkd_density_plus",
@@ -210,9 +210,9 @@ class Config(object):
     suffix = None
     vers = "v8"
     run_list = [
+        ["10", "10052", [1.5, 4.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["4",  "10064", [1.5, 6.0], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["6",  "10051", [1.5, 5.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["10", "10052", [1.5, 4.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["4",  "9962", [1.5, 6.0], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
         ["6",  "9966", [1.5, 5.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
         ["10", "9970", [1.5, 4.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
@@ -293,6 +293,7 @@ class Config(object):
     density_knn_rotate = True # rotate to eigenvector system
     density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
     density_graph_npoints = 100
+    density_graph_scaling = 1e9
 
     magnet_alignment = {
         "n_events":10,
