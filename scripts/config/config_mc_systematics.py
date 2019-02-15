@@ -75,6 +75,9 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
+	    "fractional_emittance_corrections":None,
+	    "fractional_emittance_systematics":{},
+
             "density_mc":True,			# True if pure Monte Carlo
     	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged
     	    "density_corrections":None,		# Path to the correction file

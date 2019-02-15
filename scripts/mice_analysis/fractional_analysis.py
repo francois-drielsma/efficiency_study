@@ -1,6 +1,7 @@
 import tempfile
 import json
 import ROOT
+import os
 import xboa.common
 
 from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
@@ -25,7 +26,7 @@ class FractionalAnalysis(AnalysisBase):
 	# Initialize the fractional emittance parameters
         self.bin_edges = self.config.fractional_emittance_bins
         self.fraction = self.config.fractional_emittance_fraction
-        self.uncertainty = self.config.fractional_emittance_fraction
+        self.uncertainty = self.config.fractional_emittance_uncertainty
 
 	# Initialize the data containers
         self.a_dir = tempfile.mkdtemp()
@@ -37,7 +38,7 @@ class FractionalAnalysis(AnalysisBase):
         self.dict_list = []
 
 	# Calculate corrections if required
-        self.calculate_corrections = self.config_anal["density_corrections"] == None
+        self.calculate_corrections = self.config_anal["fractional_emittance_corrections"] == None
 
     def birth(self):
         """
@@ -52,8 +53,16 @@ class FractionalAnalysis(AnalysisBase):
         self.get_planes()
         self.clear_feps_data()
 
+	# Load the systematic corrections/uncertainties from the file if they are provided
+	self.load_errors()
+
 	# Load the data
         self.append_data()
+
+        try:
+            os.mkdir(self.plot_dir+"/corrections")
+        except OSError:
+            pass
 
     def process(self):
         """
@@ -67,6 +76,11 @@ class FractionalAnalysis(AnalysisBase):
         """
 	# First, evaluate the amplitude quantiles and their statistical uncertainties
         self.make_amplitude_quantiles()
+
+	# Evaluate corrections if necessary. Import them if they are provided
+        if self.calculate_corrections:
+	    self.set_corrections()
+	self.draw_corrections()
 
 	# Draw the fractional emittance evolution graphs
         self.draw_plot()
@@ -111,6 +125,7 @@ class FractionalAnalysis(AnalysisBase):
                     found_tkd = True
 
                 name = "mc_"+name
+		print name
                 file_name = self.a_dir+"/amp_data_"+name+"_"
                 self.data["all_mc"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, False)
                 self.data["all_mc"][name].clear()
@@ -187,15 +202,17 @@ class FractionalAnalysis(AnalysisBase):
 
 	    # Add a datum point for the current plane
             datum = {
-              'name':name,
               'n_events':n_events,
               'fraction':self.fraction,
-              'amplitude_quantile':feps,
+              'value':feps,
               'stat_error':feps_stat,
+	      'syst_error':0.,
+	      'correction':1.,
+	      'corrected':feps_stat,
               'z_pos':self.z_pos[name],
             }
             json.dumps(datum)
-            self.feps_data.append(datum)
+            self.feps_data["amplitude_quantiles"][name] = datum
 
     def build_amplitude_dictionaries(self):
         """
@@ -214,6 +231,21 @@ class FractionalAnalysis(AnalysisBase):
                 except Exception:
                     print "Failed to get amplitudes for", name
 
+    def set_corrections(self):
+        """
+        Calculate the corrections, i.e. the inefficiency and response function
+	The corrections are only relevant to the tku and tkd ref. planes
+        * uses the Monte Carlo to generate corrections
+        """
+	for loc in ("tku", "tkd"):
+	    # Evaluate the correction
+	    mc_quantile = self.feps_data["amplitude_quantiles"]["mc_virtual_"+loc+"_tp"]["value"]
+	    rec_quantile = self.feps_data["amplitude_quantiles"][loc]["value"]
+	    corr = mc_quantile/rec_quantile
+
+	    # Store it in the dictionary
+	    self.feps_data["correction"][loc] = corr
+
     def draw_plot(self):
         """
         Produce a plot that shows the evolution of the fractional emittance
@@ -226,17 +258,18 @@ class FractionalAnalysis(AnalysisBase):
 	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#epsilon_{%d}  [mm]" % int(1e2*self.fraction))
 
 	# Initialize the reco graph
-        reco_predicate = lambda datum: datum['name'] == "tku" or datum['name'] == "tkd"
+	quantiles = self.feps_data["amplitude_quantiles"]
+        reco_predicate = lambda key: key == "tku" or key == "tkd"
         name = "reco"
-        point_list = [(datum['z_pos'], datum['amplitude_quantile'], datum['stat_error']) \
-                                for datum in self.feps_data if reco_predicate(datum)]
+        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+                                for key, datum in quantiles.iteritems() if reco_predicate(key)]
         reco_graph = self.make_graph(point_list, 1, 20, name)
 	mg.Add(reco_graph, "p")
 
 	# Initialize the MC truth graph
         name = "all_mc"
-        point_list = [(datum['z_pos'], datum['amplitude_quantile'], datum['stat_error']) \
-                                for datum in self.feps_data if not reco_predicate(datum)]
+        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+                                for key, datum in quantiles.iteritems() if not reco_predicate(key)]
         mc_graph = self.make_graph(point_list, 4, 24, name)
 	mg.Add(mc_graph, "ple3")
 
@@ -289,4 +322,90 @@ class FractionalAnalysis(AnalysisBase):
         Initializes the dictionary that is used to store
 	data and make corrections down the line
         """
-	self.feps_data = []
+	self.feps_data = {
+          "correction":{
+              "tku":1.,
+              "tkd":1.
+          },
+          "amplitude_quantiles":{},
+          "source":"",
+          "scale":1.
+        }
+
+    def draw_corrections(self):
+	"""
+	Draw the correction factors used
+	"""
+        title = "fractional_emittance_corrections"
+        canvas = xboa.common.make_root_canvas(title)
+	hist = ROOT.TH1F("hist_corr", ";;Correction factor", 2, 0, 1)
+	hist.SetBinContent(1, self.feps_data["correction"]["tku"])
+	hist.SetBinContent(2, self.feps_data["correction"]["tkd"])
+	hist.GetXaxis().SetBinLabel(1, "TKU")
+	hist.GetXaxis().SetBinLabel(2, "TKD")
+	hist.Draw()
+
+        for fmt in ["root", "png", "pdf"]:
+            canvas.Print(self.plot_dir+"/corrections/"+title+"."+fmt)
+	
+
+    def load_errors(self):
+        """
+        Two "classes" of systematic errors;
+        * systematic errors on the reconstruction
+        * systematic errors on the performance
+        """
+	# If the corrections are to calculated in this analysis, skip this step
+        if self.calculate_corrections:
+            return
+
+        # Set base correction factors
+        self.load_corrections(self.config_anal["fractional_emittance_corrections"])
+
+	# Load systematic uncertainties
+        systematics = self.config_anal["fractional_emittance_systematics"]
+        for typ in systematics:
+            print "Loading fractional emitttance systematic errors for", typ
+            if typ not in self.feps_data:
+                self.feps_data[typ] = {}
+            for ref_key in ["detector_reference", "performance_reference"]:
+                ref_src = systematics[typ][ref_key]
+                if ref_src == None:
+                    self.feps_data[typ][ref_key] = None
+                else:
+                    self.feps_data[typ][ref_key] = \
+                                              self.load_one_error(ref_src, None)
+                print "  Loaded reference", typ, ref_key, ref_src, \
+                                          type(self.feps_data[typ][ref_key])
+            for loc in ["tku", "tkd"]:
+                if loc not in self.feps_data[typ]:
+                    self.feps_data[typ][loc] = {}
+                for key in ["detector_systematics", "performance_systematics"]:
+                    err_src_dict = systematics[typ][loc][key]
+                    self.feps_data[typ][loc][key] = [
+                        self.load_one_error(err_src, scale) \
+                              for err_src, scale in err_src_dict.iteritems()
+                    ]
+                    print "  Loaded", len(self.feps_data[typ][loc][key]), loc, key
+
+    def load_corrections(self, file_name):
+        """
+        Load the frational emittance corrections to be applied during this 
+        fractional emittance analysis. Loads the correction factors
+        """
+        fin = open(file_name)
+        feps_str = fin.read()
+        src_feps = json.loads(feps_str)
+        src_feps["source"] = file_name
+        self.feps_data["correction"] = src_feps["correction"]
+
+    def load_one_error(self, file_name, scale):
+        """
+        Load the fractional emittance analysis output for a given uncertainty source
+        """
+        fin = open(file_name)
+        feps_str = fin.read()
+        feps = json.loads(feps_str)
+        feps["source"] = file_name
+        feps["scale"] = scale
+        return feps

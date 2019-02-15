@@ -588,7 +588,6 @@ class DensityAnalysis(AnalysisBase):
                 "level_ratio_capped":response_capped,
             }
 
-
     def draw_corrections(self):
 	"""
 	Draw the correction factors used
