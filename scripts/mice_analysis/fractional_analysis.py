@@ -1,6 +1,7 @@
 import tempfile
 import json
 import ROOT
+import copy
 import os
 import xboa.common
 
@@ -32,10 +33,10 @@ class FractionalAnalysis(AnalysisBase):
         self.a_dir = tempfile.mkdtemp()
         self.data_types = ("all_mc", "reco")
 	self.data = {}
+        self.amp_dict = {}
 	for typ in self.data_types:
 	    self.data[typ] = {}
-
-        self.dict_list = []
+	    self.amp_dict[typ] = {}
 
 	# Calculate corrections if required
         self.calculate_corrections = self.config_anal["fractional_emittance_corrections"] == None
@@ -63,6 +64,10 @@ class FractionalAnalysis(AnalysisBase):
             os.mkdir(self.plot_dir+"/corrections")
         except OSError:
             pass
+        try:
+            os.mkdir(self.plot_dir+"/systematics")
+        except OSError:
+            pass
 
     def process(self):
         """
@@ -78,12 +83,20 @@ class FractionalAnalysis(AnalysisBase):
         self.make_amplitude_quantiles()
 
 	# Evaluate corrections if necessary. Import them if they are provided
+	# Draw the corrections in fractional_emittance/corrections
         if self.calculate_corrections:
 	    self.set_corrections()
 	self.draw_corrections()
 
+	# Apply the corrections, evaluate the systematic uncertainties
+	# If requested, draw the systematics in density/systematics (TODO)
+#	self.corrections_and_uncertainties("reco")
+#        if self.config_anal["amplitude_mc"]:
+#            self.corrections_and_uncertainties("all_mc")
+#	self.draw_systematics()
+
 	# Draw the fractional emittance evolution graphs
-        self.draw_plot()
+        self.draw_evolution()
 
 	# Save everything to a json file
         self.save()
@@ -109,7 +122,7 @@ class FractionalAnalysis(AnalysisBase):
             self.data["reco"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, False)
             self.data["reco"][name].clear()
 
-        print "Set up reco planes"
+        print "Set up", len(self.data["reco"]), "reco planes"
 
 	# If MC is present, initialize their data containers as well
 	# Skip if the virtual plane is before tku or after tkd
@@ -125,7 +138,6 @@ class FractionalAnalysis(AnalysisBase):
                     found_tkd = True
 
                 name = "mc_"+name
-		print name
                 file_name = self.a_dir+"/amp_data_"+name+"_"
                 self.data["all_mc"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, False)
                 self.data["all_mc"][name].clear()
@@ -180,54 +192,47 @@ class FractionalAnalysis(AnalysisBase):
 	self.build_amplitude_dictionaries()
 
 	# Get the number of particles in the upstream tracker
-        if self.dict_list[0][0] != 'tku':
-            raise RuntimeError("First dict must be tku to do fractional emittance")
-        us_events = len(self.dict_list[0][1])
+        us_events = len(self.amp_dict["reco"]["tku"])
 
 	# Loop over the planes, get the quantiles
-        for name, amps in self.dict_list:
-	    # Initialize the quantile object
-            amp_values = amps.values()
-            n_events = len(amp_values)		
-	    norm = float(n_events)/us_events
-	    quantile = AmplitudeQuantile(4, norm, self.uncertainty)
+	for typ in self.data_types:
+            for name, amps in self.amp_dict[typ].iteritems():
+	        # Initialize the quantile object
+                amp_values = amps.values()
+                n_events = len(amp_values)		
+	        norm = float(n_events)/us_events
+	        quantile = AmplitudeQuantile(4, norm, self.uncertainty)
 
-	    # Get the quantile
-            feps = -1.
-	    feps_stat = 0.
-	    if self.fraction < norm:
-		quantile.set_quantile(amp_values, self.fraction)
-                feps = quantile.value()
-                feps_stat = quantile.error()
+	        # Get the quantile
+                feps = -1.
+	        feps_stat = 0.
+	        if self.fraction < norm:
+		    quantile.set_quantile(amp_values, self.fraction)
+                    feps = quantile.value()
+                    feps_stat = quantile.error()
 
-	    # Add a datum point for the current plane
-            datum = {
-              'n_events':n_events,
-              'fraction':self.fraction,
-              'value':feps,
-              'stat_error':feps_stat,
-	      'syst_error':0.,
-	      'correction':1.,
-	      'corrected':feps_stat,
-              'z_pos':self.z_pos[name],
-            }
-            json.dumps(datum)
-            self.feps_data["amplitude_quantiles"][name] = datum
+	        # Add a datum point for the current plane
+                datum = {
+                  'n_events':n_events,
+                  'fraction':self.fraction,
+                  'value':feps,
+                  'stat_error':feps_stat,
+	          'syst_error':0.,
+	          'correction':1.,
+	          'corrected':feps_stat,
+                  'z_pos':self.z_pos[name],
+                }
+                json.dumps(datum)
+                self.feps_data[typ]["quantiles"][name] = datum
 
     def build_amplitude_dictionaries(self):
         """
         Temporarily build amplitude dictionaries
         """
-        self.dict_list = [
-            ('tku', self.data["reco"]["tku"].fractional_amplitude()),
-            ('tkd', self.data["reco"]["tkd"].fractional_amplitude())
-        ]
 	for typ in self.data_types:
-	    if typ == "reco":
-		continue
             for name, amp_data in self.data[typ].iteritems():
                 try:
-                    self.dict_list.append((name, amp_data.fractional_amplitude()))
+                    self.amp_dict[typ][name] = amp_data.fractional_amplitude()
                 except Exception:
                     print "Failed to get amplitudes for", name
 
@@ -239,14 +244,14 @@ class FractionalAnalysis(AnalysisBase):
         """
 	for loc in ("tku", "tkd"):
 	    # Evaluate the correction
-	    mc_quantile = self.feps_data["amplitude_quantiles"]["mc_virtual_"+loc+"_tp"]["value"]
-	    rec_quantile = self.feps_data["amplitude_quantiles"][loc]["value"]
+	    mc_quantile = self.feps_data["all_mc"]["quantiles"]["mc_virtual_"+loc+"_tp"]["value"]
+	    rec_quantile = self.feps_data["reco"]["quantiles"][loc]["value"]
 	    corr = mc_quantile/rec_quantile
 
 	    # Store it in the dictionary
 	    self.feps_data["correction"][loc] = corr
 
-    def draw_plot(self):
+    def draw_evolution(self):
         """
         Produce a plot that shows the evolution of the fractional emittance
 	across the MICE cooling channel. Displays the different types of data on
@@ -257,26 +262,22 @@ class FractionalAnalysis(AnalysisBase):
         canvas = self.get_plot(canvas_name)["pad"]
 	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#epsilon_{%d}  [mm]" % int(1e2*self.fraction))
 
-	# Initialize the reco graph
-	quantiles = self.feps_data["amplitude_quantiles"]
-        reco_predicate = lambda key: key == "tku" or key == "tkd"
-        name = "reco"
-        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
-                                for key, datum in quantiles.iteritems() if reco_predicate(key)]
-        reco_graph = self.make_graph(point_list, 1, 20, name)
-	mg.Add(reco_graph, "p")
-
-	# Initialize the MC truth graph
-        name = "all_mc"
-        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
-                                for key, datum in quantiles.iteritems() if not reco_predicate(key)]
-        mc_graph = self.make_graph(point_list, 4, 24, name)
-	mg.Add(mc_graph, "ple3")
+	# Initialize the graphs
+	graphs = {}
+	markers = {"all_mc":24, "reco":20}
+	colors = {"all_mc":4, "reco":1}
+	draw_options= {"all_mc":"ple3", "reco":"p"}
+	for typ in self.data_types:
+	    quantiles = self.feps_data[typ]["quantiles"]
+            point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+                                		for datum in quantiles.itervalues()]
+            graphs[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
+	    mg.Add(graphs[typ], draw_options[typ])
 
 	# Initialize a legend
 	leg = ROOT.TLegend(.6, .65, .8, .85)
-	leg.AddEntry(reco_graph, reco_graph.GetName(), "p")
-	leg.AddEntry(mc_graph, mc_graph.GetName(), "plf")
+	leg.AddEntry(graphs["all_mc"], graphs["all_mc"].GetName(), "plf")
+	leg.AddEntry(graphs["reco"], graphs["reco"].GetName(), "p")
 
 	# Draw
 	mg.Draw("A")
@@ -327,10 +328,25 @@ class FractionalAnalysis(AnalysisBase):
               "tku":1.,
               "tkd":1.
           },
-          "amplitude_quantiles":{},
           "source":"",
           "scale":1.
         }
+
+        quantile_data = {
+            "performance_reference":None,
+            "detector_reference":None,
+            "quantiles":{},
+            "us":{
+                "detector_systematics":[],
+                "performance_systematics":[],
+            },
+            "ds":{
+                "detector_systematics":[],
+                "performance_systematics":[],
+            }
+        }
+        for typ in self.data_types:
+            self.feps_data[typ] = copy.deepcopy(quantile_data)
 
     def draw_corrections(self):
 	"""
@@ -377,7 +393,7 @@ class FractionalAnalysis(AnalysisBase):
                                               self.load_one_error(ref_src, None)
                 print "  Loaded reference", typ, ref_key, ref_src, \
                                           type(self.feps_data[typ][ref_key])
-            for loc in ["tku", "tkd"]:
+            for loc in ["us", "ds"]:
                 if loc not in self.feps_data[typ]:
                     self.feps_data[typ][loc] = {}
                 for key in ["detector_systematics", "performance_systematics"]:

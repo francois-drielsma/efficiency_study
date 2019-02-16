@@ -24,8 +24,8 @@ def get_systematics_dir(emittance, suffix, absorber, analysis="amplitude"):
     return a_dir
 
 def get_systematics(emittance, name, analysis="amplitude"):
-    us_name = {"amplitude":"all_upstream", "density":"us"}[analysis]
-    ds_name = {"amplitude":"all_downstream", "density":"ds"}[analysis]
+    us_name = {"amplitude":"all_upstream", "fractional_emittance":"us", "density":"us"}[analysis]
+    ds_name = {"amplitude":"all_downstream", "fractional_emittance":"ds", "density":"ds"}[analysis]
     systematics = {
       "reco":{
         "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
@@ -108,6 +108,11 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
+
+	    "fractional_emittance_corrections":get_systematics_dir(emittance,\
+						"tku_base", "lH2_empty", "fractional_emittance"),
+	    "fractional_emittance_systematics":get_systematics(emittance,\
+						name, "fractional_emittance"),
 
             "density_mc":False,			# True if Monte Carlo data
     	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged
