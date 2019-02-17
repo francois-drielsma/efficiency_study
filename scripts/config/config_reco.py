@@ -113,6 +113,8 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
 						"tku_base", "lH2_empty", "fractional_emittance"),
 	    "fractional_emittance_systematics":get_systematics(emittance,\
 						name, "fractional_emittance"),
+	    "fractional_emittance_corrections_draw":True,
+	    "fractional_emittance_systematics_draw":True,
 
             "density_mc":False,			# True if Monte Carlo data
     	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged

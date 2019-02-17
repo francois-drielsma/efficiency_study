@@ -41,6 +41,12 @@ class FractionalAnalysis(AnalysisBase):
 	# Calculate corrections if required
         self.calculate_corrections = self.config_anal["fractional_emittance_corrections"] == None
 
+	# Initialize the systematics graphs if necessary
+	if self.config_anal["fractional_emittance_systematics_draw"]:
+	    self.syst_graphs = {}
+	    for typ in self.data_types:
+	    	self.syst_graphs[typ] = {}
+
     def birth(self):
         """
         Sets the output directory for the fractional emittance plots
@@ -86,14 +92,16 @@ class FractionalAnalysis(AnalysisBase):
 	# Draw the corrections in fractional_emittance/corrections
         if self.calculate_corrections:
 	    self.set_corrections()
-	self.draw_corrections()
+	if self.config_anal["fractional_emittance_corrections_draw"]:
+	    self.draw_corrections()
 
 	# Apply the corrections, evaluate the systematic uncertainties
-	# If requested, draw the systematics in density/systematics (TODO)
-#	self.corrections_and_uncertainties("reco")
-#        if self.config_anal["amplitude_mc"]:
-#            self.corrections_and_uncertainties("all_mc")
-#	self.draw_systematics()
+	# If requested, draw the systematics in fractional_emittance/systematics
+	self.corrections_and_uncertainties("reco")
+        if self.config_anal["amplitude_mc"]:
+            self.corrections_and_uncertainties("all_mc")
+	if self.config_anal["fractional_emittance_systematics_draw"]:
+	    self.draw_systematics()
 
 	# Draw the fractional emittance evolution graphs
         self.draw_evolution()
@@ -148,12 +156,12 @@ class FractionalAnalysis(AnalysisBase):
 
     def append_data(self):
         """
-        Add data to the density calculation (done at death time)
+        Add data to the amplitude calculation (done at death time)
         
-        If density_mc is false, we take 'tku' data from upstream_cut sample 
+        If amplitude_mc is false, we take 'tku' data from upstream_cut sample 
         and 'tkd' data from downstream_cut sample
         
-        If density_mc is true, then we build an additional samples
+        If amplitude_mc is true, then we build an additional samples
         1. all_mc is for MC truth of all events that should have been included 
            in the sample (some of which might have been missed by recon; some in
            recon sample maybe should have been excluded)
@@ -196,6 +204,7 @@ class FractionalAnalysis(AnalysisBase):
 
 	# Loop over the planes, get the quantiles
 	for typ in self.data_types:
+	    plane_id = 0
             for name, amps in self.amp_dict[typ].iteritems():
 	        # Initialize the quantile object
                 amp_values = amps.values()
@@ -218,10 +227,11 @@ class FractionalAnalysis(AnalysisBase):
                   'value':feps,
                   'stat_error':feps_stat,
 	          'syst_error':0.,
-	          'correction':1.,
 	          'corrected':feps_stat,
                   'z_pos':self.z_pos[name],
+		  'plane_id':plane_id
                 }
+		plane_id += 1
                 json.dumps(datum)
                 self.feps_data[typ]["quantiles"][name] = datum
 
@@ -251,6 +261,232 @@ class FractionalAnalysis(AnalysisBase):
 	    # Store it in the dictionary
 	    self.feps_data["correction"][loc] = corr
 
+    def corrections_and_uncertainties(self, typ):
+        """
+        Calculate corrected fractional emittance and uncertainties
+        * typ specifies the type of data (all_mc, reco)
+        * corrected quantile is given by A_alpha = c_alpha*A_alpha where c_alpha
+            is the correction factor for this specific quantile
+        * statistical errors are provided by the amplitude quantile calculator
+        * total errors are given by the sum in quadrature of statistical errors and
+          systematic errors
+        """
+	# Set the upstream statistical uncertainty to 0, if it is not an
+	# MC data set, as it corresponds to the measurement to which to compare 
+	# the downstream measurement.
+        data = self.feps_data[typ]
+        if not self.config_anal["amplitude_mc"] and typ == "reco":
+	    data["reco"]["quantiles"]["tku"]["stat_error"] = 0.
+
+	# Do the reco correction for each of the tracker locations
+	if typ == "reco":
+            for loc in ("tku", "tkd"):
+                print "Doing fractional emittance correction for", typ, loc
+	        source = self.feps_data
+                quantile_value = self.do_corrections(typ, loc, source)
+                data["quantiles"][loc]["corrected"] = quantile_value
+
+	# If the systematics graphs are requested, initialize a graph per systematic sample
+	if self.config_anal["fractional_emittance_systematics_draw"]:
+	    for loc in ("us", "ds"):
+	        for key in ["detector_systematics", "performance_systematics"]:
+		    for source in data[loc][key]:
+		        name = self.get_syst_name(source["source"])
+			npoints = len(data["quantiles"])
+		        self.syst_graphs[typ][name] = ROOT.TGraph(npoints)
+		        self.syst_graphs[typ][name].SetName(name)
+			for quantile in data["quantiles"].itervalues():
+			    self.syst_graphs[typ][name].SetPoint(\
+				quantile["plane_id"], quantile["z_pos"], 0.)
+
+	# Evaluate the systematic uncertainties for each of the measurement planes.
+	# For the all_mc sample, consider the influence of the performance
+	# systematics on all of the virtual planes (MC model uncertainty).
+        for plane, quantile in data["quantiles"].iteritems():
+            print "Finding fractional emittance systematic errors for", typ, plane
+            reco_syst = self.calculate_detector_systematics(typ, plane)
+            perf_syst = self.calculate_performance_systematics(typ, plane)
+            syst_error = (reco_syst**2+perf_syst**2)**0.5
+            quantile["syst_error"] = syst_error
+
+        self.feps_data[typ] = data
+
+    def do_corrections(self, typ, loc, source):
+        """
+        Applies the corrections to the requested quantile
+        * typ specifies the type of data (all_mc, reco_mc, reco)
+	* loc specifies the location of the tracker (tku, tkd)
+	* source specifies the source of the corrections to be used
+        """
+	quantile = source[typ]["quantiles"][loc]["value"]
+        corr = source["correction"][loc]
+	quantile *= corr
+	return quantile
+
+    def calculate_detector_systematics(self, typ, plane):
+        """
+        Calculate the systematic errors in the reconstruction of tracks. The uncertainty
+	on fractional corresponds to the sum in quadrature of the residuals between the reference
+	reconstruction set and the data sets that are shifted from the reference set
+        * typ specifies the type of data (all_mc, reco)
+	* plane specifies the name of the measurement plane
+        """
+	# If it is all_mc, nothing to do here as there is no reconstruction uncertainty
+	# If there is no reference specified, skip as there is no systematic uncertainty
+        syst_error = 0.
+        data = self.feps_data[typ]
+        if typ == "all_mc" or data["detector_reference"] == None:
+            return syst_error
+
+        print "\nEvaluating fractional emittance reconstruction systematic errors in", plane
+
+	# Correct the fractional emittance with the reference correction
+        source = data["detector_reference"]
+        ref_feps = self.do_corrections(typ, plane, source)
+
+	# Loop over the detector systematics list for each measurement plane
+	loc = {"tku":"us", "tkd":"ds"}[plane]
+        systematics_list = data[loc]["detector_systematics"]
+        for source in systematics_list:
+	    # Evaluate the levels with the corresponding systematic shift
+            syst_feps = self.do_corrections(typ, plane, source)
+
+	    # Add in quadrature an uncertainty that corresponds to the level shift due
+	    # to the use of a different set of corrections
+            scale = source["scale"]
+	    err = (syst_feps - ref_feps)*scale
+            syst_error = (syst_error**2+err**2)**0.5
+
+	    if self.config_anal["fractional_emittance_systematics_draw"]:
+		name = self.get_syst_name(source["source"])
+		quantile = data["quantiles"][plane]
+		val = err/ref_feps
+		self.syst_graphs[typ][name].GetY()[quantile["plane_id"]] = val
+
+        return syst_error
+
+    def calculate_performance_systematics(self, typ, plane):
+        """
+        Calculate the systematic errors in the channel performance. The experiment measures
+	ratios of downstream fractional emittance over upstream fractional emittance.
+	The uncertainty is evaluated as the shifts in the fractional emittance for
+	variable deviations from the expected cooling channel performance.
+        * typ specifies the type of data (all_mc, reco)
+	* plane specifies the name of the measurement plane
+        """
+	# If the plane is in TKU, nothing to do here as there is no performance uncertainty
+	# If there is no reference specified, skip as there is no systematic uncertainty
+	syst_error = 0.
+        data = self.feps_data[typ]
+	if "tku" in plane or data["performance_reference"] == None:
+            return syst_error
+
+        print "\nEvaluating fractional emittance performance systematic errors in", plane
+
+	# Get the reference ratio
+        source = data["performance_reference"]
+	quantiles = source[typ]["quantiles"]
+	ref_key = {"all_mc":"mc_virtual_tku_tp", "reco":"tku"}[typ]
+        ref_ratio = quantiles[plane]["value"]/quantiles[ref_key]["value"]
+
+	# Loop over the performance systematics list
+        systematics_list = data["ds"]["performance_systematics"]
+	ratio_error = 0.
+        for source in systematics_list:
+	    # Evaluate the ratio with the corresponding systematic shift
+	    quantiles = source[typ]["quantiles"]
+            syst_ratio = quantiles[plane]["value"]/quantiles[ref_key]["value"]
+
+	    # Add in quadrature an uncertainty that corresponds to the ratio shift due
+	    # to the use of a different cooling channel
+            scale = source["scale"]
+            err = (syst_ratio - ref_ratio)*scale
+            ratio_error = (ratio_error**2+err**2)**0.5
+
+	    if self.config_anal["fractional_emittance_systematics_draw"]:
+		name = self.get_syst_name(source["source"])
+		quantile = data["quantiles"][plane]
+		self.syst_graphs[typ][name].GetY()[quantile["plane_id"]] = err
+
+	# Convert the uncertainties in terms of fractional emittance
+        ref_feps = data["quantiles"][plane]["value"]
+        syst_error = ratio_error * ref_feps
+
+        return syst_error
+
+    def get_syst_name(self, path):
+	"""
+	Convert systematic path to a systematic name
+	"""
+	suffix = path.split("Systematics_",1)[1]
+	name = suffix.split("/")[0]
+	return name
+
+    def draw_systematics(self):
+        """
+        Draws the systematic errors. The uncertainty on each level corresponds to the 
+	residuals between the reference reconstruction set and the data sets that 
+	are shifted from the reference set
+        """
+	# Draw graphs that represent the deviations from the baseline
+	# One multigraph per data category
+        for typ in self.data_types:
+	    # Initialize the multigraph
+            title = "fractional_emittance_systematics_"+typ
+            canvas = xboa.common.make_root_canvas(title)
+	    mg = ROOT.TMultiGraph("mg_syst", ";z [m];Systematic residual")
+
+	    # Loop over the systematic graphs, add them to the multigraph and the legend
+	    leg = ROOT.TLegend(.6, .65, .8, .85)
+
+	    gid = 0
+	    for key, graph in self.syst_graphs[typ].iteritems():
+		graph.Sort()
+	        graph.SetLineColor(2+gid)
+	        graph.SetMarkerStyle(21+gid)
+		mg.Add(graph, "lp")
+		leg.AddEntry(graph, key, "lp")
+		gid += 1
+
+	    mg.Draw("A")
+	    leg.Draw("SAME")
+
+	    # Add an envelope (quadratic sum of all sources of uncertainty)
+	    graph_ref = self.syst_graphs[typ].itervalues().next()
+            npoints = graph_ref.GetN()
+            graph_upper = ROOT.TGraph(npoints)
+            graph_lower = ROOT.TGraph(npoints)
+	    graph_upper.SetLineWidth(2)
+	    graph_lower.SetLineWidth(2)
+	    graph_upper.SetMarkerStyle(20)
+	    graph_lower.SetMarkerStyle(20)
+	    names = []
+	    for i in range(npoints):
+	        quad_sum = 0.
+	        for graph in self.syst_graphs[typ].itervalues():
+	             quad_sum = (quad_sum**2 + graph.GetY()[i]**2)**0.5
+
+	        z = graph_ref.GetX()[i]
+	        graph_upper.SetPoint(i, z, quad_sum)
+	        graph_lower.SetPoint(i, z, -quad_sum)
+		names.append(graph.GetName())
+
+	    mg.Add(graph_upper, "lp")
+	    mg.Add(graph_lower, "lp")
+
+	    # Add labels to the top of the envelope (measurement plane tags)
+	    labels = {}
+	    for plane, quantile in self.feps_data[typ]["quantiles"].iteritems():
+		i = quantile["plane_id"]
+	        labels[plane] = ROOT.TLatex(graph_upper.GetX()[i], graph_upper.GetY()[i], "  "+plane)
+	        labels[plane].SetTextSize(0.025)
+	        labels[plane].SetTextAngle(90)
+		labels[plane].Draw("SAME")
+
+	    # Print the canvas
+            for fmt in ["root", "png", "pdf"]:
+                canvas.Print(self.plot_dir+"/systematics/"+title+"."+fmt)
+
     def draw_evolution(self):
         """
         Produce a plot that shows the evolution of the fractional emittance
@@ -263,16 +499,27 @@ class FractionalAnalysis(AnalysisBase):
 	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#epsilon_{%d}  [mm]" % int(1e2*self.fraction))
 
 	# Initialize the graphs
-	graphs = {}
+	graphs, graphs_tot = {}, {}
 	markers = {"all_mc":24, "reco":20}
 	colors = {"all_mc":4, "reco":1}
 	draw_options= {"all_mc":"ple3", "reco":"p"}
 	for typ in self.data_types:
+	    # Get the quantiles
 	    quantiles = self.feps_data[typ]["quantiles"]
+
+	    # Add a graph that contains only statistical uncertainties
             point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
                                 		for datum in quantiles.itervalues()]
             graphs[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
+	    graphs[typ].SetLineWidth(2)
 	    mg.Add(graphs[typ], draw_options[typ])
+
+	    # Add a graph that contains the full uncertainties (quadratic sum of stat. and syst.)
+            point_list = [(datum['z_pos'], datum['value'],\
+				(datum['stat_error']**2+datum['syst_error']**2)**0.5)\
+                                for datum in quantiles.itervalues()]
+            graphs_tot[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
+	    mg.Add(graphs_tot[typ], draw_options[typ])
 
 	# Initialize a legend
 	leg = ROOT.TLegend(.6, .65, .8, .85)
@@ -352,14 +599,24 @@ class FractionalAnalysis(AnalysisBase):
 	"""
 	Draw the correction factors used
 	"""
+	quantiles = self.feps_data["reco"]["quantiles"]
+	corr_list = self.feps_data["correction"]
+
         title = "fractional_emittance_corrections"
         canvas = xboa.common.make_root_canvas(title)
-	hist = ROOT.TH1F("hist_corr", ";;Correction factor", 2, 0, 1)
-	hist.SetBinContent(1, self.feps_data["correction"]["tku"])
-	hist.SetBinContent(2, self.feps_data["correction"]["tkd"])
-	hist.GetXaxis().SetBinLabel(1, "TKU")
-	hist.GetXaxis().SetBinLabel(2, "TKD")
-	hist.Draw()
+	graph = ROOT.TGraph(2)
+	graph.SetMarkerStyle(20)
+	graph.SetTitle(";z [m];Correction factor")
+	labels = {}
+	for i, loc in enumerate(["tku", "tkd"]):
+	    graph.SetPoint(i, quantiles[loc]["z_pos"]/1e3, corr_list[loc])
+	    labels[loc] = ROOT.TLatex(graph.GetX()[i], graph.GetY()[i], loc)
+	    labels[loc].SetTextSize(0.025)
+	    labels[loc].SetTextAngle(90)
+	
+	graph.Draw("APL")
+	for loc in quantiles.keys():
+	    labels[loc].Draw("SAME")
 
         for fmt in ["root", "png", "pdf"]:
             canvas.Print(self.plot_dir+"/corrections/"+title+"."+fmt)

@@ -77,6 +77,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
 
 	    "fractional_emittance_corrections":None,
 	    "fractional_emittance_systematics":{},
+	    "fractional_emittance_corrections_draw":True,
+	    "fractional_emittance_systematics_draw":True,
 
             "density_mc":True,			# True if pure Monte Carlo
     	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged

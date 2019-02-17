@@ -225,7 +225,7 @@ class DensityAnalysis(AnalysisBase):
         * corrected profiles is given by rho(alpha) = c(alpha)*i(alpha)*rho(alpha) where c(alpha)
             is the response function and i(alpha) is the inefficiency function
         * statistical errors are provided by the density estimator
-        * total errors are given by sum in quadrature of statistical errors and
+        * total errors are given by the sum in quadrature of statistical errors and
           systematic errors
         """
 	# Set the upstream statistical uncertainty to 0 as it is the given
@@ -296,7 +296,7 @@ class DensityAnalysis(AnalysisBase):
 
 	# Loop over the detector systematics list
         systematics_list = data[loc]["detector_systematics"]
-        for i, source in enumerate(systematics_list):
+        for source in systematics_list:
 	    # Evaluate the levels with the corresponding systematic shift
             syst_levels = self.do_corrections(typ, loc, source)
 
@@ -320,14 +320,6 @@ class DensityAnalysis(AnalysisBase):
 		    self.syst_graphs[typ][loc][name].SetPoint(j, alpha, val)
 
         return syst_error_list
-
-    def get_syst_name(self, path):
-	"""
-	Convert systematic path to a systematic name
-	"""
-	suffix = path.split("Systematics_",1)[1]
-	name = suffix.split("/")[0]
-	return name
 
     def calculate_performance_systematics(self, typ, loc):
         """
@@ -354,7 +346,7 @@ class DensityAnalysis(AnalysisBase):
 	# Loop over the performance systematics list
         systematics_list = data[loc]["performance_systematics"]
 	ratio_error_list = [0. for i in range(self.npoints)]
-        for i, source in enumerate(systematics_list):
+        for source in systematics_list:
 	    # Evaluate the ratio with the corresponding systematic shift
             syst_ratio = np.array(source[typ]["ds"]["levels"])/np.array(source[typ]["us"]["levels"])
 	    syst_ratio = syst_ratio.tolist()
@@ -382,18 +374,23 @@ class DensityAnalysis(AnalysisBase):
 
         return syst_error_list
 
+    def get_syst_name(self, path):
+	"""
+	Convert systematic path to a systematic name
+	"""
+	suffix = path.split("Systematics_",1)[1]
+	name = suffix.split("/")[0]
+	return name
+
     def draw_systematics(self):
         """
         Draws the systematic errors. The uncertainty on each level corresponds to the 
 	residuals between the reference reconstruction set and the data sets that 
 	are shifted from the reference set
-        * typ specifies the type of data (all_mc, reco_mc, reco)
-	* loc specifies the location of the tracker (us, ds)
         """
 	# Feed the systematics graphs to the drawer
         for typ in self.data_types:
 	    for loc in self.locations:
-		print typ, loc, len(self.syst_graphs[typ][loc])
 		if len(self.syst_graphs[typ][loc]):
 	    	    plotter = DensityPlotter(self.plot_dir, typ+"_"+loc)
 		    plotter.plot_systematics(self.syst_graphs[typ][loc])
