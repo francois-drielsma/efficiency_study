@@ -297,7 +297,7 @@ class FractionalAnalysis(AnalysisBase):
 		        self.syst_graphs[typ][name].SetName(name)
 			for quantile in data["quantiles"].itervalues():
 			    self.syst_graphs[typ][name].SetPoint(\
-				quantile["plane_id"], quantile["z_pos"], 0.)
+				quantile["plane_id"], quantile["z_pos"]/1e3, 0.)
 
 	# Evaluate the systematic uncertainties for each of the measurement planes.
 	# For the all_mc sample, consider the influence of the performance
