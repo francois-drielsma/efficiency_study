@@ -227,7 +227,7 @@ class FractionalAnalysis(AnalysisBase):
                   'value':feps,
                   'stat_error':feps_stat,
 	          'syst_error':0.,
-	          'corrected':feps_stat,
+	          'corrected':feps,
                   'z_pos':self.z_pos[name],
 		  'plane_id':plane_id
                 }
@@ -508,14 +508,14 @@ class FractionalAnalysis(AnalysisBase):
 	    quantiles = self.feps_data[typ]["quantiles"]
 
 	    # Add a graph that contains only statistical uncertainties
-            point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+            point_list = [(datum['z_pos'], datum['corrected'], datum['stat_error']) \
                                 		for datum in quantiles.itervalues()]
             graphs[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
 	    graphs[typ].SetLineWidth(2)
 	    mg.Add(graphs[typ], draw_options[typ])
 
 	    # Add a graph that contains the full uncertainties (quadratic sum of stat. and syst.)
-            point_list = [(datum['z_pos'], datum['value'],\
+            point_list = [(datum['z_pos'], datum['corrected'],\
 				(datum['stat_error']**2+datum['syst_error']**2)**0.5)\
                                 for datum in quantiles.itervalues()]
             graphs_tot[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
