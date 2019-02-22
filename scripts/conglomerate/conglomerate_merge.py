@@ -147,6 +147,8 @@ class ConglomerateMerge(object):
         else:
             canvas_name = options["canvas_name"]
         format_list = options["write_plots"]["formats"]
+        canvas_name = canvas_name.replace("*", "")
+        canvas_name = canvas_name.replace("?", "")
         for fmt in format_list:
             canvas.Print(target_dir+"/"+canvas_name+"."+fmt)
  

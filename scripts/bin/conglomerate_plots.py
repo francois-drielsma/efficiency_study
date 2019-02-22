@@ -169,18 +169,19 @@ class CompareFractionalEmittanceConfig(CompareConfig):
 
 
 def density_y_range(beam):
-    y_range = [1e-9, 109e-9]
+    y_range = [1, 109]
     if "4-140" in beam:
-        y_range = [1e-9, 109e-9]
+        y_range = [1, 109]
     elif "6-140" in beam:
-        y_range = [1e-9, 59e-9]
+        y_range = [1, 59]
     elif "10-140" in beam:
-        y_range = [1e-9, 24e-9]
+        y_range = [0, 24]
     return y_range
 
 
 def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
     output_dir = "compare_density/"
+    x_range = [0.01, 1.1]
     modifiers = {
         "merge_options":{
             "right_labels":top_labels, # intentionally transposed!
@@ -196,6 +197,7 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
         "mice_logo":False,
         "legend":False,
         "calculate_errors":[],
+        "rescale_x":x_range,
         "redraw":{
             "draw_option":["p", "p"],
             "fill_color":[0, 0],
@@ -204,16 +206,18 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
             "marker_style":None,
             "marker_color":[0, 0],
             "draw_order":[0, 1],
-            "x_range":None,
+            "x_range":x_range,
             "y_range":density_y_range(beam),
             "graph":{
-                    "draw_option":["", "L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
+                    "draw_option":["L 3", "L 3", "L 3", "L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
                     "marker_style":None,
                     "marker_color":None,
-                    "fill_color":[1, ROOT.kOrange+4, ROOT.kGreen+3],
-                    "fill_style":[1001, 1001, 1001],
-                    "transparency":[0, 0.5, 0.5],
-                    "draw_order":[0, 1, 2],
+                    "fill_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
+                    "line_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3],
+                    "line_width":[2, 2, 2, 2, 2],
+                    "fill_style":[1001, 1001, 1001, 1001, 1001],
+                    "transparency":[0, 0.5, 0.5, 0.5, 0.5],
+                    "draw_order":[0, 1, 2, 3, 4],
             },
             "ignore_more_histograms":False,
         },
@@ -264,7 +268,7 @@ class CompareDensityConfig(CompareConfig):
         output_dir = "compare_density/"
         self.setup(beam, target_dir, "density/", output_dir, dir_list)
         self.conglomerate_list = []
-        mods = density_recon_mod("density_profile_recon", beam, target_dir, top_labels, right_labels)
+        mods = density_recon_mod("density_profile_reco", beam, target_dir, top_labels, right_labels)
         self.conglomerate_list.append(
             self.get_conglomerate_0(modifiers = mods),
         )
@@ -894,7 +898,7 @@ def main_paper(batch_level = 0):
     config_list += [CompareAmplitudeConfigBoth,
                    CompareAmplitudeConfigMC,
                    CompareAmplitudeConfigData]
-    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
     my_dir_list = numpy.array(my_dir_list).transpose().tolist()
     config_list = [CompareFractionalEmittanceConfig, CompareDensityConfig]
     run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)

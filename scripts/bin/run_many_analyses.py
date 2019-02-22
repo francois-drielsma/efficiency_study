@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import time
+import utilities
 import utilities.run # check that the path is correct
 
 def run_analysis(jobs, cards_list, logs):

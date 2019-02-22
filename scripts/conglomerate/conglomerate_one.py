@@ -103,6 +103,7 @@ class ConglomerateOne(object):
         for key in a_list:
             old_canvas = key.ReadObj()
             target_name = self.options["canvas_name"].replace(" ", "_")
+            target_name = target_name.replace("*", "").replace("?", "")
             canvas_name = (old_canvas.GetName()).replace(" ", "_")
             if target_name in canvas_name:
                 return old_canvas
@@ -389,6 +390,8 @@ class ConglomerateOne(object):
                 "draw_order":None,
                 "fill_color":None,
                 "fill_style":None,
+                "line_color":None,
+                "line_width":None,
             }
         if graph_draw["draw_order"] == None:
             graph_draw["draw_order"] = range(len(graph_list))
@@ -405,6 +408,10 @@ class ConglomerateOne(object):
                 graph.SetMarkerColor(graph_draw["marker_color"][i])
             if graph_draw["fill_style"] != None:
                 graph.SetFillStyle(graph_draw["fill_style"][i])
+            if "line_color" in graph_draw and graph_draw["line_color"] != None:
+                graph.SetLineColor(graph_draw["line_color"][i])
+            if "line_width" in graph_draw and graph_draw["line_width"] != None:
+                graph.SetLineWidth(graph_draw["line_width"][i])
             if graph_draw["fill_color"] != None:
                 if graph_draw["transparency"] != None:
                     graph.SetFillColorAlpha(graph_draw["fill_color"][i],
@@ -491,6 +498,8 @@ class ConglomerateOne(object):
             name = str(canvas.GetName())
         print name, self.options["write_plots"]
         name = name.replace(" ", "_")
+        name = name.replace("*", "")
+        name = name.replace("?", "")
         name = name.replace(".",  "_")
         name = os.path.join(plot_dir, name)
         for fmt in formats:

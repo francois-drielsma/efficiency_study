@@ -21,76 +21,79 @@ def reco_file_names(run_number_list, maus, do_globals):
     print file_list
     return file_list
 
-def get_systematics_dir(emittance, suffix, absorber):
-    a_dir = "output/2017-02-7-Systematics-v3/plots_Simulated_2017-2.7_"+str(emittance)+\
-           "-140_"+absorber+"_Systematics_"+suffix+"/amplitude/amplitude.json"
+def get_systematics_dir(emittance, suffix, absorber, analysis):
+    a_dir = "output/2017-02-7-Systematics-v4/plots_Simulated_2017-2.7_"+str(emittance)+\
+           "-140_"+absorber+"_Systematics_"+suffix+"/"+analysis+"/"+analysis+".json"
     return a_dir
 
-def get_systematics(emittance, name):
+def get_systematics(emittance, analysis):
+    us_name = {"amplitude":"all_upstream", "density":"us"}[analysis]
+    ds_name = {"amplitude":"all_downstream", "density":"ds"}[analysis]
+
     systematics = {
       "all_mc":{
-        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full"),
-        "all_upstream":{
+        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
+        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full", analysis),
+        us_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{},
           "performance_systematics":{
-            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full", analysis):1.,
+            #get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full", analysis):1.,
             # disabled as this dupes the mc_beam_offset_plus
             #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full", analysis):1.,
           }
         }
       },
       "reco_mc":{
         "detector_reference":None,
         "performance_reference":None,
-        "all_upstream":{
+        us_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{},
           "performance_systematics":{}
         }
       },
       "reco":{
-        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full"),
-        "all_upstream":{
+        "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
+        "performance_reference":get_systematics_dir(emittance, "mc_base", "lH2_full", analysis),
+        us_name:{
           "detector_systematics":{
-            get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUE1_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUC_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUE2_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tku_density_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUE1_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUE2_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_density_plus", "lH2_empty", analysis):1.,
           },
           "performance_systematics":{}
         },
-        "all_downstream":{
+        ds_name:{
           "detector_systematics":{
-            get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDE1_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDE2_plus", "lH2_empty"):1.,
-            get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty"):1.,
+            get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDE1_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDE2_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty", analysis):1.,
           },
           "performance_systematics":{
-            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full"):1.,
+            get_systematics_dir(emittance, "mc_ssu_match_plus", "lH2_full", analysis):1.,
+            #get_systematics_dir(emittance, "mc_lh2_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_fc_plus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_beam_offset_plus", "lH2_full", analysis):1.,
             # disabled as this dupes the mc_beam_offset_plus
-            #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full"):1.,
-            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full"):1.,
+            #get_systematics_dir(emittance, "mc_beam_offset_minus", "lH2_full", analysis):1.,
+            get_systematics_dir(emittance, "mc_ssd_match_plus", "lH2_full", analysis):1.,
           }
         }
       },
@@ -135,8 +138,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
             "tku_fiducial_radius":150.,
             "tkd_fiducial_radius":150.,
-            "amplitude_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty"),
-            "amplitude_systematics":get_systematics(emittance, name),
+            "amplitude_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "amplitude"),
+            "amplitude_systematics":get_systematics(emittance, "amplitude"),
             "cov_fixed_us":None, #cov_us,
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
@@ -148,10 +151,22 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "weight_tof01_target":"output/2017-02_reco_weighting/plots_3-140-10069/tof01_weights",
             "weight_tof01_mode":"sample_using_distribution",
 
+            "fractional_emittance_corrections":None,
+            "fractional_emittance_systematics":{},
+
+            "density_mc":True,                  # True if Monte Carlo data
+            "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
+            "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
+            "density_systematics":get_systematics(emittance, "density"),
+            "density_corrections_draw":True,    # True if density correctoins are to be drawn
+            "density_systematics_draw":True,    # True if density systematics are to be drawn
+            "density_sections":False,           # True if density sections are to be printed
+
             "do_extrapolation":False,
             "do_magnet_alignment":False,
             "do_fractional_emittance":True,
             "do_amplitude":True,
+            "do_density":True,
             "do_efficiency":True,
             "do_globals":True,
             "do_mc":True,
@@ -160,7 +175,6 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "do_tof01_weighting":False,
             "do_optics":True,
             "do_data_recorder":False,
-            "do_density":True,
         }
 
 class Config(object):
@@ -305,7 +319,8 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fractions = [0.09, (1-0.91**2), (1-0.91**3), 0.5]
+    fractional_emittance_fraction = 0.09        # Fraction at which to evaluate the quantiles
+    fractional_emittance_uncertainty = 0        # 0: theoretical, 1: bootstrapped
 
     density_nthreads = 1
     density_knn_rotate = True # rotate to eigenvector system

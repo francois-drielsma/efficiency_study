@@ -75,21 +75,30 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
+            "fractional_emittance_corrections":None,
+            "fractional_emittance_systematics":{},
+
+            "density_mc":True,                  # True if pure Monte Carlo
+            "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
+            "density_corrections":None,         # Path to the correction file
+            "density_systematics":{},           # Density systematic uncertainty dictionary
+            "density_corrections_draw":True,    # True if density correctoins are to be drawn
+            "density_systematics_draw":True,    # True if density systematics are to be drawn
+            "density_sections":False,           # True if density sections are to be printed
+
             "do_magnet_alignment":False,
             "do_efficiency":True,
-            "do_fractional_emittance":False, #True,
-            "do_amplitude":False, #True,
-	    "do_density":False, #True,
+            "do_fractional_emittance":True,
+            "do_amplitude":True,
+            "do_density":True,
             "do_extrapolation":False,
-            "do_globals":False, #do_globals,
-            "do_mc":False, #True,
+            "do_globals":do_globals,
+            "do_mc":True,
             "do_plots":True,
-            "do_cuts_plots":False, #True,
+            "do_cuts_plots":True,
             "do_tof01_weighting":False,
             "do_optics":False,
             "do_data_recorder":False,
-            "do_density":False, #True,
-
         }
 
 class Config(object):
@@ -186,11 +195,11 @@ class Config(object):
     cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-Systematics-test"
+    data_dir = "output/2017-02-7-Systematics-v4"
     analyses = []
 
 
-    files = "00??"
+    files = "*"
     lih_systematics_list = [
       "mc_base", "mc_lih_plus"
     ]
@@ -287,7 +296,8 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fractions = [0.09, (1-0.91**2), (1-0.91**3), 0.5]
+    fractional_emittance_fraction = 0.09
+    fractional_emittance_uncertainty = 0
 
     density_nthreads = 1
     density_knn_rotate = True # rotate to eigenvector system

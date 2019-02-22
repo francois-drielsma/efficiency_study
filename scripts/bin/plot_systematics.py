@@ -185,7 +185,7 @@ class Hacking(object):
         y_min = -y_max
         if not zero:
             y_min = -y_max/10.
-        x_max *= 1.5
+        x_max *= 1.0
         if name in self.multigraph_axis_range:
             [y_min, y_max] = self.multigraph_axis_range[name]
  
@@ -282,13 +282,16 @@ class Hacking(object):
         "tku_density_plus":"TKU Density",
         "tku_pos_plus":"TKU Position",
         "tku_rot_plus":"TKU Rotation",
-        "tku_scale_SSUC_plus":"TKU Centre Coil",
+        "tku_full-p":"TKU Momentum Handling",
+        "tku_scale_SSUC_plus":"TKU Centre Coil pos",
+        "tku_scale_SSUC_neg":"TKU Centre Coil neg",
         "tku_scale_SSUE1_plus":"TKU End1 Coil",
         "tku_scale_SSUE2_plus":"TKU End2 Coil",
         "tkd_density_plus":"TKD Density",
         "tkd_pos_plus":"TKD Position",
         "tkd_rot_plus":"TKD Rotation",
-        "tkd_scale_SSDC_plus":"TKD Centre Coil",
+        "tkd_scale_SSDC_plus":"TKD Centre Coil pos",
+        "tkd_scale_SSDC_neg":"TKD Centre Coil neg",
         "tkd_scale_SSDE1_plus":"TKD End1 Coil",
         "tkd_scale_SSDE2_plus":"TKD End2 Coil",
 
@@ -463,7 +466,7 @@ def copy_more(input_dir, output_dir):
 
 def main():
     utilities.root_style.setup_gstyle()
-    sys_dir = "2017-02-7-Systematics-v3/"
+    sys_dir = "2017-02-7-Systematics-v4/"
     output_dir = "output/"+sys_dir+"recon_systematics_summary/"
     #do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
     #copy_more(sys_dir, output_dir)

@@ -25,10 +25,11 @@ class CompareCutsSystematicConfig(CompareConfig):
         self.beam = beam
         self.absorber = absorber
 
-    def set_dirs(self, data_src, mc_src, sys_src, output_target, dir_name):
+    def set_dirs(self, data_src, mc_src, sys_src, output_target, dir_name, anal_dir):
         self.data_src = data_src
         self.mc_src = mc_src
         self.sys_src = sys_src
+        self.analysis_dir = anal_dir
         self.output_target = output_target
         self.dir_name = dir_name
         self.output_dir = self.output_target+"/"+self.dir_name+"/"+self.beam+"_"+self.absorber+"/"
@@ -68,7 +69,7 @@ class CompareCutsSystematicConfig(CompareConfig):
             "file_name":self.plot,
             "canvas_name":self.plot,
             "normalise_hist":self.normalise,
-            "histogram_names":[self.hist+" us cut"],
+            "histogram_names":[self.hist],
             "mice_logo":False,
             "legend":False,
             "calculate_errors":[],
@@ -97,7 +98,7 @@ class CompareCutsSystematicConfig(CompareConfig):
             self.get_conglomerate_0(modifiers = modifiers),
         ]
         self.data_caption = [[],]
-        self.setup(self.beam, self.output_target, "data_plots/", self.dir_name, dir_list)
+        self.setup(self.beam, self.output_target, self.analysis_dir, self.dir_name, dir_list)
 
     labels = {
         "tku_p":"p at TKU Reference Plane [MeV/c]",
@@ -114,6 +115,7 @@ class CompareCutsSystematicConfig(CompareConfig):
         "tkd_px":"px at TKD Reference Plane [MeV/c]",
         "tkd_py":"py at TKD Reference Plane [MeV/c]",
         "tof01":"ToF_{01} [ns]",
+        "tkd_max_r*":"Max R in TKD [mm]",
     }
 
 def systematics_cut_summary():
@@ -157,32 +159,34 @@ class SystematicsConglomerate(object):
         ref = "tku_base"
         sys_list =  []
         for systematic in ["tku_base", "tku_scale_SSUE2_plus",
-                           ["tku_scale_SSUC_plus"],# "tku_scale_SSUC_neg"],
+                           ["tku_scale_SSUC_plus", "tku_scale_SSUC_neg"],
                            "tku_scale_SSUE1_plus", "tku_pos_plus", "tku_rot_plus",
-                           "tku_density_plus"
+                           "tku_density_plus", "tku_full-p",
                           ]:
             sys_list += [
-                (ref, systematic, sys_abs, "tof01", "tof01", [2., 6.], True),
-                (ref, systematic, sys_abs, "tku_p", "tku_p", [130., 150.], False),
-                (ref, systematic, sys_abs, "tku_x", "tku_x", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tku_y", "tku_y", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tku_px", "tku_px", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tku_py", "tku_py", [-100., 100.], False),
-                (ref, systematic, sys_abs, "chi2_tku", "chi2", [0., 5.], True),
-                (ref, systematic, sys_abs, "p_res", "p_res", [-25., 25.], True),
+                (ref, systematic, sys_abs, "tof01", "tof01 us cut",   [2., 6.],      True, "data_plots/"),
+                (ref, systematic, sys_abs, "tku_p", "tku_p us cut",   [130., 150.],  False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_x", "tku_x us cut",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_y", "tku_y us cut",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_px", "tku_px us cut", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_py", "tku_py us cut", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "chi2_tku", "chi2 us cut", [0., 5.],      True, "data_plots/"),
+                (ref, systematic, sys_abs, "p_res", "p_res us cut",   [-25., 25.],   True, "data_plots/"),
+                (ref, systematic, sys_abs, "tkd_max_r*", "tkd_max_r", [0., 200.], True,"cut_plots/"),
             ]
         for systematic in ["tku_base", "tkd_scale_SSDE2_plus", "tkd_scale_SSDC_plus",
-                           ["tkd_scale_SSUC_plus"],# "tkd_scale_SSDC_neg"],
+                           ["tkd_scale_SSDC_plus", "tkd_scale_SSDC_neg"],
                            "tkd_scale_SSDE1_plus", "tkd_pos_plus", "tkd_rot_plus",
                            "tkd_density_plus"]:
             sys_list += [
-                (ref, systematic, sys_abs, "chi2_tkd", "chi2", [0., 10.], True),
-                (ref, systematic, sys_abs, "p_res", "p_res", [-50., 50.], True),
-                (ref, systematic, sys_abs, "tkd_p", "tkd_p", [120., 160.], False),
-                (ref, systematic, sys_abs, "tkd_x", "tkd_x", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tkd_y", "tkd_y", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_px", "tkd_px", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_py", "tkd_py", [-100., 100.], False),
+                (ref, systematic, sys_abs, "chi2_tkd", "chi2 ds cut", [0., 10.],     True, "data_plots/"),
+                (ref, systematic, sys_abs, "p_res", "p_res ds cut",   [-50., 50.],   True, "data_plots/"),
+                (ref, systematic, sys_abs, "tkd_p", "tkd_p ds cut",   [120., 160.],  False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_x", "tkd_x ds cut",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_y", "tkd_y ds cut",   [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_px", "tkd_px ds cut", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_py", "tkd_py ds cut", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_max_r*", "tkd_max_r", [0., 200.], True,"cut_plots/"),
             ]
         self.run_systematics(dir_lists, sys_list)
 
@@ -194,20 +198,21 @@ class SystematicsConglomerate(object):
         for systematic in [["mc_beam_offset_plus", "mc_beam_offset_minus"],
                           "mc_base", 
                           "mc_fc_plus", "mc_ssu_match_plus", "mc_ssd_match_plus",
-                          "mc_lh2_plus"
+                          #"mc_lh2_plus"
                           ]:
             sys_list += [
-                (ref, systematic, sys_abs, "p_res", "p_res", [-10., 40.], True),
-                (ref, systematic, sys_abs, "tku_p", "tku_p", [130., 150.], False),
-                (ref, systematic, sys_abs, "tku_x", "tku_x", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tku_y", "tku_y", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tku_px", "tku_px", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tku_py", "tku_py", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_p", "tkd_p", [105., 145.], False),
-                (ref, systematic, sys_abs, "tkd_x", "tkd_x", [-150., 150.], False),
-                (ref, systematic, sys_abs, "tkd_y", "tkd_y", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_px", "tkd_px", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_py", "tkd_py", [-100., 100.], False),
+                (ref, systematic, sys_abs, "p_res", "p_res us cut",   [-10., 40.],   True, "data_plots/"),
+                (ref, systematic, sys_abs, "tku_p", "tku_p",   [130., 150.],  False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_x", "tku_x",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_y", "tku_y",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_px", "tku_px", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tku_py", "tku_py", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_p", "tkd_p",   [105., 145.],  False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_x", "tkd_x",   [-150., 150.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_y", "tkd_y",   [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_px", "tkd_px", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_py", "tkd_py", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_max_r*", "tkd_max_r", [0., 200.], True,"cut_plots/"),
             ]
         self.run_systematics(dir_lists, sys_list)
 
@@ -217,12 +222,12 @@ class SystematicsConglomerate(object):
         sys_list = []
         for systematic in ["mc_base", "mc_lih_plus"]:
             sys_list += [
-                (ref, systematic, "LiH", "p_res", "p_res", [-50., 50.], True),
-                (ref, systematic, sys_abs, "tkd_p", "tkd_p", [100., 160.], False),
-                (ref, systematic, sys_abs, "tkd_x", "tkd_x", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_y", "tkd_y", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_px", "tkd_px", [-100., 100.], False),
-                (ref, systematic, sys_abs, "tkd_py", "tkd_py", [-100., 100.], False),
+                (ref, systematic, "LiH",   "p_res",  "p_res",  [-50., 50.],   True, "data_plots/"),
+                (ref, systematic, sys_abs, "tkd_p",  "tkd_p",  [100., 160.],  False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_x",  "tkd_x",  [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_y",  "tkd_y",  [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_px", "tkd_px", [-100., 100.], False,"data_plots/"),
+                (ref, systematic, sys_abs, "tkd_py", "tkd_py", [-100., 100.], False,"data_plots/"),
             ]
         self.run_systematics(dir_lists, sys_list)
 
@@ -234,17 +239,19 @@ class SystematicsConglomerate(object):
             dir_list += sub_list
 
         first = True
-        for ref, systematic, sys_abs, fname, hist, x_range, normalise in sys_list:
+        for ref, systematic, sys_abs, fname, hist, x_range, normalise, anal_dir in sys_list:
             conglomerate_list = []
             for beam in dir_list:
                 [beam, absorber] = beam.split("140_")
                 beam += "140"
                 try:
                     config = CompareCutsSystematicConfig(beam, absorber, sys_abs, systematic, ref)
-                    config.set_dirs(self.target_dir, self.target_dir, self.sys_run, self.target_dir, self.dir_name)
+                    config.set_dirs(self.target_dir, self.target_dir, self.sys_run, 
+                                    self.target_dir, self.dir_name, anal_dir)
                     if first:
                         self.mkdirs(config.output_dir)
-                    config.set_hist_data(self.top_labels, self.right_labels, fname, hist, x_range, normalise)
+                    config.set_hist_data(self.top_labels, self.right_labels,
+                                         fname, hist, x_range, normalise)
                     config.finalise_setup()
                     cong = ConglomerateContainer(config)
                     cong.conglomerate()
@@ -273,20 +280,20 @@ def main():
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
     target_dir = "output/2017-02-7-v5/"
-    systematics_source_dir = "output/2017-02-7-Systematics-v3/"
+    systematics_source_dir = "output/2017-02-7-Systematics-v4/"
     top_labels = ["4-140", "6-140", "10-140"]
 
     dir_name = "compare_recon_systematics"
     lh2_empty_dir_list = [["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],]
     right_labels = ["Empty\nLH2",]
     sys_conglomerate = SystematicsConglomerate(top_labels, right_labels, target_dir, systematics_source_dir, dir_name)
-    #sys_conglomerate.lh2_empty(lh2_empty_dir_list)
+    sys_conglomerate.lh2_empty(lh2_empty_dir_list)
 
     dir_name = "compare_performance_systematics"
     lh2_full_dir_list = [["2017-2.7_4-140_lH2_full", "2017-2.7_6-140_lH2_full", "2017-2.7_10-140_lH2_full",],]
     right_labels = ["Full\nLH2",]
     sys_conglomerate = SystematicsConglomerate(top_labels, right_labels, target_dir, systematics_source_dir, dir_name)
-    sys_conglomerate.lh2_full(lh2_full_dir_list)
+    #sys_conglomerate.lh2_full(lh2_full_dir_list)
 
     lih_full_dir_list = [["2017-2.7_4-140_LiH", "2017-2.7_6-140_LiH", "2017-2.7_10-140_LiH",],]
     right_labels = ["LiH",] 

@@ -69,27 +69,28 @@ class kNNDensityEstimator(object):
 
         return self.norm*self.density(x)/self.scale
 
-    # Returns the density profile
+    # Returns the density profile as two arrays (values and stat errors)
     #  -npoints	Number of points contained in the graph (number of steps)
     #  -bsr	Use bootstrap resampling to evaluate uncertainties
     #  -bsr_n	Number of iterations of the bootstrap resampling
-    def profile(self, npoints=1000, bsr=False, bsr_n=10, scaling=1.):
+    def profile(self, npoints=1000, bsr=False, bsr_n=10):
+
+	# Set the levels of the training set if they have not been set yet
 	if not len(self.levels):
 	    self.set_levels()
 
-	profile = ROOT.TGraphErrors(npoints)
-        profile.SetTitle(";Fraction #alpha;#rho_{#alpha}")
-	profile.GetYaxis().SetTitleOffset(1)
-
+	# Use the requested uncertainty calculation, produce profiles
+	values, errors = [0. for i in range(npoints)], [0. for i in range(npoints)]
         if not bsr:
 	    # Take the quantiles as the estimate, the Gaussian error as the uncertainty
 	    for i in range(npoints):
-	        alpha = (float(i+1)/(npoints+1))
+	    	alpha = (float(i+1)/(npoints+1))
 		level = 0.
 		if alpha < self.norm:
 	    	    level = np.quantile(self.levels, 1.-alpha/self.norm)
-	    	profile.SetPoint(i, alpha, level*scaling)
-	    	profile.SetPointError(i, 0., level*self.level_uncertainty(alpha)*scaling)
+
+	    	values[i] = level
+	    	errors[i] = level*self.level_uncertainty(alpha)
 	else:
 	    # Bootstrap the data, evaluate the profiles for each new sample
 	    baseline = self.data
@@ -115,17 +116,36 @@ class kNNDensityEstimator(object):
 
 	    # Take the mean as the estimate, the rms as the uncertainty
 	    for i in range(npoints):
-		alpha = (float(i+1)/(npoints+1))
-		level = np.mean(levels[i])
-		rms = np.std(levels[i])
-		profile.SetPoint(i, alpha, level)
-		profile.SetPointError(i, 0., rms)
+		values[i] = np.mean(levels[i])
+		errors[i] = np.std(levels[i])
 
 	    # Reset the data
 	    self.__init__(baseline, self.rotate, self.nthreads, self.norm)
 	    self.levels = baseline_levels
 
-        return profile
+	# Return
+        return values, errors
+
+    # Returns the density profile as a graph
+    #  -npoints	Number of points contained in the graph (number of steps)
+    #  -bsr	Use bootstrap resampling to evaluate uncertainties
+    #  -bsr_n	Number of iterations of the bootstrap resampling
+    def profile_graph(self, npoints=1000, bsr=False, bsr_n=10):
+
+	# Initialize the graph
+	profile = ROOT.TGraphErrors(npoints)
+        profile.SetTitle(";Fraction #alpha;#rho_{#alpha}")
+	profile.GetYaxis().SetTitleOffset(1)
+
+	# Set the points
+	values, errors = self.profile(npoints, bsr, bsr_n)
+	for i in range(npoints):
+	    alpha = (float(i+1)/(npoints+1))
+	    profile.SetPoint(i, alpha, values[i])
+	    profile.SetPointError(i, 0., errors[i])
+
+	# Return
+	return profile
 
     # Returns a lower dimensional section of the space at x
     #  -axes	List of axes ids to produce a Poincare section of
@@ -217,7 +237,7 @@ class kNNDensityEstimator(object):
 	# Single-threaded approach
 	if self.nthreads == 1:
 	    for i in range(self.n):
-	        self.set_level(i)
+	        set_level(i)
 
 	# Multi-threaded approach
 	else:
