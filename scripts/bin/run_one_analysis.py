@@ -151,7 +151,7 @@ class Analyser(object):
             self.analysis_list.append(mice_analysis.fractional_analysis.FractionalAnalysis(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_density"]:
             print "Doing kNN density estimation"
-	    self.analysis_list.append(mice_analysis.density_analysis.DensityAnalysis(self.config, self.config_anal, self.data_loader))
+            self.analysis_list.append(mice_analysis.density_analysis.DensityAnalysis(self.config, self.config_anal, self.data_loader))
         if self.config_anal["do_data_recorder"]:
             print "Doing data recorder"
             self.analysis_list.append(mice_analysis.data_recorder.DataRecorder(self.config, self.config_anal, self.data_loader))

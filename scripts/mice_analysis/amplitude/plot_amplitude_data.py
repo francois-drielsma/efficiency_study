@@ -22,7 +22,7 @@ class PlotAmplitudeData(object):
         for i in range(4):
             for j in range(i+1, 4):
                 self.plot_phase_space(i, j)
-		self.plot_phase_space_scatter(i, j)
+                self.plot_phase_space_scatter(i, j)
 
     def plot_data_1d(self, plot_name, plot_lambda_x, x_label, plot_lambda_y, y_label):
         if len(self.data.state_list) == 0:
@@ -82,64 +82,64 @@ class PlotAmplitudeData(object):
             canvas.Print(self.plot_dir+"/phase_space/"+title+"."+fmt)
 
     def plot_phase_space_scatter(self, x_var, y_var):
-	# Initialize the canvas
+        # Initialize the canvas
         x_label = self.psv_labels[x_var]
         y_label = self.psv_labels[y_var]
         title = "amplitude_phase_space_scatter_"+\
-		self.key+"_"+self.psv_names[x_var]+"_"+self.psv_names[y_var]
+                self.key+"_"+self.psv_names[x_var]+"_"+self.psv_names[y_var]
         canvas = xboa.common.make_root_canvas(title)
 
-	# Fill the data
+        # Fill the data
         data = []
         for sample in range(2):
             for a_bin in range(21):
                 for run, spill, evt, psv, amp in self.data.retrieve(a_bin, sample):
                     data.append([psv[x_var], psv[y_var], amp])
 
-	# Sort by descending order of amplitude (low amplitude points drawn last)
-	data.sort(key=lambda el: el[2], reverse=True)
+        # Sort by descending order of amplitude (low amplitude points drawn last)
+        data.sort(key=lambda el: el[2], reverse=True)
 
-	# Initalize and draw the graph
-	x_data = [el[0] for el in data]
-	y_data = [el[1] for el in data]
-	amps = [el[2] for el in data]
+        # Initalize and draw the graph
+        x_data = [el[0] for el in data]
+        y_data = [el[1] for el in data]
+        amps = [el[2] for el in data]
         graph = ROOT.TGraph2D(len(x_data), array('d', x_data), array('d', y_data), array('d', amps))
-	graph.SetTitle(";;;A_{#perp}  [mm]")
+        graph.SetTitle(";;;A_{#perp}  [mm]")
         graph.Draw("PCOLZ")
 
-	# Set the view right (from above), set the style
-	ROOT.gPad.SetTheta(90);
-	ROOT.gPad.SetPhi(0);
+        # Set the view right (from above), set the style
+        ROOT.gPad.SetTheta(90);
+        ROOT.gPad.SetPhi(0);
 
-	graph.SetMarkerStyle(20);
-	graph.SetMarkerSize(1);
+        graph.SetMarkerStyle(20);
+        graph.SetMarkerSize(1);
 
-	# Remove default x and y axes, replace them by correctly placed TGaxis
-	graph.GetXaxis().SetTitleOffset(999);
-	graph.GetXaxis().SetLabelOffset(999);
-	graph.GetXaxis().SetTickSize(0);
+        # Remove default x and y axes, replace them by correctly placed TGaxis
+        graph.GetXaxis().SetTitleOffset(999);
+        graph.GetXaxis().SetLabelOffset(999);
+        graph.GetXaxis().SetTickSize(0);
 
-	graph.GetYaxis().SetTitleOffset(999);
-	graph.GetYaxis().SetLabelOffset(999);
-	graph.GetYaxis().SetTickSize(0);
+        graph.GetYaxis().SetTitleOffset(999);
+        graph.GetYaxis().SetLabelOffset(999);
+        graph.GetYaxis().SetTickSize(0);
 
-	wmin = graph.GetXaxis().GetXmin();
-	wmax = graph.GetXaxis().GetXmax();
-	xaxis = ROOT.TGaxis(-.5775, -.5775, .5775, -.5775, wmin, wmax, 505);
+        wmin = graph.GetXaxis().GetXmin();
+        wmax = graph.GetXaxis().GetXmax();
+        xaxis = ROOT.TGaxis(-.5775, -.5775, .5775, -.5775, wmin, wmax, 505);
         xaxis.SetTitle(x_label)
-	xaxis.SetLabelFont(42);
-	xaxis.SetTextFont(42);
-	xaxis.Draw("SAME")
+        xaxis.SetLabelFont(42);
+        xaxis.SetTextFont(42);
+        xaxis.Draw("SAME")
 
-	wmin = graph.GetYaxis().GetXmin();
-	wmax = graph.GetYaxis().GetXmax();
-	yaxis = ROOT.TGaxis(-.5775, -.5775, -.5775, .5775, wmin, wmax, 505);
+        wmin = graph.GetYaxis().GetXmin();
+        wmax = graph.GetYaxis().GetXmax();
+        yaxis = ROOT.TGaxis(-.5775, -.5775, -.5775, .5775, wmin, wmax, 505);
         yaxis.SetTitle(y_label)
-	yaxis.SetLabelFont(42);
-	yaxis.SetTextFont(42);
-	yaxis.Draw("SAME")
+        yaxis.SetLabelFont(42);
+        yaxis.SetTextFont(42);
+        yaxis.Draw("SAME")
 
-	# Output
+        # Output
         for fmt in ["root", "png", "pdf"]:
             canvas.Print(self.plot_dir+"/phase_space/"+title+"."+fmt)
 

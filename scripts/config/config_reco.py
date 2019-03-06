@@ -109,20 +109,20 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
-	    "fractional_emittance_corrections":get_systematics_dir(emittance,\
-						"tku_base", "lH2_empty", "fractional_emittance"),
-	    "fractional_emittance_systematics":get_systematics(emittance,\
-						name, "fractional_emittance"),
-	    "fractional_emittance_corrections_draw":True,
-	    "fractional_emittance_systematics_draw":True,
+            "fractional_emittance_corrections":get_systematics_dir(emittance,\
+                                                "tku_base", "lH2_empty", "fractional_emittance"),
+            "fractional_emittance_systematics":get_systematics(emittance,\
+                                                name, "fractional_emittance"),
+            "fractional_emittance_corrections_draw":True,
+            "fractional_emittance_systematics_draw":True,
 
-            "density_mc":False,			# True if Monte Carlo data
-    	    "density_corrections_cutoff":.5,	# Cutoff above which correction is averaged
+            "density_mc":False,                 # True if Monte Carlo data
+            "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
             "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
             "density_systematics":get_systematics(emittance, name, "density"),
-            "density_corrections_draw":True,	# True if density correctoins are to be drawn
-            "density_systematics_draw":True,	# True if density systematics are to be drawn
-            "density_sections":False,		# True if density sections are to be printed
+            "density_corrections_draw":True,    # True if density correctoins are to be drawn
+            "density_systematics_draw":True,    # True if density systematics are to be drawn
+            "density_sections":False,           # True if density sections are to be printed
 
             "do_mc":False,
             "do_magnet_alignment":False,
@@ -277,13 +277,13 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fraction = 0.09	# Fraction at which to evaluate the quantiles
-    fractional_emittance_uncertainty = 0	# 0: theoretical, 1: bootstrapped
+    fractional_emittance_fraction = 0.09        # Fraction at which to evaluate the quantiles
+    fractional_emittance_uncertainty = 0        # 0: theoretical, 1: bootstrapped
 
-    density_nthreads = 2	# Number of threads used by the density estimator
-    density_knn_rotate = True	# Use the metric of the covariance matrix
-    density_uncertainty = 0	# 0: theoretical, 1: bootstrapped
-    density_npoints = 1000	# Number of points in the density profiles
+    density_nthreads = 2        # Number of threads used by the density estimator
+    density_knn_rotate = True   # Use the metric of the covariance matrix
+    density_uncertainty = 0     # 0: theoretical, 1: bootstrapped
+    density_npoints = 1000      # Number of points in the density profiles
 
     magnet_alignment = {
         "n_events":10,
