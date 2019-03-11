@@ -8,6 +8,11 @@ from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
 from mice_analysis.fractional_emittance.amplitude_quantile import AmplitudeQuantile
 from mice_analysis.analysis_base import AnalysisBase
 
+#BUG?
+#I dont understand how the corrections are supposed to work. It looks like config
+#fractional_emittance_corrections holds both boolean flag to calculate corrections
+#and string file name for location from which to load corrections; which is it?
+
 class FractionalAnalysis(AnalysisBase):
 
     def __init__(self, config, config_anal, data_loader):
@@ -38,7 +43,7 @@ class FractionalAnalysis(AnalysisBase):
         self.dict_list = []
 
 	# Calculate corrections if required
-        self.calculate_corrections = self.config_anal["fractional_emittance_corrections"] == None
+        self.calculate_corrections = self.config_anal["fractional_emittance_mc"]
 
     def birth(self):
         """
@@ -255,7 +260,9 @@ class FractionalAnalysis(AnalysisBase):
 	# Initialize the canvas and the TMultiGraph
         canvas_name = 'fractional_emittance'
         canvas = self.get_plot(canvas_name)["pad"]
-	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#epsilon_{%d}  [mm]" % int(1e2*self.fraction))
+	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#varepsilon_{%d}  [mm]" % int(1e2*self.fraction))
+        # Initialize a legend
+        leg = ROOT.TLegend(.6, .65, .8, .85)
 
 	# Initialize the reco graph
 	quantiles = self.feps_data["amplitude_quantiles"]
@@ -263,20 +270,20 @@ class FractionalAnalysis(AnalysisBase):
         name = "reco"
         point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
                                 for key, datum in quantiles.iteritems() if reco_predicate(key)]
+        print "Reco keys      ", quantiles.keys()
+        print "Reco point list", point_list
         reco_graph = self.make_graph(point_list, 1, 20, name)
 	mg.Add(reco_graph, "p")
+        leg.AddEntry(reco_graph, reco_graph.GetName(), "p")
 
 	# Initialize the MC truth graph
         name = "all_mc"
         point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
                                 for key, datum in quantiles.iteritems() if not reco_predicate(key)]
-        mc_graph = self.make_graph(point_list, 4, 24, name)
-	mg.Add(mc_graph, "ple3")
-
-	# Initialize a legend
-	leg = ROOT.TLegend(.6, .65, .8, .85)
-	leg.AddEntry(reco_graph, reco_graph.GetName(), "p")
-	leg.AddEntry(mc_graph, mc_graph.GetName(), "plf")
+        if len(point_list):
+            mc_graph = self.make_graph(point_list, 4, 24, name)
+            mg.Add(mc_graph, "ple3")
+            leg.AddEntry(mc_graph, mc_graph.GetName(), "plf")
 
 	# Draw
 	mg.Draw("A")
@@ -377,10 +384,11 @@ class FractionalAnalysis(AnalysisBase):
                                               self.load_one_error(ref_src, None)
                 print "  Loaded reference", typ, ref_key, ref_src, \
                                           type(self.feps_data[typ][ref_key])
-            for loc in ["tku", "tkd"]:
+            for loc in ["us", "ds"]:
                 if loc not in self.feps_data[typ]:
                     self.feps_data[typ][loc] = {}
                 for key in ["detector_systematics", "performance_systematics"]:
+                    print typ, loc, key, systematics[typ].keys()
                     err_src_dict = systematics[typ][loc][key]
                     self.feps_data[typ][loc][key] = [
                         self.load_one_error(err_src, scale) \
@@ -393,6 +401,8 @@ class FractionalAnalysis(AnalysisBase):
         Load the frational emittance corrections to be applied during this 
         fractional emittance analysis. Loads the correction factors
         """
+        if file_name == None:
+            return
         fin = open(file_name)
         feps_str = fin.read()
         src_feps = json.loads(feps_str)

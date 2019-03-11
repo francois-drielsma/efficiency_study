@@ -6,10 +6,12 @@ class ExtractCoolingStats(object):
         self.table = []
         self.rows = []
         self.headings = []
+        self.target_bin = None
       
-    def extract(self, source_glob):
+    def extract(self, source_glob, target_bin):
+        self.target_bin = target_bin
         self.source_glob = source_glob
-        return self.load_json()
+        self.load_json()
 
     def load_json(self):
         #print "Loading from", self.source_glob
@@ -24,19 +26,24 @@ class ExtractCoolingStats(object):
             job_name = job_name.ljust(26)
             print job_name,
             data = json.loads(open(fname).read())
-            return self.find_significance(data)
+            self.find_significance(data)
 
     def find_significance(self, data):
         cdf_list = data['reco']['ratio']['corrected_cdf']
         cdf_stats_errors = data['reco']['ratio']['cdf_stats_errors']
         cdf_sys_errors = data['reco']['ratio']['cdf_sys_errors']
-        cdf_sum_errors = []
+        cdf_sum_errors = [None]*len(cdf_list)
         max_sig = -1000.
-        for i, cdf in enumerate(cdf_list):
+        if self.target_bin != None:
+            test_list = [self.target_bin]
+        else:
+            test_list = range(len(cdf_list))
+        for i in test_list:
+            cdf = cdf_list[i]
             cdf_stats = cdf_stats_errors[i]
             cdf_sys = cdf_sys_errors[i]
             cdf_err = (cdf_stats**2+cdf_sys**2)**0.5
-            cdf_sum_errors.append(cdf_err)
+            cdf_sum_errors[i] = cdf_err
             sig = (cdf-1.)/cdf_err
             if sig > max_sig:
                 max_sig = sig
@@ -59,7 +66,7 @@ class ExtractCoolingStats(object):
         for i, row in enumerate(self.table):
             print self.name_lookup[self.rows[i]].ljust(10),
             for cell in row:
-                print "&", format(cell[0], "8.4g"), "$\pm$", format(cell[1], "8.2g"), "$\pm$", format(cell[2], "8.2g"),
+                print "&", format(cell[0], "8.4g"), "$\pm$", format(cell[1], "8.1g"), "$\pm$", format(cell[2], "8.1g"),
             print "\\\\"
         print self.table_footer
 
@@ -82,19 +89,19 @@ class ExtractCoolingStats(object):
 
 
 def main():
+    prefix = "output/2017-02-7-v6/"
     stats = ExtractCoolingStats()
-    headings = []
     stats.rows = ["None", "lH2_empty", "lH2_full", "LiH",]
-    stats.headings = ["4-140", "6-140", "10-140"]
+    bin_headings = [(0, "4-140"), (0, "6-140"), (0, "10-140")]
+    stats.headings = [head[1] for head in bin_headings]
     table = []
     for absorber in stats.rows:
         stats.new_row()
-        for emittance in stats.headings:
+        for bin_n, emittance in bin_headings:
             for real in ["_"]:
-                prefix = "output/2017-02-7-v4/"
                 suffix = "/amplitude/amplitude.json"
                 a_glob = prefix+"plots"+real+"2017-2.7_"+emittance+"*"+absorber+"*"+suffix
-                stats.extract(a_glob)
+                stats.extract(a_glob, bin_n)
     stats.print_table()
 
 if __name__ == "__main__":

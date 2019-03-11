@@ -333,8 +333,6 @@ class ConglomerateOne(object):
 
     def redraw(self, canvas, hist_list, graph_list):
         redraw = self.options["redraw"]
-        draw_option = ["" for hist in hist_list]
-        draw_order = [i for i, hist in enumerate(hist_list)]
         if not redraw:
             return
         #### hist

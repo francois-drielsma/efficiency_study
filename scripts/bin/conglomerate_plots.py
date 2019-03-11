@@ -1,6 +1,7 @@
 import copy
 import sys
 import shutil
+import json
 
 import ROOT
 import numpy
@@ -96,10 +97,10 @@ def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, ri
         },
         "hist_title":"",
         "file_name":"fractional_emittance",
-        "canvas_name":"fractional_amplitude",
+        "canvas_name":"fractional_emittance",
         "normalise_hist":False,
-        "histogram_names":["fractional_amplitude"],
-        "graph_names":["Reco "+str(fraction), "MC "+str(fraction)],
+        "histogram_names":[],
+        "graph_names":["mg_feps", "reco", "all_mc"], #"Reco "+str(fraction), "MC "+str(fraction)],
         "mice_logo":False,
         "legend":False,
         "calculate_errors":[],
@@ -114,13 +115,14 @@ def fractional_emittance_mod(fraction, y_range, beam, target_dir, top_labels, ri
             "x_range":[15010, 18990],
             "y_range":y_range,
             "graph":{
-                    "draw_option":["P", "P", "P", "P L"], # reco, extrap reco, reco mc, mc truth
-                    "marker_style":[20, 1, 21, 25],
-                    "marker_color":[1, 0, 4, 4],
-                    "fill_color":None,
+                    "draw_option":["P", "P", "P", "P", "P"], # reco, extrap reco, reco mc, mc truth
+                    "marker_style":[1, 20, 1, 21, 25],
+                    "marker_color":[1, 1, ROOT.kRed, ROOT.kRed, ROOT.kRed],
+                    "line_color":[1, 1, ROOT.kRed, ROOT.kRed, ROOT.kRed],
+                    "fill_color":[1, 1, ROOT.kRed, ROOT.kRed, ROOT.kRed],
                     "fill_style":None,
                     "transparency":None,
-                    "draw_order":[1, 3, 2, 0],
+                    "draw_order":[0, 2, 4, 3, 1],
             },
             "ignore_more_histograms":False,
         },
@@ -159,7 +161,7 @@ class CompareFractionalEmittanceConfig(CompareConfig):
         output_dir = "compare_fractional_emittance/"
         self.setup(beam, target_dir, "fractional_emittance/", output_dir, dir_list)
         self.conglomerate_list = []
-        for frac in [9.0, 50.0]:
+        for frac in [9.0]:
             y_range = frac_y_range(frac, beam)
             mods = fractional_emittance_mod(frac, y_range, beam, target_dir, top_labels, right_labels)
             self.conglomerate_list.append(
@@ -193,19 +195,19 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
         "canvas_name":name,
         "normalise_hist":False,
         "histogram_names":[name],
-        "graph_names":[name],
+        "graph_names":[name, "Graph"],
         "mice_logo":False,
         "legend":False,
         "calculate_errors":[],
         "rescale_x":x_range,
-        "redraw":{
-            "draw_option":["p", "p"],
-            "fill_color":[0, 0],
+        "redraw":{ 
+            "draw_option":["p"],
+            "fill_color":[0],
             "transparency":None,
-            "line_color":[0, 0],
+            "line_color":[0],
             "marker_style":None,
-            "marker_color":[0, 0],
-            "draw_order":[0, 1],
+            "marker_color":[0],
+            "draw_order":[0],
             "x_range":x_range,
             "y_range":density_y_range(beam),
             "graph":{
@@ -257,7 +259,6 @@ def density_ratio_mod(name, beam, target_dir, top_labels, right_labels):
         "defit":False,
     }
     return modifiers
-
 
 class CompareDensityConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
@@ -792,8 +793,8 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
             "redraw":{
                 "graph":{
                     "fill_style":[1001, 1001, 1001, 1001],
-                    "fill_color":[ROOT.kBlack, ROOT.kBlack, ROOT.kRed, ROOT.kRed],
-                    "transparency":[0.5, 0.3, 0.5, 0.5],
+                    "fill_color":[ROOT.kBlue, ROOT.kBlue, ROOT.kRed, ROOT.kRed],
+                    "transparency":[0.5, 0.5, 0.2, 0.2],
                 }
             },
             "rescale_x":amplitude_x_range(beam),
@@ -805,14 +806,14 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                                         "pdf_ratio", ["PDF Ratio stats_hist"],
                                         ["PDF_Ratio stats", "PDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.01, 1.49], replace_hist = True,
                                         graph_draw_option = ["p", "3", "p", "3"], graph_marker_style=[20, 20, 22, 22], 
-                                        graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
+                                        graph_marker_color=[1, 1, ROOT.kRed-7, ROOT.kRed-7], graph_draw_order=[3, 1, 2, 0,], 
                                         modifiers=ratio_modifiers),
             self.get_conglomerate_graph("cdf_ratio*", "Amplitude [mm]",
                                         "R_{Amp}",
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
                                         ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.601, 1.399], replace_hist = True,
                                         graph_draw_option = ["p", "3", "p", "3"], graph_marker_style=[20, 20, 22, 22], 
-                                        graph_marker_color=[1, 1, ROOT.kRed, ROOT.kRed], graph_draw_order=[3, 2, 1, 0,], 
+                                        graph_marker_color=[1, 1, ROOT.kRed-7, ROOT.kRed-7], graph_draw_order=[3, 1, 2, 0,], 
                                         modifiers=ratio_modifiers),
         ]
 
@@ -864,6 +865,9 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         except Exception:
             sys.excepthook(*sys.exc_info())
         fail_dict[ConfigClass.__name__] = fail_list
+    return fail_dict
+
+def print_fail_dict(fail_dict):
     print "Failed:"
     for key in fail_dict:
         print "    ", key, "had", len(fail_dict[key]), "fails"
@@ -875,9 +879,10 @@ def main_paper(batch_level = 0):
     Main program; 
     - batch_level tells how much output for ROOT: batch_level 0 is silent, 10 is most verbose
     """
+    fd_1, fd_2 = {}, {}
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-v5/"
+    target_dir = "output/2017-02-7-v7/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
@@ -895,13 +900,16 @@ def main_paper(batch_level = 0):
                    CompareOpticsConfig, CompareOpticsMCConfig,
                    CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,]
-    config_list += [CompareAmplitudeConfigBoth,
-                   CompareAmplitudeConfigMC,
-                   CompareAmplitudeConfigData]
-    #run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    config_list = [CompareAmplitudeConfigBoth,
+                   #CompareAmplitudeConfigMC,
+                   CompareAmplitudeConfigData
+                   ]
+    fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
     my_dir_list = numpy.array(my_dir_list).transpose().tolist()
-    config_list = [CompareFractionalEmittanceConfig, CompareDensityConfig]
-    run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    config_list = [CompareFractionalEmittanceConfig,] #CompareDensityConfig] #
+    #fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    print_fail_dict(fd_1)
+    print_fail_dict(fd_2)
 
 
 if __name__ == "__main__":

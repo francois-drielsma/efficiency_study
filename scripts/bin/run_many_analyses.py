@@ -39,7 +39,7 @@ def main_reco_analysis():
     run_analysis(job_list, cards_list, logs)
         
 def main_systematics_analysis():
-    job_list = range(140)
+    job_list = range(1, 2)
     cards_list = ["scripts/config/config_mc_systematics.py",] #
     logs = 'logs/systematics-logs'
     run_analysis(job_list, cards_list, logs)

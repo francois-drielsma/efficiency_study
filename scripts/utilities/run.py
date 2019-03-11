@@ -5,6 +5,7 @@ import subprocess
 import time
 import os
 import shutil
+import sys
 
 class Run(object):
     def __init__(self, config):
@@ -25,7 +26,6 @@ class Run(object):
         except OSError:
             pass
         os.makedirs(self.logs+"/sbatch")
-        
 
     def run_many(self):
         print 'Running', len(self.jobs), 'jobs with cards', self.prefix,
@@ -39,9 +39,10 @@ class Run(object):
 
         self.processes = []
         while len(self.processes) > 0 or len(job_list) > 0:
-            print round(timer/60., 1), '    ',
+            print '\r', round(timer/60., 1), '    ',
             self.poll()
-            print len(self.processes)
+            print len(self.processes),
+            sys.stdout.flush()
             while len(self.processes) < self.n_procs and len(job_list) > 0:
                 job = job_list.pop(0)
                 for cards in self.prefix:
