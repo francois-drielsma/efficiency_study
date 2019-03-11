@@ -261,7 +261,7 @@ class DensityAnalysis(AnalysisBase):
         * source specifies the source of the corrections to be used
         * Use capped corrections if use_capped is True
         """
-        levels = np.array(source[typ][loc]["levels"])
+        levels = np.array(self.density_data[typ][loc]["levels"])
         corr_key = "level_ratio"
         if use_capped:
             corr_key = "level_ratio_capped"
