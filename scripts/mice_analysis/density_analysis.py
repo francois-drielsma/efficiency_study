@@ -241,7 +241,7 @@ class DensityAnalysis(AnalysisBase):
         for loc in self.locations:
             print "Doing density level correction for", typ, loc
             source = self.density_data
-            levels = self.do_corrections(typ, loc, source)
+            levels = self.do_corrections(source, typ, loc, source)
             data[loc]["corrected_levels"] = levels
 
         # Evaluate the systematic uncertainties for each of the tracker locations
@@ -255,7 +255,7 @@ class DensityAnalysis(AnalysisBase):
 
         self.density_data[typ] = data
 
-    def do_corrections(self, typ, loc, source, use_capped = True):
+    def do_corrections(self, ref_source, typ, loc, source, use_capped = True):
         """
         Applies the corrections to the requested density profile
         Only applies response correction to the reconstructed sample
@@ -264,7 +264,7 @@ class DensityAnalysis(AnalysisBase):
         * source specifies the source of the corrections to be used
         * Use capped corrections if use_capped is True
         """
-        levels = np.array(source[typ][loc]["levels"])
+        levels = np.array(ref_source[typ][loc]["levels"])
         corr_key = "level_ratio"
         if use_capped:
             corr_key = "level_ratio_capped"
@@ -294,15 +294,25 @@ class DensityAnalysis(AnalysisBase):
         print "\nEvaluating density reconstruction systematic errors", loc
 
         # Correct the density profile with the reference corrections
-        source = data["detector_reference"]
-        ref_levels = self.do_corrections(typ, loc, source)
-
+        ref_source = data["detector_reference"]
+        ref_levels = self.do_corrections(ref_source, typ, loc, ref_source)
+        print "Reference density sytematic error"
+        print "   ", ref_levels[:5], "...", ref_levels[-5:]
+        response = ref_source["response"][loc]["level_ratio_capped"]
+        print "   ", response[:5], "...", response[-5:]
         # Loop over the detector systematics list
         systematics_list = data[loc]["detector_systematics"]
         for source in systematics_list:
             # Evaluate the levels with the corresponding systematic shift
-            syst_levels = self.do_corrections(typ, loc, source)
-
+            syst_levels = self.do_corrections(ref_source, typ, loc, source)
+            print "Systematic density sytematic error for", source['source']
+            print "   sys levels:", syst_levels[:5], "...", syst_levels[-5:]
+            response = source["response"][loc]["level_ratio_capped"]
+            print "   response:  ", response[:5], "...", response[-5:]
+            inefficiency = source["inefficiency"][loc]["level_ratio_capped"]
+            print "   inefficncy:", inefficiency[:5], "...", inefficiency[-5:]
+            err_levels = source[typ][loc]["levels"]
+            print "   err levels:", err_levels[:5], "...", err_levels[-5:]
             # Initialize a graph that contains the deviation from the reference
             name = self.get_syst_name(source["source"])
             if self.config_anal["density_systematics_draw"]:
@@ -321,6 +331,7 @@ class DensityAnalysis(AnalysisBase):
                     if ref_levels[j] > 0:
                         val = err/ref_levels[j]
                     self.syst_graphs[typ][loc][name].SetPoint(j, alpha, val)
+            print
 
         return syst_error_list
 
