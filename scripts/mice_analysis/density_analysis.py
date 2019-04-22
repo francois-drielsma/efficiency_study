@@ -501,22 +501,22 @@ class DensityAnalysis(AnalysisBase):
         gratio_full = ROOT.TGraphErrors(self.npoints)
         gratio_full.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
         for i in range(self.npoints):
-            ratio = graphs["ds"].GetY()[i]/graphs["us"].GetY()[i]
+            us, ds = graphs["us"].GetY()[i], graphs["ds"].GetY()[i]
+            use, dse = graphs["us"].GetEY()[i], graphs["ds"].GetEY()[i]
+            ratio = ds/us
             gratio.GetX()[i] = graphs["us"].GetX()[i]
             gratio.GetEX()[i] = graphs["us"].GetEX()[i]
             gratio.GetY()[i] = ratio
             gratio.GetEY()[i] = 0.
-            if graphs["ds"].GetY()[i] > 0.:
-                gratio.GetEY()[i] = ratio*graphs["ds"].GetEY()[i]/graphs["ds"].GetY()[i]
+            gratio.GetEY()[i] = dse/us
 
             gratio_full.GetX()[i] = gratio.GetX()[i]
             gratio_full.GetEX()[i] = gratio.GetEX()[i]
             gratio_full.GetY()[i] = ratio
             gratio_full.GetEY()[i] = 0.
-            if graphs["ds"].GetY()[i] > 0.:
-                us_rel_err = graphs_full["us"].GetEY()[i]/graphs_full["us"].GetY()[i]
-                ds_rel_err = graphs_full["ds"].GetEY()[i]/graphs_full["ds"].GetY()[i]
-                gratio_full.GetEY()[i] = ratio*(us_rel_err**2 + ds_rel_err**2)**0.5
+            us_rel_err = dse/us
+            ds_rel_err = ratio*use/us
+            gratio_full.GetEY()[i] = (us_rel_err**2 + ds_rel_err**2)**0.5
 
         self.plots[name+"_"+typ]["graphs"]["ratio"] = gratio
         self.plots[name+"_"+typ]["graphs"]["ratio_full"] = gratio_full

@@ -192,7 +192,7 @@ class kNNDensityEstimator(object):
         section = None
         if secdim == 1:
             nbins = 100
-                section = ROOT.TH1F("section_%d"%(axes[0]),\
+            section = ROOT.TH1F("section_%d"%(axes[0]),\
                                 ";x_{%d};#rho(#bf{x})"%(axes[0]),\
                                 nbins, mins[0], maxs[0])
             for i in range(nbins):
