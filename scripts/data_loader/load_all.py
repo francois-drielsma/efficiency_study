@@ -151,9 +151,12 @@ class LoadAll(object):
         self.this_tree = None
         self.update_cuts()
         # return True if there are more events
-        #virt_data = [(numpy.mean(self.mc_loader.virtual_dict[key]), numpy.std(self.mc_loader.virtual_dict[key]), key) for key in self.mc_loader.virtual_dict.keys()]
-        #for data in sorted(virt_data):
-        #    print data[2], data[0], data[1]
+        if True:
+            virt_data = [(numpy.mean(self.mc_loader.virtual_dict[key]),
+                          numpy.std(self.mc_loader.virtual_dict[key]), key) 
+                          for key in self.mc_loader.virtual_dict.keys()]
+            for data in sorted(virt_data):
+                print data[2].ljust(40), format(data[0], "10.6g"), format(data[1], "10.6g")
         return self.this_file_name != ""
 
     def clear_data(self):

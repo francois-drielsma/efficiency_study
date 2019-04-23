@@ -237,26 +237,63 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
 
 def density_ratio_mod(name, beam, target_dir, top_labels, right_labels):
     output_dir = "compare_density/"
+    x_range = [0.01, 1.1]
     modifiers = {
         "merge_options":{
-            "right_labels":right_labels,
-            "top_labels":top_labels
+            "right_labels":top_labels,
+            "top_labels":right_labels
         },
         "hist_title":"",
         "file_name":name,
         "canvas_name":name,
         "normalise_hist":False,
-        "histogram_names":None,
-        "graph_names":["Graph"],
+        "histogram_names":[""],
+        "graph_names":["", "sys", "stats"],
         "mice_logo":False,
         "legend":False,
         "calculate_errors":[],
-        "redraw":False,
+        "extra_lines":{
+            "verticals":[],
+            "horizontals":[{
+                "y_value":1.0,
+                "line_color":1,
+                "line_style":2,
+                "line_width":2,
+            }]
+        },
+        "rescale_x":x_range,
+        "redraw":{ 
+            "draw_option":["p", "p"],
+            "fill_color":[0, 0],
+            "transparency":None,
+            "line_color":[0, 0],
+            "marker_style":None,
+            "marker_color":[0, 0],
+            "draw_order":[0, 1],
+            "x_range":x_range,
+            "y_range":[0.01, 1.4],
+            "graph":{
+                    "draw_option":["L 3", "L 3", "L 3", "L 3", "L 3", "L 3"],
+                    "marker_style":None,
+                    "marker_color":None,
+                    "fill_color":[ROOT.kBlue, ROOT.kBlue, ROOT.kBlue, ROOT.kRed, ROOT.kRed, ROOT.kRed],
+                    "line_color":[ROOT.kBlue, ROOT.kBlue, ROOT.kBlue, ROOT.kRed, ROOT.kRed, ROOT.kRed],
+                    "line_width":[2, 2, 2, 2, 2, 2],
+                    "fill_style":[1001, 1001, 1001, 1001, 1001, 1001],
+                    "transparency":[0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                    "draw_order":[3, 4, 5, 0, 1, 2, ],
+            },
+            "ignore_more_histograms":False,
+        },
         "write_plots":{
             "dir":target_dir+"/"+output_dir+"/"+beam,
             "file_name":name,
         },
         "defit":False,
+        "axis_title":{
+            "x":"Fraction of upstream sample",
+            "y":"Ratio of TKD to TKU Density",
+        },
     }
     return modifiers
 
@@ -264,7 +301,7 @@ class CompareDensityConfig(CompareConfig):
     def __init__(self, beam, target_dir, top_labels, right_labels):
         dir_list = [
             target_dir+"plots_"+beam+"/",
-            target_dir+"plots_Simulated_"+beam
+            #target_dir+"plots_Simulated_"+beam
         ]
         output_dir = "compare_density/"
         self.setup(beam, target_dir, "density/", output_dir, dir_list)
@@ -273,10 +310,20 @@ class CompareDensityConfig(CompareConfig):
         self.conglomerate_list.append(
             self.get_conglomerate_0(modifiers = mods),
         )
-        #mods = density_ratio_mod("density_ratio_recon", beam, target_dir, top_labels, right_labels)
-        #self.conglomerate_list.append(
-        #    self.get_conglomerate_0(modifiers = mods),
-        #)
+
+class CompareDensityRatioConfig(CompareConfig):
+    def __init__(self, beam, target_dir, top_labels, right_labels):
+        dir_list = [
+            target_dir+"plots_"+beam+"/",
+            target_dir+"plots_Simulated_"+beam
+        ]
+        output_dir = "compare_density/"
+        self.setup(beam, target_dir, "density/", output_dir, dir_list)
+        self.conglomerate_list = []
+        mods = density_ratio_mod("density_ratio_reco", beam, target_dir, top_labels, right_labels)
+        self.conglomerate_list.append(
+            self.get_conglomerate_0(modifiers = mods),
+        )
         self.data_caption = [[],]
 
 
@@ -658,7 +705,7 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
                 "top_labels":top_labels,
                 "col_fill":emit_colors(),
             },
-            "normalise_graph":True,
+            "normalise_graph":"Upstream stats",
             "redraw":{
                     "graph":{
                         "draw_option":["p", "3", "p", "3"],
@@ -678,13 +725,13 @@ class CompareAmplitudeConfigMC(CompareConfig): # MC corrections
                                         "Number",
                                         "amplitude_pdf_all_mc", ["Upstream sys hist"],
                                         ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
-                                        y_range = [0.001, 1.099], x_range = [0.01, 99.9], replace_hist = True,
+                                        y_range = [0.001, 1.24], x_range = [0.01, 99.9], replace_hist = True,
                                         modifiers = absolute_modifiers),
             self.get_conglomerate_graph("amplitude_pdf_reco", "Amplitude [mm]",
-                                        "Number",
+                                        "Normalised Number of Events",
                                         "amplitude_pdf_reco", ["Upstream sys hist"],
                                         ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
-                                        y_range = [0.001, 1.099], x_range = [0.01, 99.9], replace_hist = True,
+                                        y_range = [0.001, 1.24], x_range = [0.01, 99.9], replace_hist = True,
                                         modifiers = absolute_modifiers),
             self.get_conglomerate_graph("amplitude_cdf_reco", "Amplitude [mm]",
                                         "Cumulative density",
@@ -717,7 +764,9 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                 "horizontals":[
                     {"y_value":1., "line_color":1, "line_style":2, "line_width":2},
                 ],
-                "verticals":[],
+                "verticals":[
+                    {"x_value":30., "line_color":4, "line_style":2, "line_width":2},
+                ],
             },
             "merge_options":{
                 "right_labels":right_labels,
@@ -731,7 +780,7 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                 "right_labels":right_labels,
                 "top_labels":top_labels
             },
-            "normalise_graph":True,
+            "normalise_graph":"Upstream stats",
             "redraw":{
                     "graph":{
                         "draw_option":["p", "3", "p", "3"],
@@ -744,14 +793,43 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                     }
             },
             "rescale_x":amplitude_x_range(beam),
+            "extra_lines":{
+                "horizontals":[],
+                "verticals":[
+                    {"x_value":30., "line_color":4, "line_style":2, "line_width":2},
+                ],
+            }
+        }
+
+        absolute_modifiers_err = copy.deepcopy(absolute_modifiers)
+        absolute_modifiers_err["write_plots"] = {}
+        absolute_modifiers_err = {
+            "merge_options":{
+                "right_labels":right_labels,
+                "top_labels":top_labels
+            },
+            "normalise_graph":True,
+            "redraw":{
+                    "graph":{
+                        "draw_option":["p", "p", "3", "p", "p", "3"],
+                        "marker_style":[24, 20, 20, 26, 22, 22],
+                        "marker_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3, ROOT.kGreen+3],
+                        "fill_color":[ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kOrange+4, ROOT.kGreen+3, ROOT.kGreen+3, ROOT.kGreen+3],
+                        "fill_style":[1001, 1001, 1001, 1001, 1001, 1001],
+                        "transparency":[0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+                        "draw_order":[1, 2, 4, 5, 0, 3],
+                    }
+            },
+            "rescale_x":amplitude_x_range(beam),
+            "write_plots":{"file_name":"amplitude_pdf_reco_correction"}
         }
 
         self.conglomerate_list = [
             self.get_conglomerate_graph("amplitude_pdf_reco", "Amplitude [mm]",
-                                        "Number",
+                                        "Normalised Number of Events",
                                         "amplitude_pdf_reco", ["Upstream sys hist"],
                                         ["Upstream stats", "Upstream sys", "Downstream stats", "Downstream sys"],
-                                        x_range = [0.01, 99.9], y_range = [0.001, 1.09], replace_hist = True,
+                                        x_range = [0.01, 99.9], y_range = [0.001, 1.24], replace_hist = True,
                                         modifiers = absolute_modifiers),
             self.get_conglomerate_graph("amplitude_cdf_reco", "Amplitude [mm]",
                                         "Cumulative density",
@@ -769,6 +847,12 @@ class CompareAmplitudeConfigData(CompareConfig): # data plots
                                         "cdf_ratio", ["CDF_Ratio_stats hist"],
                                         ["CDF_Ratio stats", "CDF_Ratio sys"], x_range = [0.01, 99.9], y_range = [0.601, 1.399], replace_hist = True,
                                         graph_draw_option = ["p", "2"], graph_marker_style=[20, 20], graph_marker_color=[1, 1], graph_draw_order=[1,0], modifiers=ratio_modifiers),
+            self.get_conglomerate_graph("amplitude_pdf_reco", "Amplitude [mm]",
+                                        "Number",
+                                        "amplitude_pdf_reco", ["Upstream sys hist"],
+                                        ["Raw upstream", "Upstream stats", "Upstream sys", "Raw downstream", "Downstream stats", "Downstream sys"],
+                                        x_range = [0.01, 99.9], y_range = [0.001, 1.24], replace_hist = True,
+                                        modifiers = absolute_modifiers_err),
         ]
 
 class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
@@ -783,7 +867,9 @@ class CompareAmplitudeConfigBoth(CompareConfig): # comparisons
                 "horizontals":[
                     {"y_value":1., "line_color":1, "line_style":2, "line_width":2},
                 ],
-                "verticals":[],
+                "verticals":[
+                    {"x_value":30., "line_color":4, "line_style":2, "line_width":2},
+                ],
             },
             "merge_options":{
                 "right_labels":right_labels,
@@ -859,7 +945,7 @@ def run_conglomerate(batch_level, config_list, dir_lists, do_cuts_summary, targe
         if batch_level > 1:
             ROOT.gROOT.SetBatch(False)
         try:
-            if len(dir_lists) > 1:
+            if len(dir_list) > 1:
                 merge = ConglomerateMerge(conglomerate_list)
                 merge.merge_all(rows, cols)
         except Exception:
@@ -882,32 +968,33 @@ def main_paper(batch_level = 0):
     fd_1, fd_2 = {}, {}
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-v7/"
+    target_dir = "output/2017-02-7-production-test/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
     if batch_level < 10 and hide_root_errors:
         ROOT.gErrorIgnoreLevel = 6000
     my_dir_list = [
-        ["2017-2.7_4-140_None",      "2017-2.7_6-140_None",      "2017-2.7_10-140_None",],
-        ["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
-        ["2017-2.7_4-140_lH2_full",  "2017-2.7_6-140_lH2_full",  "2017-2.7_10-140_lH2_full",],
+#        ["2017-2.7_4-140_None",      "2017-2.7_6-140_None",      "2017-2.7_10-140_None",],
+#        ["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
+#        ["2017-2.7_4-140_lH2_full",  "2017-2.7_6-140_lH2_full",  "2017-2.7_10-140_lH2_full",],
         ["2017-2.7_4-140_LiH",       "2017-2.7_6-140_LiH",       "2017-2.7_10-140_LiH"],
     ]
     top_labels = ["4-140", "6-140", "10-140"]
-    right_labels = ["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
-    config_list = [CompareData1DConfig, CompareCutsConfig, 
-                   CompareOpticsConfig, CompareOpticsMCConfig,
-                   CompareGlobalsConfig, CompareMCConfig,
-                   CompareData2DConfig, CompareData2DMCConfig,]
-    config_list = [CompareAmplitudeConfigBoth,
+    right_labels = ["LiH"] #["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
+    config_list = [#CompareData1DConfig, CompareCutsConfig, 
+                   #CompareOpticsConfig, CompareOpticsMCConfig,
+                   #CompareGlobalsConfig, CompareMCConfig,
+                   CompareData2DConfig, CompareData2DMCConfig,
+                  ]
+    config_list += [#CompareAmplitudeConfigBoth,
                    #CompareAmplitudeConfigMC,
-                   CompareAmplitudeConfigData
+                   #CompareAmplitudeConfigData
                    ]
     fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
     my_dir_list = numpy.array(my_dir_list).transpose().tolist()
-    config_list = [CompareFractionalEmittanceConfig,] #CompareDensityConfig] #
-    #fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    config_list = [CompareDensityRatioConfig] #CompareDensityConfig,  CompareFractionalEmittanceConfig, 
+    #fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, False, target_dir, top_labels, right_labels)
     print_fail_dict(fd_1)
     print_fail_dict(fd_2)
 

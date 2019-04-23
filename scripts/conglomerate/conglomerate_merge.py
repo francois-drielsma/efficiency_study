@@ -22,11 +22,11 @@ class ConglomerateMerge(object):
     def merge_all(self, rows, cols):
         self.rows = rows
         self.cols = cols
-        canvas_names = set()
+        unique_id = set()
         for cong_base in self.conglomerate_list:
             for cong in cong_base.conglomerations:
-                canvas_names.add(cong.options["canvas_name"])
-        for name in canvas_names:
+                unique_id.add(cong.options["unique_id"])
+        for name in unique_id:
             self.merge_one(name)
 
     def do_legend(self, i, j, legend, legend_size, pad):
@@ -144,8 +144,10 @@ class ConglomerateMerge(object):
         target_dir = self.conglomerate_list[0].conglomerations[0].config.target_plot_dir
         if options["write_plots"]["file_name"]:
             canvas_name = options["write_plots"]["file_name"]
+            print "OPTIONS"
         else:
             canvas_name = options["canvas_name"]
+        print "CANVAS NAME", canvas_name
         format_list = options["write_plots"]["formats"]
         canvas_name = canvas_name.replace("*", "")
         canvas_name = canvas_name.replace("?", "")
@@ -180,7 +182,7 @@ class ConglomerateMerge(object):
                     print "Exception while looping over pads in ", i, j
                     print "Failed to find hist", hist_index, "in", canvas_name
                 for cong in cong_base.conglomerations:
-                    if cong.options["canvas_name"] == canvas_name:
+                    if cong.options["unique_id"] == canvas_name:
                         break
                 source_x_axis = cong.x_axis
                 source_y_axis = cong.y_axis

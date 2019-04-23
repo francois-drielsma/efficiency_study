@@ -111,7 +111,10 @@ class FractionalAnalysis(AnalysisBase):
                     break
 
             file_name = self.a_dir+"/amp_data_"+name+"_"
-            self.data["reco"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, False)
+            min_bin = self.config.amplitude_min_bin
+            min_events= self.config.amplitude_min_events
+            self.data["reco"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, 
+                                                          False, min_bin, min_events)
             self.data["reco"][name].clear()
 
         print "Set up reco planes"

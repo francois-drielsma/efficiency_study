@@ -467,12 +467,13 @@ class DensityAnalysis(AnalysisBase):
             print "stt:", format(all_err, "4.2g"), "sys:",
             if include_syst and value > 0.:
                 syst_err = self.density_data[typ][loc]["levels_syst_errors"][i]
-                if abs(syst_err) < 1e-3 and abs(syst_err) > 1e-12:
-                    raise RuntimeError("""
-                  I did something hacky; I ran the systematics calculation
+                if abs(syst_err) < 1e-6 and abs(syst_err) > 1e-12:
+                    print """
+                  Warning - I did something hacky; I ran the systematics calculation
                   with a 1e9 scale factor and then the main analysis without the scale factor; so
                   now there is a discrepancy. If I rerun the systematics they will come out 1e9 
-                  too low and I will need to scale them (e.g. *scale_factor) like everywhere else.""")
+                  too low and I will need to scale them (e.g. *scale_factor) like everywhere else.
+                  Systematic error was """+str(syst_err)
                 all_err = (syst_err**2+all_err**2)**0.5
                 print format(syst_err, "4.2g"),
             print "all:", format(all_err, "4.2g")
@@ -523,9 +524,10 @@ class DensityAnalysis(AnalysisBase):
         * graphs_full is a dictionary containing the up and downstream graphs with full errors
         * name of the type of graph being output
         """
+        gratio_multi = ROOT.TMultiGraph()
         gratio = ROOT.TGraphErrors(self.npoints)
         gratio_full = ROOT.TGraphErrors(self.npoints)
-        gratio_full.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
+        gratio_multi.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
         for i in range(self.npoints):
             ratio = graphs["ds"].GetY()[i]/graphs["us"].GetY()[i]
             gratio.GetX()[i] = graphs["us"].GetX()[i]
@@ -549,12 +551,18 @@ class DensityAnalysis(AnalysisBase):
 
         gratio.SetLineColor(1)
         gratio.SetFillColorAlpha(1, .25)
+        gratio.SetName("stats error")
         gratio_full.SetLineColor(1)
         gratio_full.SetFillColorAlpha(1, .25)
+        gratio_full.SetName("sys error")
 
-        gratio_full.Draw("ALE3")
-        gratio.Draw("LE3 SAME")
-        return gratio, gratio_full
+        #gratio_full.Draw("ALE3")
+        #gratio.Draw("LE3 SAME")
+        gratio_multi.Add(gratio)
+        gratio_multi.Add(gratio_full)
+        gratio_multi.SetName(name+"_"+typ)
+        gratio_multi.Draw("A LE3")
+        return gratio_multi
 
     def save(self):
         """

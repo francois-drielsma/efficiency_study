@@ -80,6 +80,7 @@ class CompareConfig(object):
                     "x":None,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -140,6 +141,7 @@ class CompareConfig(object):
                     "x":axis_title,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -195,6 +197,7 @@ class CompareConfig(object):
                     "x":axis_title,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -241,6 +244,7 @@ class CompareConfig(object):
                     "x":x_axis_title,
                     "y":y_axis_title,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -337,6 +341,8 @@ class CompareConfig(object):
                     "x":x_axis_title,
                     "y":y_axis_title,
                 },
+                "unique_id":None,
             }
+
         self.recursive_modify_dict(my_config, modifiers)
         return my_config

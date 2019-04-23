@@ -46,10 +46,11 @@ class ConglomerateOne(object):
         if hist_names == None:
             hist_names = []
         other_types = [type(ROOT.TGraph()), type(ROOT.TFrame()),
-                       type(ROOT.TLegend())] #, type(ROOT.TMultiGraph())]
+                       type(ROOT.TLegend()), type(ROOT.TGraphErrors())] #, type(ROOT.TMultiGraph())]
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
+            print "ROOT object name", name, "type", type(an_object)
             for hist_name in hist_names:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
@@ -249,9 +250,11 @@ class ConglomerateOne(object):
     def normalise_graph(self, canvas, hist_list, graph_list):
         if not self.options["normalise_graph"]:
             return
-        max_y = self.graph_max_y(graph_list[0])
-        for graph in graph_list[1:]:
-            max_y = max(self.graph_max_y(graph), max_y)
+        tgt_name = self.options["normalise_graph"]
+        for graph in graph_list:
+              if type(tgt_name) == type("") and tgt_name in graph.GetName():
+                  break
+        max_y = self.graph_max_y(graph)
         for graph in graph_list:
             ey_low = graph.GetEYlow()
             ey_high = graph.GetEYhigh()
@@ -395,9 +398,10 @@ class ConglomerateOne(object):
             graph_draw["draw_order"] = range(len(graph_list))
         for i in graph_draw["draw_order"]:
             graph = graph_list[i]
-            if type(graph) == type(ROOT.TMultiGraph()) and redraw["y_range"] != None:
-                graph.SetMinimum(redraw["y_range"][0])
-                graph.SetMaximum(redraw["y_range"][1])
+            if type(graph) == type(ROOT.TMultiGraph()):
+                if redraw["y_range"] != None:
+                    graph.SetMinimum(redraw["y_range"][0])
+                    graph.SetMaximum(redraw["y_range"][1])
                 continue
             graph.SetName(graph.GetName()+"_"+self.uid())
             if graph_draw["marker_style"] != None:
@@ -493,12 +497,14 @@ class ConglomerateOne(object):
         if self.options["write_plots"]["file_name"]:
             name = str(self.options["write_plots"]["file_name"])
         else:
-            name = str(canvas.GetName())
+            name = str(self.options["canvas_name"])
         print name, self.options["write_plots"]
         name = name.replace(" ", "_")
         name = name.replace("*", "")
         name = name.replace("?", "")
         name = name.replace(".",  "_")
+        if self.options["unique_id"] == None:
+            self.options["unique_id"] = name
         name = os.path.join(plot_dir, name)
         for fmt in formats:
             canvas.Print(name+"."+fmt)
@@ -550,8 +556,6 @@ class ConglomerateOne(object):
             old_canvas = self.get_canvas(file_name)
             self.hist_list += self.get_hist_list(old_canvas)
             self.graph_list += self.get_graph_list(old_canvas)
-        if len(self.hist_list) == 0:
-            print "Error - failed to find plots for", self.options["file_name"]
         print "Found", len(self.hist_list), "histograms"
         for hist in self.hist_list:
             print "   ", hist.GetName()
