@@ -292,7 +292,7 @@ class DensityAnalysis(AnalysisBase):
 
         # Correct the density profile with the reference corrections
         source = data["detector_reference"]
-        ref_levels = self.do_corrections(typ, loc, False)
+        ref_levels = self.do_corrections(typ, loc, source, False)
 
         # Loop over the detector systematics list
         systematics_list = data[loc]["detector_systematics"]
