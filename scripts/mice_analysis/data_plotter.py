@@ -138,9 +138,9 @@ class DataPlotter(AnalysisBase):
             for plane in self.config.plot_virtual_stations:
                 name = "global_through_"+str(plane)
                 self.birth_var_1d("r", name, None, None, min_max=[0, 450], n_bins=75)
-            self.birth_p_tot_res_vs_var_1d("r", "global_through_virtual_absorber_centre", None, None, [-20., 40.], [0., 200.])
-            self.birth_p_tot_res_vs_var_1d("y", "global_through_virtual_absorber_centre", None, None, [-20., 40.], [-200., 200.])
-            self.birth_p_tot_res_vs_var_1d("x", "global_through_virtual_absorber_centre", None, None, [-20., 40.], [-200., 200.])
+            self.birth_p_tot_res_vs_var_1d("r", "global_through_virtual_absorber_centre", [-20., 40.], [0., 200.])
+            self.birth_p_tot_res_vs_var_1d("y", "global_through_virtual_absorber_centre", [-20., 40.], [-200., 200.])
+            self.birth_p_tot_res_vs_var_1d("x", "global_through_virtual_absorber_centre", [-20., 40.], [-200., 200.])
             self.birth_var_2d("pz", "tku", "r", "global_through_virtual_diffuser_ds", [0., 200.], [0, 200], "all", self.has_diffuser_us_and_tku, None)
             self.birth_var_2d("pz", "tku", "r", "global_through_virtual_diffuser_ds", [0., 200.], [0, 200], "us cut", self.has_diffuser_us_and_tku, None)
             self.birth_var_2d("pz", "global_through_virtual_absorber_centre", "x", "global_through_virtual_absorber_centre", [None, None], [-200, 200], "us cut", None, None)
@@ -276,9 +276,9 @@ class DataPlotter(AnalysisBase):
             for plane in self.config.plot_virtual_stations:
                 name = "global_through_"+str(plane)
                 self.process_var_1d("r", name, None, None)
-            self.process_p_tot_res_vs_var_1d("r", "global_through_virtual_absorber_centre", None, None)
-            self.process_p_tot_res_vs_var_1d("y", "global_through_virtual_absorber_centre", None, None)
-            self.process_p_tot_res_vs_var_1d("x", "global_through_virtual_absorber_centre", None, None)
+            self.process_p_tot_res_vs_var_1d("r", "global_through_virtual_absorber_centre")
+            self.process_p_tot_res_vs_var_1d("y", "global_through_virtual_absorber_centre")
+            self.process_p_tot_res_vs_var_1d("x", "global_through_virtual_absorber_centre")
             self.process_var_2d("pz", "tku", "r", "global_through_virtual_diffuser_ds", "all", self.has_diffuser_us_and_tku, None)
             self.process_var_2d("pz", "tku", "r", "global_through_virtual_diffuser_ds", "us cut", self.has_diffuser_us_and_tku, None)
             self.process_var_2d("pz", "global_through_virtual_absorber_centre", "x", "global_through_virtual_absorber_centre", "us cut", None, None)
@@ -894,7 +894,7 @@ class DataPlotter(AnalysisBase):
         for i in range(len(p_tku_cut_ds)):
             hist.Fill(p_tku_cut_ds[i], dp_cut_ds[i])
 
-    def birth_p_tot_res_vs_var_1d(self, var_1, detector_1, event_predicate, hit_predicate, min_max_1, min_max_2):
+    def birth_p_tot_res_vs_var_1d(self, var_1, detector_1, min_max_1, min_max_2):
         cut = "ds cut"
         p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", self.has_both_trackers)
         p_tkd_cut_us, p_tkd_cut_ds, p_tkd_all = self.get_tracker_hit_data("tkd", "p", self.has_both_trackers)
@@ -904,7 +904,7 @@ class DataPlotter(AnalysisBase):
         dp = {"all":dp_all, "us cut":dp_cut_us, "ds cut":dp_cut_ds}[cut]
         lab_1 = "p_{tku} - p_{tkd} [MeV/c]"
 
-        data_cut_us, data_cut_ds, data_all = self.get_detector_data(detector_1, var_1, event_predicate, hit_predicate)
+        data_cut_us, data_cut_ds, data_all = self.get_detector_data(detector_1, var_1, self.has_both_trackers, None)
         data = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
         lab_2 = detector_1+" "+var_1+" ["+utilities.default_units(var_1)+"]"
         name = "p_res vs "+detector_1+" "+var_1+" "+cut
@@ -915,7 +915,7 @@ class DataPlotter(AnalysisBase):
                                         min_max_2[0], min_max_2[1])
         hist.Draw("COLZ")
 
-    def process_p_tot_res_vs_var_1d(self, var_1, detector_1, event_predicate, hit_predicate):
+    def process_p_tot_res_vs_var_1d(self, var_1, detector_1):
         cut = "ds cut"
         p_tku_cut_us, p_tku_cut_ds, p_tku_all = self.get_tracker_hit_data("tku", "p", self.has_both_trackers)
         p_tkd_cut_us, p_tkd_cut_ds, p_tkd_all = self.get_tracker_hit_data("tkd", "p", self.has_both_trackers)
@@ -924,11 +924,15 @@ class DataPlotter(AnalysisBase):
         dp_all = [p_tku - p_tkd_all[i] for i, p_tku in enumerate(p_tku_all)]
         dp = {"all":dp_all, "us cut":dp_cut_us, "ds cut":dp_cut_ds}[cut]
 
-        data_cut_us, data_cut_ds, data_all = self.get_detector_data(detector_1, var_1, event_predicate, hit_predicate)
+        data_cut_us, data_cut_ds, data_all = self.get_detector_data(detector_1, var_1, self.has_both_trackers, None)
         data = {"all":data_all, "us cut":data_cut_us, "ds cut":data_cut_ds}[cut]
 
         name = "p_res vs "+detector_1+" "+var_1+" "+cut
         hist = self.get_plot(name)["histograms"][name]
+        if len(dp) != len(data):
+            print "ERROR! dp length was not same as data length!"
+            print var_1, detector_1
+            return 
         for i, item_1 in enumerate(dp):
             item_2 = data[i]
             hist.Fill(item_1, item_2)
