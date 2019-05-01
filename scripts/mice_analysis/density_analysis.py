@@ -252,18 +252,18 @@ class DensityAnalysis(AnalysisBase):
 
         self.density_data[typ] = data
 
-    def do_corrections(self, typ, loc, source, use_capped = True):
+    def do_corrections(self, typ, loc, source):
         """
         Applies the corrections to the requested density profile
         Only applies response correction to the reconstructed sample
+        Use capped corrections if density_use_capped is True in config
         * typ specifies the type of data (all_mc, reco_mc, reco)
         * loc specifies the location of the tracker (us, ds)
         * source specifies the source of the corrections to be used
-        * Use capped corrections if use_capped is True
         """
         levels = np.array(self.density_data[typ][loc]["levels"])
         corr_key = "level_ratio"
-        if use_capped:
+        if self.config_anal['density_used_capped']:
             corr_key = "level_ratio_capped"
         if typ == "reco":
             response = np.array(source["response"][loc][corr_key])
@@ -292,13 +292,13 @@ class DensityAnalysis(AnalysisBase):
 
         # Correct the density profile with the reference corrections
         source = data["detector_reference"]
-        ref_levels = self.do_corrections(typ, loc, source, False)
+        ref_levels = self.do_corrections(typ, loc, source)
 
         # Loop over the detector systematics list
         systematics_list = data[loc]["detector_systematics"]
         for source in systematics_list:
             # Evaluate the levels with the corresponding systematic shift
-            syst_levels = self.do_corrections(typ, loc, source, False)
+            syst_levels = self.do_corrections(typ, loc, source)
 
             # Initialize a graph that contains the deviation from the reference
             name = self.get_syst_name(source["source"])

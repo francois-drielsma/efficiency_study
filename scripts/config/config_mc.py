@@ -154,6 +154,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
             "fractional_emittance_systematics_draw":True,
 
             "density_mc":True,                  # True if Monte Carlo data
+            "density_use_capped":False,         # True if capped corrections are used
             "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
             "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
             "density_systematics":get_systematics(emittance, name, "density"),
