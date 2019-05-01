@@ -321,10 +321,36 @@ class CompareDensityRatioConfig(CompareConfig):
         self.setup(beam, target_dir, "density/", output_dir, dir_list)
         self.conglomerate_list = []
         mods = density_ratio_mod("density_ratio_reco", beam, target_dir, top_labels, right_labels)
+        #mods = self.density_ratio_lines(beam, mods)
         self.conglomerate_list.append(
             self.get_conglomerate_0(modifiers = mods),
         )
         self.data_caption = [[],]
+
+
+    def density_ratio_lines(self, beam, mods):
+        values = {
+            "2017-2.7_4-140_None":0.9857,#   0.0103  0.04609  0.04722
+            "2017-2.7_6-140_None":0.9809,#  0.01253  0.04618  0.04786
+            "2017-2.7_10-140_None":1.063,#  0.03582  0.05633  0.06676
+            "2017-2.7_4-140_lH2_empty":0.9831,#  0.01253  0.04518  0.04689
+            "2017-2.7_6-140_lH2_empty":1.015,#  0.01847  0.04866  0.05204
+            "2017-2.7_10-140_lH2_empty":1.053,#  0.06238  0.05356  0.08222
+            "2017-2.7_4-140_lH2_full":1.089,#  0.02459   0.0487  0.05456
+            "2017-2.7_6-140_lH2_full":1.174,#  0.01624  0.05405  0.05644
+            "2017-2.7_10-140_lH2_full":1.229,#  0.04927  0.06481  0.08141
+            "2017-2.7_4-140_LiH":1.076,#  0.01489  0.05012  0.05228
+            "2017-2.7_6-140_LiH":1.173,#  0.01685  0.05696   0.0594
+            "2017-2.7_10-140_LiH":1.266,#  0.04694  0.06698  0.08179
+        }
+        mods["extra_lines"]["horizontals"].append({
+            "y_value":values[beam],
+            "line_color":ROOT.kGray+2,
+            "line_style":1,
+            "line_width":2,
+        })
+        return mods
+
 
 
 def vertical(x_value_list, modifier):
@@ -968,33 +994,33 @@ def main_paper(batch_level = 0):
     fd_1, fd_2 = {}, {}
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-production-test/"
+    target_dir = "output/2017-02-7-v11/"
     batch_level = 0
     hide_root_errors = True
     do_cuts_summary = True
     if batch_level < 10 and hide_root_errors:
         ROOT.gErrorIgnoreLevel = 6000
     my_dir_list = [
-#        ["2017-2.7_4-140_None",      "2017-2.7_6-140_None",      "2017-2.7_10-140_None",],
-#        ["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
-#        ["2017-2.7_4-140_lH2_full",  "2017-2.7_6-140_lH2_full",  "2017-2.7_10-140_lH2_full",],
+        ["2017-2.7_4-140_None",      "2017-2.7_6-140_None",      "2017-2.7_10-140_None",],
+        ["2017-2.7_4-140_lH2_empty", "2017-2.7_6-140_lH2_empty", "2017-2.7_10-140_lH2_empty",],
+        ["2017-2.7_4-140_lH2_full",  "2017-2.7_6-140_lH2_full",  "2017-2.7_10-140_lH2_full",],
         ["2017-2.7_4-140_LiH",       "2017-2.7_6-140_LiH",       "2017-2.7_10-140_LiH"],
     ]
     top_labels = ["4-140", "6-140", "10-140"]
-    right_labels = ["LiH"] #["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
-    config_list = [#CompareData1DConfig, CompareCutsConfig, 
-                   #CompareOpticsConfig, CompareOpticsMCConfig,
-                   #CompareGlobalsConfig, CompareMCConfig,
+    right_labels = ["LiH", "No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
+    config_list = [CompareData1DConfig, CompareCutsConfig, 
+                   CompareOpticsConfig, CompareOpticsMCConfig,
+                   CompareGlobalsConfig, CompareMCConfig,
                    CompareData2DConfig, CompareData2DMCConfig,
                   ]
-    config_list += [#CompareAmplitudeConfigBoth,
-                   #CompareAmplitudeConfigMC,
-                   #CompareAmplitudeConfigData
+    config_list += [CompareAmplitudeConfigBoth,
+                   CompareAmplitudeConfigMC,
+                   CompareAmplitudeConfigData
                    ]
-    fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
-    my_dir_list = numpy.array(my_dir_list).transpose().tolist()
+    #fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    #my_dir_list = numpy.array(my_dir_list).transpose().tolist()
     config_list = [CompareDensityRatioConfig] #CompareDensityConfig,  CompareFractionalEmittanceConfig, 
-    #fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, False, target_dir, top_labels, right_labels)
+    fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, False, target_dir, top_labels, right_labels)
     print_fail_dict(fd_1)
     print_fail_dict(fd_2)
 

@@ -423,8 +423,8 @@ class DensityAnalysis(AnalysisBase):
             graphs = {}
             graphs_full = {}
             for loc in self.locations:
-                graphs[loc] = self.make_graph(typ, loc, True, False)
-                graphs_full[loc] = self.make_graph(typ, loc, True, True)
+                graphs[loc] = self.make_graph(typ, loc, True, False, False)
+                graphs_full[loc] = self.make_graph(typ, loc, True, True, False)
 
             # Print up/down comparison
             canvas_name = 'density_profile_%s' % typ
@@ -435,6 +435,23 @@ class DensityAnalysis(AnalysisBase):
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
 
+            # Initialize the graphs
+            graphs = {}
+            graphs_full = {}
+            for loc in self.locations:
+                graphs[loc] = self.make_graph(typ, loc, True, False, True)
+                graphs_full[loc] = self.make_graph(typ, loc, True, True, True)
+
+            # Print up/down comparison
+            canvas_name = 'normalised_density_profile_%s' % typ
+            canvas = self.get_plot(canvas_name)["pad"]
+
+            mg = self.make_multigraph(typ, graphs, graphs_full, "normalised_density_profile")
+            leg = self.make_multigraph_legend(graphs)
+            for fmt in ["pdf", "png", "root"]:
+                canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
+
+
             # Print ratios
             canvas_name = 'density_ratio_%s' % typ
             canvas = self.get_plot(canvas_name)["pad"]
@@ -443,18 +460,21 @@ class DensityAnalysis(AnalysisBase):
             for fmt in ["pdf", "png", "root"]:
                 canvas.Print(self.plot_dir+"/"+canvas_name+"."+fmt)
 
-    def make_graph(self, typ, loc, include_corr, include_syst):
+    def make_graph(self, typ, loc, include_corr, include_syst, normalised):
         """
         Builds a TGraphErrors for the requested data type and location
         * typ specifies the type of data (all_mc, reco_mc, reco)
         * loc specifies the location of the tracker (us, ds)
         * include_corr is True if the corrected levels are to be represented
         * include_syst is True if the systematic uncertainty is to be includes
+        * normalised is True if we normalise to the maximum density in the "us" location
         """
         scale_factor = self.config.density_graph_scaling
         level_type = "levels"
         if include_corr:
             level_type = "corrected_levels"
+        if normalised:
+            scale_factor = 1./max(self.density_data[typ]["us"][level_type])
 
         print "Plotting density", loc, typ
         graph = ROOT.TGraphErrors(self.npoints)
@@ -462,11 +482,13 @@ class DensityAnalysis(AnalysisBase):
             alpha = (float(i+1.)/(self.npoints+1.))
             value = self.density_data[typ][loc][level_type][i]*scale_factor
             graph.SetPoint(i, alpha, value)
-            print "    ", i, format(value, "4.2g"),
             all_err = self.density_data[typ][loc]["levels_stat_errors"][i]*scale_factor
+            print "    ", i, format(value, "4.2g"),
             print "stt:", format(all_err, "4.2g"), "sys:",
             if include_syst and value > 0.:
                 syst_err = self.density_data[typ][loc]["levels_syst_errors"][i]
+                if normalised:
+                    syst_err *= scale_factor/self.config.density_graph_scaling
                 if abs(syst_err) < 1e-6 and abs(syst_err) > 1e-12:
                     print """
                   Warning - I did something hacky; I ran the systematics calculation
@@ -529,22 +551,21 @@ class DensityAnalysis(AnalysisBase):
         gratio_full = ROOT.TGraphErrors(self.npoints)
         gratio_multi.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
         for i in range(self.npoints):
-            ratio = graphs["ds"].GetY()[i]/graphs["us"].GetY()[i]
+            us, ds = graphs["us"].GetY()[i], graphs["ds"].GetY()[i]
+            use, dse = graphs["us"].GetEY()[i], graphs["ds"].GetEY()[i]
+            ratio = ds/us
             gratio.GetX()[i] = graphs["us"].GetX()[i]
             gratio.GetEX()[i] = graphs["us"].GetEX()[i]
             gratio.GetY()[i] = ratio
-            gratio.GetEY()[i] = 0.
-            if graphs["ds"].GetY()[i] > 0.:
-                gratio.GetEY()[i] = ratio*graphs["ds"].GetEY()[i]/graphs["ds"].GetY()[i]
+            gratio.GetEY()[i] = dse/us
 
             gratio_full.GetX()[i] = gratio.GetX()[i]
             gratio_full.GetEX()[i] = gratio.GetEX()[i]
             gratio_full.GetY()[i] = ratio
             gratio_full.GetEY()[i] = 0.
-            if graphs["ds"].GetY()[i] > 0.:
-                us_rel_err = graphs_full["us"].GetEY()[i]/graphs_full["us"].GetY()[i]
-                ds_rel_err = graphs_full["ds"].GetEY()[i]/graphs_full["ds"].GetY()[i]
-                gratio_full.GetEY()[i] = ratio*(us_rel_err**2 + ds_rel_err**2)**0.5
+            us_rel_err = dse/us
+            ds_rel_err = ratio*use/us
+            gratio_full.GetEY()[i] = (us_rel_err**2 + ds_rel_err**2)**0.5
 
         self.plots[name+"_"+typ]["graphs"]["ratio"] = gratio
         self.plots[name+"_"+typ]["graphs"]["ratio_full"] = gratio_full
@@ -556,8 +577,6 @@ class DensityAnalysis(AnalysisBase):
         gratio_full.SetFillColorAlpha(1, .25)
         gratio_full.SetName("sys error")
 
-        #gratio_full.Draw("ALE3")
-        #gratio.Draw("LE3 SAME")
         gratio_multi.Add(gratio)
         gratio_multi.Add(gratio_full)
         gratio_multi.SetName(name+"_"+typ)
@@ -577,7 +596,7 @@ class DensityAnalysis(AnalysisBase):
         * uses the Monte Carlo to generate corrections
         """
         for loc in self.locations:
-            # Initialize the data        
+            # Initialize the data
             all_mc_levels = self.density_data["all_mc"][loc]["levels"]
             reco_mc_levels = self.density_data["reco_mc"][loc]["levels"]
             reco_levels = self.density_data["reco"][loc]["levels"]
@@ -643,21 +662,21 @@ class DensityAnalysis(AnalysisBase):
           "inefficiency":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                      "level_ratio_capped":[1. for i in range(self.npoints)]
+                  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
               "ds":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                      "level_ratio_capped":[1. for i in range(self.npoints)]
+                  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
           },
           "response":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                      "level_ratio_capped":[1. for i in range(self.npoints)]
+                  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
               "ds":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                      "level_ratio_capped":[1. for i in range(self.npoints)]
+                  "level_ratio_capped":[1. for i in range(self.npoints)]
               },
           },
           "source":"",
@@ -669,16 +688,16 @@ class DensityAnalysis(AnalysisBase):
             "performance_reference":None,
             "detector_reference":None,
             "us":{
-                    "levels":[],
-                    "corrected_levels":[],
+                "levels":[],
+                "corrected_levels":[],
                 "levels_stat_errors":[],
                 "levels_syst_errors":[],
                 "detector_systematics":[],
                 "performance_systematics":[],
             },
             "ds":{
-                    "levels":[],
-                    "corrected_levels":[],
+                "levels":[],
+                "corrected_levels":[],
                 "levels_stat_errors":[],
                 "levels_syst_errors":[],
                 "detector_systematics":[],

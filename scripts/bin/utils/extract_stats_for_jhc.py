@@ -2,6 +2,7 @@ import glob
 import json
 import copy
 
+import numpy
 import scipy.stats
 from scipy.stats import chi2
 
@@ -65,6 +66,8 @@ class ExtractCoolingStats(object):
                 pdf_1 = self.all_data[conf_1]["reco"][us_ds]["pdf"]
                 pdf_2 = self.all_data[conf_2]["reco"][us_ds]["pdf"]
                 pdf_1, pdf_2 = self.stats_mangle(pdf_1, pdf_2)
+                pdf_1 = numpy.array(pdf_1)
+                pdf_2 = numpy.array(pdf_2)
                 chisq, p = scipy.stats.chisquare(pdf_1[:n_bins], pdf_2[:n_bins])
                 chi2_table[-1].append([chisq, p])
                 print "    chi square test "+conf_1+ " vs "+conf_2+" "+us_ds
@@ -139,7 +142,7 @@ class ExtractCoolingStats(object):
         return chi2_val, 1-chi2_p
 
 def main():
-    prefix = "output/2017-02-7-v9/"
+    prefix = "output/2017-02-7-v10/"
     stats = ExtractCoolingStats()
     stats.rows = ["None", "lH2_empty", "lH2_full", "LiH",]
     bin_headings = [("4-140"), ("6-140"), ("10-140")]

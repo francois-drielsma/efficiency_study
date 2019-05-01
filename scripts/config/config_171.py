@@ -5,7 +5,7 @@ def rogers_mc_file_names(datasets):
     return file_list
 
 def prod_mc_file_names(datasets):
-    file_list = ["/work/ast/cr67/mc/"+datasets+"/*_sim.root"]
+    file_list = ["/work/ast/cr67/mc/*"+str(datasets)+"/*_sim.root"]
     return file_list
 
 def reco_file_names(run_number_list, maus, do_globals):
@@ -173,16 +173,16 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, emittance, tramlines_d
 
             "do_extrapolation":False,
             "do_magnet_alignment":False,
-            "do_fractional_emittance":False,
-            "do_amplitude":True,
-            "do_density":True,
-            "do_efficiency":True,
-            "do_globals":True,
+            "do_fractional_emittance":False, #True,
+            "do_amplitude":False, #True,
+            "do_density":False, #True,
+            "do_efficiency":False, #True,
+            "do_globals":False, #True,
             "do_mc":True,
-            "do_plots":True,
-            "do_cuts_plots":True,
+            "do_plots":False, #True,
+            "do_cuts_plots":False, #True,
             "do_tof01_weighting":False,
-            "do_optics":True,
+            "do_optics":False, #True,
             "do_data_recorder":False,
         }
 
@@ -228,7 +228,7 @@ class Config(object):
           "delta_tof12":False, #extrapolatedtof12 compared to recon tof12
           "global_through_tof0":False,
           "global_through_tof1":False,
-          "global_through_us_apertures":True, # Disable for prod mc 171
+          "global_through_us_apertures":True,
           "global_through_tku_tp":False,
           "global_through_tkd_tp":False,
           "global_through_tof2":False,
@@ -285,9 +285,13 @@ class Config(object):
     cut_report[4] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
     cut_report[4] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-v11/"
+    data_dir = "output/2017-02-7-test/"
     files = "*"
     analyses = []
+    #analyses.append(get_analysis("10069_v400/"+files, "Simulated 2017-2.7 3-140 lH2 empty", [1.5, 6.5], data_dir, 3, 25))
+    #analyses.append(get_analysis("9971_v400/"+files,  "Simulated 2017-2.7 3-140 lH2 full",  [1.5, 6.5], data_dir, 3, 25))
+    #analyses.append(get_analysis("10483_v400/"+files, "Simulated 2017-2.7 3-140 LiH",       [1.5, 6.5], data_dir, 3, 25))
+    #analyses.append(get_analysis("10444_v400/"+files, "Simulated 2017-2.7 3-140 None",      [1.5, 6.5], data_dir, 3, 25))
 
     analyses.append(get_analysis("10064_v400/"+files, "Simulated 2017-2.7 4-140 lH2 empty", [1.5, 6.0], data_dir, 4, 32))
     analyses.append(get_analysis("9962_v400/"+files, "Simulated 2017-2.7 4-140 lH2 full",   [1.5, 6.0], data_dir, 4, 32))
@@ -303,9 +307,6 @@ class Config(object):
     analyses.append(get_analysis("9970_v400/"+files, "Simulated 2017-2.7 10-140 lH2 full",   [1.5, 4.5], data_dir, 10, 70))
     analyses.append(get_analysis("10486_v400/"+files, "Simulated 2017-2.7 10-140 LiH",       [1.5, 4.5], data_dir, 10, 70))
     analyses.append(get_analysis("10447_v400/"+files, "Simulated 2017-2.7 10-140 None",      [1.5, 4.5], data_dir, 10, 70))
-
-    analyses.append(get_analysis("000171//"+files, "Simulated 2017-2.7 6-140 LiH",      [1.5, 5.5], data_dir, 10, 70, True))
-
     amplitude_bin_width = 5
     amplitude_max = 25
 
@@ -327,8 +328,8 @@ class Config(object):
     maus_verbose_level = 5
 
     amplitude_bin_width = 5
-    amplitude_min_events = 100
-    amplitude_min_bin = 0
+    amplitude_min_events = 1000
+    amplitude_min_bin = 6
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fraction = 0.09        # Fraction at which to evaluate the quantiles

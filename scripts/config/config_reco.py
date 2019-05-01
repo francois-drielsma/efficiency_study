@@ -5,15 +5,11 @@ def mc_file_names(job_name, datasets):
     file_list = ["/home/cr67/work/reco/mc/"+job_name+"/"+datasets+"/*_sim.root"]
     return file_list
 
-def reco_file_names(run_number_list, maus, do_globals):
+def reco_file_names(run_number_list, maus):
     file_list = []
     for run in run_number_list:
         run = str(run).rjust(5, '0')
-        a_file = "/work/ast/cr67/reco/"+maus+"/"+run+"/"+run+"_recon"
-        if not do_globals:
-            a_file += ".root"
-        else:
-            a_file += ".root"
+        a_file = "/work/ast/cr67/reco/"+maus+"/"+run+"/"+run+"_recon.root"
         file_list.append(a_file)
     print file_list
     return file_list
@@ -24,8 +20,8 @@ def get_systematics_dir(emittance, suffix, absorber, analysis):
     return a_dir
 
 def get_systematics(emittance, analysis="amplitude"):
-    us_name = {"amplitude":"all_upstream", "density":"us"}[analysis]
-    ds_name = {"amplitude":"all_downstream", "density":"ds"}[analysis]
+    us_name = {"amplitude":"all_upstream", "density":"us", "fractional_emittance":"us"}[analysis]
+    ds_name = {"amplitude":"all_downstream", "density":"ds", "fractional_emittance":"ds"}[analysis]
     systematics = {
       "reco":{
         "detector_reference":get_systematics_dir(emittance, "tku_base", "lH2_empty", analysis),
@@ -35,7 +31,7 @@ def get_systematics(emittance, analysis="amplitude"):
             get_systematics_dir(emittance, "tku_pos_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tku_rot_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tku_scale_SSUE1_plus", "lH2_empty", analysis):1.,
-            get_systematics_dir(emittance, "tku_scale_SSUC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tku_scale_SSUC_neg", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tku_scale_SSUE2_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tku_density_plus", "lH2_empty", analysis):1.,
           },
@@ -46,7 +42,7 @@ def get_systematics(emittance, analysis="amplitude"):
             get_systematics_dir(emittance, "tkd_pos_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tkd_rot_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tkd_scale_SSDE1_plus", "lH2_empty", analysis):1.,
-            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty", analysis):1.,
+            get_systematics_dir(emittance, "tkd_scale_SSDC_plus", "lH2_empty", analysis):0.1,
             get_systematics_dir(emittance, "tkd_scale_SSDE2_plus", "lH2_empty", analysis):1.,
             get_systematics_dir(emittance, "tkd_density_plus", "lH2_empty", analysis):1.,
           },
@@ -59,7 +55,7 @@ def get_systematics(emittance, analysis="amplitude"):
     }
     return systematics
 
-def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittance, p_bins, tkd_cut, do_globals, tramlines_dp):
+def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittance, p_bins, tkd_cut, tramlines_dp):
     plot_dir = data_dir+"/plots_"+name+"/"
     plot_dir = plot_dir.replace(" ", "_")
     min_p = min([min(a_bin) for a_bin in p_bins])
@@ -83,7 +79,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "p_bins_alt":[[100, 180]], # alternative momentum cut
             "p_tot_ds_low":tkd_cut[0], # downstream momentum cut lower bound
             "p_tot_ds_high":tkd_cut[1], # downstream momentum cut upper bound
-            "reco_files":reco_file_names(run_list, maus_version, do_globals), # list of strings to be handed to glob
+            "reco_files":reco_file_names(run_list, maus_version), # list of strings to be handed to glob
             "name":name, # appears on plots
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
@@ -107,6 +103,15 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
+            "fractional_emittance_mc":False,
+            "fractional_emittance_corrections":get_systematics_dir(emittance,
+                                                                   "tku_base", 
+                                                                   "lH2_empty",
+                                                                   "fractional_emittance"),
+            "fractional_emittance_systematics":get_systematics(emittance, "fractional_emittance"),
+            "fractional_emittance_corrections_draw":True,
+            "fractional_emittance_systematics_draw":True,
+
             "density_mc":False,                 # True if Monte Carlo data
             "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
             "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
@@ -115,14 +120,12 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "density_systematics_draw":True,    # True if density systematics are to be drawn
             "density_sections":False,           # True if density sections are to be printed
 
-            "fractional_emittance_corrections":None,
-
             "do_mc":False,
             "do_magnet_alignment":False,
-            "do_fractional_emittance":False, #True,
+            "do_fractional_emittance":False,
             "do_efficiency":False,
             "do_extrapolation":False,
-            "do_globals":do_globals,
+            "do_globals":True,
             "do_amplitude":True,
             "do_density":True,
             "do_plots":True,
@@ -221,31 +224,23 @@ class Config(object):
     cut_report[2] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-7-v5/"
+    data_dir = "output/2017-02-7-v11/"
     src_dir = "MAUS-Drielsma-ReFit"
-    correct_amplitude = True
     analyses = []
-    #analyses.append(get_analysis([10069], "2017-2.7 3-140 lH2 empty", [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True, 25))
-    #analyses.append(get_analysis([9971],  "2017-2.7 3-140 lH2 full",  [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True, 25))
-    #analyses.append(get_analysis([10483], "2017-2.7 3-140 LiH",       [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True, 25))
-    #analyses.append(get_analysis([10444], "2017-2.7 3-140 None",      [1.5, 6.5], src_dir, data_dir, 3, [[135, 145]], [90, 170], True, 25))
+    analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
+    analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
+    analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
+    analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
 
-    analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True, 32))
-    analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True, 32))
-    analyses.append(get_analysis([10484], "2017-2.7 4-140 LiH",       [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True, 32))
-    analyses.append(get_analysis([10445], "2017-2.7 4-140 None",      [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], True, 32))
+    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], 35))
+    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], 35))
+    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], 35))
+    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], 35))
 
-    analyses.append(get_analysis([10051], "2017-2.7 6-140 lH2 empty", [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True, 35))
-    analyses.append(get_analysis([9966],  "2017-2.7 6-140 lH2 full",  [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True, 35))
-    analyses.append(get_analysis([10485], "2017-2.7 6-140 LiH",       [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True, 35))
-    analyses.append(get_analysis([10446], "2017-2.7 6-140 None",      [1.5, 5.5], src_dir, data_dir, 6, [[135, 145]], [90, 170], True, 35))
-
-    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True, 70))
-    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True, 70))
-    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True, 70))
-    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], True, 70))
-    amplitude_bin_width = 5
-    amplitude_max = 25
+    analyses.append(get_analysis([10052], "2017-2.7 10-140 lH2 empty", [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], 70))
+    analyses.append(get_analysis([9970],  "2017-2.7 10-140 lH2 full",  [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], 70))
+    analyses.append(get_analysis([10486], "2017-2.7 10-140 LiH",       [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], 70))
+    analyses.append(get_analysis([10447], "2017-2.7 10-140 None",      [1.5, 4.5], src_dir, data_dir, 10, [[135, 145]], [90, 170], 70))
 
     required_trackers = [0, 1] # for space points
     required_number_of_track_points = 12 # doesnt do anything
@@ -269,6 +264,10 @@ class Config(object):
     extrapolation_does_apertures = True # set to True in order to include apertures in track extrapolation
     maus_verbose_level = 5
 
+    amplitude_bin_width = 5
+    amplitude_min_events = 100
+    amplitude_min_bin = 0
+
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
     fractional_emittance_fraction = 0.09        # Fraction at which to evaluate the quantiles
     fractional_emittance_uncertainty = 0        # 0: theoretical, 1: bootstrapped
@@ -276,7 +275,7 @@ class Config(object):
     density_nthreads = 1
     density_knn_rotate = True # rotate to eigenvector system
     density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
-    density_graph_npoints = 100
+    density_npoints = 100
     density_graph_scaling = 1e9
 
     magnet_alignment = {

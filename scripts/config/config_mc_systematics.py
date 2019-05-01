@@ -56,7 +56,7 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
             "tku_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
-            "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
+            "tkd_chi2_threshold":4.0, # BUGGGGGGGGG # maximum allowed chi2/dof for chi2 cut
             "amplitude_corrections":None,
             "amplitude_systematics":{},
             "field_uncertainty":0.02,
@@ -75,8 +75,11 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
-            "fractional_emittance_corrections":None,
+            "fractional_emittance_mc":True,
+            "fractional_emittance_corrections":False,
             "fractional_emittance_systematics":{},
+            "fractional_emittance_corrections_draw":True,
+            "fractional_emittance_systematics_draw":True,
 
             "density_mc":True,                  # True if pure Monte Carlo
             "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
@@ -87,14 +90,14 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "density_sections":False,           # True if density sections are to be printed
 
             "do_magnet_alignment":False,
-            "do_efficiency":True,
-            "do_fractional_emittance":True,
+            "do_efficiency":False, #True,
+            "do_fractional_emittance":False, #True,
             "do_amplitude":True,
-            "do_density":True,
+            "do_density":False, #True,
             "do_extrapolation":False,
-            "do_globals":do_globals,
-            "do_mc":True,
-            "do_plots":True,
+            "do_globals":False, #do_globals,
+            "do_mc":False, #True,
+            "do_plots":False, #True,
             "do_cuts_plots":True,
             "do_tof01_weighting":False,
             "do_optics":False,
@@ -157,7 +160,7 @@ class Config(object):
     }
     data_recorder_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts = copy.deepcopy(upstream_cuts)
-    downstream_cuts["p_tot_ds"] = False
+    downstream_cuts["p_tot_ds"] = True
     downstream_cuts["tof2_sp"] = False
     downstream_cuts["pvalue_ds"] = False
     downstream_cuts["chi2_ds"] = True
@@ -175,8 +178,8 @@ class Config(object):
     mc_true_ds_cuts = copy.deepcopy(mc_true_us_cuts)
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
-    mc_true_ds_cuts["mc_p_ds"] = False
-    cut_report = [[], [], [], []]
+    mc_true_ds_cuts["mc_p_ds"] = True
+    cut_report = [[], [], [], [], [], []]
 
     cut_report[0]  = ["hline", "all events", "hline",]
     cut_report[0] += ["scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
@@ -192,14 +195,20 @@ class Config(object):
     cut_report[2] += ["hline", "mc_true_us_cut", "hline"]
 
     cut_report[3] = ["hline", "mc_true_us_cut", "hline",]
-    cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
+    cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-Systematics-v4"
+    cut_report[4] = ["hline", "mc_true_ds_cut", "hline",]
+    cut_report[4] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds",]
+
+    cut_report[5] = ["hline", "downstream_cut", "hline",]
+    cut_report[5] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds",]
+
+    data_dir = "output/2017-02-7-Systematics-test"
     analyses = []
 
 
-    files = "*"
+    files = "000?"
     lih_systematics_list = [
       "mc_base", "mc_lih_plus"
     ]
@@ -302,7 +311,7 @@ class Config(object):
     density_nthreads = 1
     density_knn_rotate = True # rotate to eigenvector system
     density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
-    density_graph_npoints = 100
+    density_npoints = 100
     density_graph_scaling = 1e9
 
     magnet_alignment = {

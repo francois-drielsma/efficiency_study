@@ -89,10 +89,10 @@ class ExtractCoolingStats(object):
 
 
 def main():
-    prefix = "output/2017-02-7-v6/"
+    prefix = "output/2017-02-7-v10/"
     stats = ExtractCoolingStats()
     stats.rows = ["None", "lH2_empty", "lH2_full", "LiH",]
-    bin_headings = [(0, "4-140"), (0, "6-140"), (0, "10-140")]
+    bin_headings = [(0, "4-140"), (4, "6-140"), (6, "10-140")]
     stats.headings = [head[1] for head in bin_headings]
     table = []
     for absorber in stats.rows:
