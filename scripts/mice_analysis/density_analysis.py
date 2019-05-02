@@ -467,7 +467,6 @@ class DensityAnalysis(AnalysisBase):
         * loc specifies the location of the tracker (us, ds)
         * include_corr is True if the corrected levels are to be represented
         * include_syst is True if the systematic uncertainty is to be includes
-        * normalised is True if we normalise to the maximum density in the "us" location
         """
         scale_factor = self.config.density_graph_scaling
         level_type = "levels"
@@ -482,8 +481,8 @@ class DensityAnalysis(AnalysisBase):
             alpha = (float(i+1.)/(self.npoints+1.))
             value = self.density_data[typ][loc][level_type][i]*scale_factor
             graph.SetPoint(i, alpha, value)
-            all_err = self.density_data[typ][loc]["levels_stat_errors"][i]*scale_factor
             print "    ", i, format(value, "4.2g"),
+            all_err = self.density_data[typ][loc]["levels_stat_errors"][i]*scale_factor
             print "stt:", format(all_err, "4.2g"), "sys:",
             if include_syst and value > 0.:
                 syst_err = self.density_data[typ][loc]["levels_syst_errors"][i]
@@ -662,21 +661,21 @@ class DensityAnalysis(AnalysisBase):
           "inefficiency":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                  "level_ratio_capped":[1. for i in range(self.npoints)]
+                      "level_ratio_capped":[1. for i in range(self.npoints)]
               },
               "ds":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                  "level_ratio_capped":[1. for i in range(self.npoints)]
+                      "level_ratio_capped":[1. for i in range(self.npoints)]
               },
           },
           "response":{
               "us":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                  "level_ratio_capped":[1. for i in range(self.npoints)]
+                      "level_ratio_capped":[1. for i in range(self.npoints)]
               },
               "ds":{
                   "level_ratio":[1. for i in range(self.npoints)],
-                  "level_ratio_capped":[1. for i in range(self.npoints)]
+                      "level_ratio_capped":[1. for i in range(self.npoints)]
               },
           },
           "source":"",
@@ -688,16 +687,16 @@ class DensityAnalysis(AnalysisBase):
             "performance_reference":None,
             "detector_reference":None,
             "us":{
-                "levels":[],
-                "corrected_levels":[],
+                    "levels":[],
+                    "corrected_levels":[],
                 "levels_stat_errors":[],
                 "levels_syst_errors":[],
                 "detector_systematics":[],
                 "performance_systematics":[],
             },
             "ds":{
-                "levels":[],
-                "corrected_levels":[],
+                    "levels":[],
+                    "corrected_levels":[],
                 "levels_stat_errors":[],
                 "levels_syst_errors":[],
                 "detector_systematics":[],

@@ -8,10 +8,11 @@ import ROOT
 class kNNDensityEstimator(object):
 
     # Initialize the kNN density estimator
-    #  -data		Array of data points
-    #  -rotate		Evaluate the distances in the metric of the covariance matrix
-    #  -nthreads	Number of threads available
-    #  -norm		Normalisation factor (i.e. transmission, default to 1.)
+    #  -data            Array of data points
+    #  -rotate          Evaluate the distances in the metric of the covariance matrix
+    #  -nthreads        Number of threads available
+    #  -norm            Normalisation factor (i.e. fractional of the beam transmitted,
+    #                   default to 1.)
     def __init__(self, data, rotate=True, nthreads=1, norm=1.):
 
         # Initialize the base members
@@ -70,9 +71,9 @@ class kNNDensityEstimator(object):
         return self.norm*self.density(x)/self.scale
 
     # Returns the density profile as two arrays (values and stat errors)
-    #  -npoints	Number of points contained in the graph (number of steps)
-    #  -bsr	Use bootstrap resampling to evaluate uncertainties
-    #  -bsr_n	Number of iterations of the bootstrap resampling
+    #  -npoints Number of points contained in the graph (number of steps)
+    #  -bsr     Use bootstrap resampling to evaluate uncertainties
+    #  -bsr_n   Number of iterations of the bootstrap resampling
     def profile(self, npoints=1000, bsr=False, bsr_n=10, scaling=1.):
         # Set the levels of the training set if they have not been set yet
         if not len(self.levels):
@@ -146,10 +147,10 @@ class kNNDensityEstimator(object):
         return profile
 
     # Returns a lower dimensional section of the space at x
-    #  -axes	List of axes ids to produce a Poincare section of
-    #  -x	d-point that the Poincare section contains
-    #  -mins	Minimums in each of the axes
-    #  -maxs	Maximums in each of the axes
+    #  -axes    List of axes ids to produce a Poincare section of
+    #  -x       d-point that the Poincare section contains
+    #  -mins    Minimums in each of the axes
+    #  -maxs    Maximums in each of the axes
     def section(self, axes, x=[], mins=[], maxs=[]):
 
         # Check that the dimension of the section is supported and sensible
