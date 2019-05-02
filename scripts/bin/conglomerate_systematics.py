@@ -118,11 +118,11 @@ class CompareCutsSystematicConfig(CompareConfig):
         "tkd_max_r*":"Max R in TKD [mm]",
     }
 
-def systematics_cut_summary():
-    target_dir = "output/2017-02-7-Systematics-v3/"
+def systematics_cut_summary(target_dir):
     dir_list = [
-        "2017-2.7_3-140_lH2_empty_Systematics_tku_base",  "2017-2.7_4-140_lH2_empty_Systematics_tku_base",
-        "2017-2.7_6-140_lH2_empty_Systematics_tku_base",  "2017-2.7_10-140_lH2_empty_Systematics_tku_base", 
+        "2017-2.7_4-140_lH2_empty_Systematics_tku_base",
+        "2017-2.7_6-140_lH2_empty_Systematics_tku_base",
+        "2017-2.7_10-140_lH2_empty_Systematics_tku_base", 
     ]
     mc_cuts_summary = MergeCutsSummaryTex()
     mc_cuts_summary.table_ref_pre = "systematics_"
@@ -276,11 +276,11 @@ class SystematicsConglomerate(object):
 
 
 def main():
-    #systematics_cut_summary()
+    target_dir = "output/2017-02-7-v11/"
+    systematics_source_dir = "output/2017-02-7-Systematics-v5/"
+    systematics_cut_summary(systematics_source_dir)
     root_style.setup_gstyle()
     ROOT.gROOT.SetBatch(True)
-    target_dir = "output/2017-02-7-v5/"
-    systematics_source_dir = "output/2017-02-7-Systematics-v4/"
     top_labels = ["4-140", "6-140", "10-140"]
 
     dir_name = "compare_recon_systematics"
@@ -293,7 +293,7 @@ def main():
     lh2_full_dir_list = [["2017-2.7_4-140_lH2_full", "2017-2.7_6-140_lH2_full", "2017-2.7_10-140_lH2_full",],]
     right_labels = ["Full\nLH2",]
     sys_conglomerate = SystematicsConglomerate(top_labels, right_labels, target_dir, systematics_source_dir, dir_name)
-    #sys_conglomerate.lh2_full(lh2_full_dir_list)
+    sys_conglomerate.lh2_full(lh2_full_dir_list)
 
     lih_full_dir_list = [["2017-2.7_4-140_LiH", "2017-2.7_6-140_LiH", "2017-2.7_10-140_LiH",],]
     right_labels = ["LiH",] 

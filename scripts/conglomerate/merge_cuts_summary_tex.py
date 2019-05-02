@@ -13,7 +13,7 @@ class MergeCutsSummaryTex(object):
         self.data = []
         # table captions
         self.caption = ""
-        self.vertical_splits = 8
+        self.vertical_splits = 6
         self.table_ref_pre = ""
 
     def append_summary(self, config, dir_selection):

@@ -186,8 +186,8 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
     x_range = [0.01, 1.1]
     modifiers = {
         "merge_options":{
-            "right_labels":top_labels, # intentionally transposed!
-            "top_labels":right_labels,
+            "right_labels":right_labels,
+            "top_labels":top_labels,
             "row_fill":emit_colors(),
         },
         "hist_title":"",
@@ -209,7 +209,7 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
             "marker_color":[0],
             "draw_order":[0],
             "x_range":x_range,
-            "y_range":density_y_range(beam),
+            "y_range":[0.01, 1.4], #density_y_range(beam),
             "graph":{
                     "draw_option":["L 3", "L 3", "L 3", "L 3", "L 3"], # reco, extrap reco, reco mc, mc truth
                     "marker_style":None,
@@ -230,7 +230,7 @@ def density_recon_mod(name, beam, target_dir, top_labels, right_labels):
         "defit":False,
         "axis_title":{
             "x":"Fraction of upstream sample",
-            "y":"Density #times 10^{-9} [(mm MeV/c)^{-2}]",
+            "y":"Normalised Density",
         },
     }
     return modifiers
@@ -240,8 +240,8 @@ def density_ratio_mod(name, beam, target_dir, top_labels, right_labels):
     x_range = [0.01, 1.1]
     modifiers = {
         "merge_options":{
-            "right_labels":top_labels,
-            "top_labels":right_labels
+            "right_labels":right_labels,
+            "top_labels":top_labels,
         },
         "hist_title":"",
         "file_name":name,
@@ -306,7 +306,7 @@ class CompareDensityConfig(CompareConfig):
         output_dir = "compare_density/"
         self.setup(beam, target_dir, "density/", output_dir, dir_list)
         self.conglomerate_list = []
-        mods = density_recon_mod("density_profile_reco", beam, target_dir, top_labels, right_labels)
+        mods = density_recon_mod("normalised_density_profile_reco", beam, target_dir, top_labels, right_labels)
         self.conglomerate_list.append(
             self.get_conglomerate_0(modifiers = mods),
         )
@@ -395,10 +395,10 @@ class CompareCutsConfig(CompareConfig):
             self.get_conglomerate_2("global_through_virtual_diffuser_us_r_"+nu+"_0", None, "Radius at diffuser (upstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100], mod)),
             self.get_conglomerate_2("global_through_virtual_diffuser_ds_r_"+nu+"_0", None, "Radius at diffuser (downstream) [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([100], mod)),
             self.get_conglomerate_2("tkd_n_tracks_"+nd+"_0", None, "Number of tracks in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)),
-            self.get_conglomerate_2("tkd_chi2_"+nd+"_0", None, "#chi^{2}/D.o.F. in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4], mod)),
+            self.get_conglomerate_2("tkd_chi2_"+nd+"_0", None, "#chi^{2}/D.o.F. in TKD", None, True, [0.5, 0.5, 0.9, 0.9], vertical([8], mod)),
             self.get_conglomerate_2("tkd_max_r_"+nd+"_0", None, "Maximum radius in TKD stations [mm]", [0., 300.], True, [0.5, 0.5, 0.9, 0.9], vertical([150], mod)),
             self.get_conglomerate_2("tkd_p_"+nd1+"_0", None, "Momentum at TKD Reference Plane [MeV/c]", [50., 250.], True, [0.5, 0.5, 0.9, 0.9], vertical([90, 170], mod)),
-            self.get_conglomerate_2("tku_chi2_"+nu+"_0", None, "#chi^{2}/D.o.F. in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([4], mod)),
+            self.get_conglomerate_2("tku_chi2_"+nu+"_0", None, "#chi^{2}/D.o.F. in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([8], mod)),
             self.get_conglomerate_2("tku_max_r_"+nu+"_0", None, "Maximum radius in TKU stations [mm]", None, True, [0.5, 0.5, 0.9, 0.9], vertical([150], mod)),
             self.get_conglomerate_2("tku_n_tracks_"+nu+"_0", None, "Number of tracks in TKU", None, True, [0.5, 0.5, 0.9, 0.9], vertical([0.5, 1.5], mod)), # disable two cuts
             self.get_conglomerate_2("tku_p_"+nu+"_0", None, "Momentum at TKU Reference Plane [MeV/c]", [50., 250.], [135, 145], [0.5, 0.5, 0.9, 0.9], vertical([135, 145], mod)),
@@ -416,8 +416,8 @@ class CompareCutsConfig(CompareConfig):
         ]
         self.data_caption = [[],]
         self.data_caption[0] = [
-            " Samples are listed for 3-140 and 4-140 datasets.",
-            " Samples are listed for 6-140 and 10-140 datasets.",
+            " Samples are listed for None and lH2 empty datasets.",
+            " Samples are listed for lH2 full and LiH datasets.",
         ]
         self.data_caption.append(copy.deepcopy(self.data_caption[0]))
         self.data_caption.append(copy.deepcopy(self.data_caption[0]))
@@ -1007,20 +1007,20 @@ def main_paper(batch_level = 0):
         ["2017-2.7_4-140_LiH",       "2017-2.7_6-140_LiH",       "2017-2.7_10-140_LiH"],
     ]
     top_labels = ["4-140", "6-140", "10-140"]
-    right_labels = ["LiH", "No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
-    config_list = [CompareData1DConfig, CompareCutsConfig, 
-                   CompareOpticsConfig, CompareOpticsMCConfig,
-                   CompareGlobalsConfig, CompareMCConfig,
-                   CompareData2DConfig, CompareData2DMCConfig,
+    right_labels = ["No\nabsorber", "Empty\nLH2", "Full\nLH2", "LiH"]
+    config_list = [CompareCutsConfig, #CompareData1DConfig,
+#                   CompareOpticsConfig, CompareOpticsMCConfig,
+#                   CompareGlobalsConfig, CompareMCConfig,
+#                   CompareData2DConfig, CompareData2DMCConfig,
                   ]
-    config_list += [CompareAmplitudeConfigBoth,
-                   CompareAmplitudeConfigMC,
-                   CompareAmplitudeConfigData
-                   ]
-    #fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
-    #my_dir_list = numpy.array(my_dir_list).transpose().tolist()
-    config_list = [CompareDensityRatioConfig] #CompareDensityConfig,  CompareFractionalEmittanceConfig, 
-    fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, False, target_dir, top_labels, right_labels)
+#    config_list += [CompareAmplitudeConfigBoth,
+#                   CompareAmplitudeConfigMC,
+#                   CompareAmplitudeConfigData
+#                   ]
+    fd_1 = run_conglomerate(batch_level, config_list, my_dir_list, do_cuts_summary, target_dir, top_labels, right_labels)
+    my_dir_list = numpy.array(my_dir_list).transpose().tolist()
+    config_list = [CompareDensityRatioConfig, CompareDensityConfig]#,  CompareFractionalEmittanceConfig, 
+#    fd_2 = run_conglomerate(batch_level, config_list, my_dir_list, False, target_dir, top_labels, right_labels)
     print_fail_dict(fd_1)
     print_fail_dict(fd_2)
 

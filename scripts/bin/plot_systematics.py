@@ -466,13 +466,13 @@ def copy_more(input_dir, output_dir):
 
 def main():
     utilities.root_style.setup_gstyle()
-    sys_dir = "2017-02-7-Systematics-v4/"
+    sys_dir = "2017-02-7-Systematics-v5/"
     output_dir = "output/"+sys_dir+"recon_systematics_summary/"
-    #do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
-    #copy_more(sys_dir, output_dir)
-    #do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
-    #do_downstream(sys_dir, ["4",  "6", "10"], output_dir) # ,
-    #do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
+    do_copy(sys_dir, ["4", "6", "10"], output_dir)# "4", "6", "10"
+    copy_more(sys_dir, output_dir)
+    do_upstream(sys_dir, ["4", "6", "10"], output_dir) # 
+    do_downstream(sys_dir, ["4",  "6", "10"], output_dir) # ,
+    do_correction_comparison(sys_dir, ["4", "6", "10"], output_dir) #
     output_dir = "output/"+sys_dir+"performance_systematics_summary/"
     do_performance_comparison(sys_dir, ["4", "6", "10"], output_dir) #
 
