@@ -11,7 +11,8 @@ class kNNDensityEstimator(object):
     #  -data            Array of data points
     #  -rotate          Evaluate the distances in the metric of the covariance matrix
     #  -nthreads        Number of threads available
-    #  -norm            Normalisation factor (i.e. transmission, default to 1.)
+    #  -norm            Normalisation factor (i.e. fractional of the beam transmitted,
+    #                   default to 1.)
     def __init__(self, data, rotate=True, nthreads=1, norm=1.):
 
         # Initialize the base members
@@ -48,7 +49,7 @@ class kNNDensityEstimator(object):
             Ut = np.matrix(eigvec).transpose()
             self.metric = invLsqrt*Ut
 
-            # d) Rotate all the points 
+            # d) Rotate all the points
             for i in range(self.n):
                 x = self.metric*np.matrix(data[i]).transpose()
                 self.data[i] = x.transpose()
@@ -73,8 +74,8 @@ class kNNDensityEstimator(object):
     #  -npoints Number of points contained in the graph (number of steps)
     #  -bsr     Use bootstrap resampling to evaluate uncertainties
     #  -bsr_n   Number of iterations of the bootstrap resampling
-    def profile(self, npoints=1000, bsr=False, bsr_n=10):
-
+    #  -scaling Global scaling factor
+    def profile(self, npoints=1000, bsr=False, bsr_n=10, scaling=1.):
         # Set the levels of the training set if they have not been set yet
         if not len(self.levels):
             self.set_levels()
@@ -88,9 +89,8 @@ class kNNDensityEstimator(object):
                 level = 0.
                 if alpha < self.norm:
                     level = np.quantile(self.levels, 1.-alpha/self.norm)
-
-                values[i] = level
-                errors[i] = level*self.level_uncertainty(alpha)
+                values[i] = level*scaling
+                errors[i] = level*self.level_uncertainty(alpha)*scaling
         else:
             # Bootstrap the data, evaluate the profiles for each new sample
             baseline = self.data
@@ -107,7 +107,7 @@ class kNNDensityEstimator(object):
                 self.__init__(sample, self.rotate, self.nthreads, self.norm)
                 self.set_levels()
 
-                # Evaluate the array of levels of the new sample        
+                # Evaluate the array of levels of the new sample
                 for i in range(npoints):
                     alpha = (float(i+1)/(npoints+1))
                     levels[i][j] = 0.
@@ -163,7 +163,7 @@ class kNNDensityEstimator(object):
         for axis in axes:
             if axis >= self.dim:
                 raise ValueError('Axis id %d is not compatible with space dimension %d'\
-                                                                         %(axis, self.dim))
+                                                        %(axis, self.dim))
 
         # If an intersection point is provided, check that it is of the right dimension
         # If not provided, take the point at the origin of the space
@@ -237,7 +237,7 @@ class kNNDensityEstimator(object):
         # Single-threaded approach
         if self.nthreads == 1:
             for i in range(self.n):
-                set_level(i)
+                self.set_level(i)
 
         # Multi-threaded approach
         else:

@@ -19,6 +19,9 @@ class PlotAmplitudeData(object):
         self.plot_data_1d("emittance_vs_n_events_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.n_events_lambda, "Number of Events")
         self.plot_data_1d("emittance_vs_beta_x_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_x_lambda, "#beta_{x} [mm]")
         self.plot_data_1d("emittance_vs_beta_y_"+self.key, self.emittance_4d_lambda, "#varepsilon_{4D} [mm]", self.beta_y_lambda, "#beta_{y} [mm]")
+        self.plot_data_1d("max_amplitude_vs_n_events_"+self.key, self.max_amp_lambda, "#A [mm]", self.n_events_lambda, "Number of Events")
+        self.plot_data_1d("max_amplitude_vs_beta_x_"+self.key, self.max_amp_lambda, "A [mm]", self.beta_x_lambda, "#beta_{x} [mm]")
+        self.plot_data_1d("max_amplitude_vs_beta_y_"+self.key, self.max_amp_lambda, "A [mm]", self.beta_y_lambda, "#beta_{y} [mm]")
         for i in range(4):
             for j in range(i+1, 4):
                 self.plot_phase_space(i, j)
@@ -167,6 +170,10 @@ class PlotAmplitudeData(object):
     @classmethod
     def emittance_4d_lambda(cls, state):
         return state["emittance"]
+
+    @classmethod
+    def max_amp_lambda(cls, state):
+        return state["max_amplitude"]
 
     @classmethod
     def n_events_lambda(cls, state):

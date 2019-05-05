@@ -67,10 +67,10 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "tof1_n_sp":1,
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
-            "delta_tof01_lower":-1., # Delta TOF01 cut lower bound
-            "delta_tof01_upper":+1.5, # Delta TOF01 cut upper bound
-            "delta_tof12_lower":-5., # Delta TOF01 cut lower bound
-            "delta_tof12_upper":5., # Delta TOF01 cut upper bound
+            "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
+            "delta_tof01_upper":+1.5, # Delta TOF01 cut upper bound 
+            "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
+            "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
             "tof01_tramline_lower":-15.+tramlines_dp, # p_tof01 - p_tku
             "tof01_tramline_upper":+15.+tramlines_dp, # p_tof01 - p_tku
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
@@ -105,7 +105,7 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
 
             "fractional_emittance_mc":False,
             "fractional_emittance_corrections":get_systematics_dir(emittance,
-                                                                   "tku_base",
+                                                                   "tku_base", 
                                                                    "lH2_empty",
                                                                    "fractional_emittance"),
             "fractional_emittance_systematics":get_systematics(emittance, "fractional_emittance"),
@@ -113,7 +113,6 @@ def get_analysis(run_list, name, tof01_min_max, maus_version, data_dir, emittanc
             "fractional_emittance_systematics_draw":True,
 
             "density_mc":False,                 # True if Monte Carlo data
-            "density_use_capped":False,         # True if capped corrections are used
             "density_corrections_cutoff":.5,    # Cutoff above which correction is averaged
             "density_corrections":get_systematics_dir(emittance, "tku_base", "lH2_empty", "density"),
             "density_systematics":get_systematics(emittance, "density"),
@@ -225,8 +224,8 @@ class Config(object):
     cut_report[2] += ["extrapolation_cut", "hline"]
 
 
-    data_dir = "output/2017-02-7-v11/"
-    src_dir = "MAUS-Drielsma-ReFit"
+    data_dir = "output/2017-02-7-production-test-3/"
+    src_dir = "Production-v3"
     analyses = []
     analyses.append(get_analysis([10064], "2017-2.7 4-140 lH2 empty", [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
     analyses.append(get_analysis([9962],  "2017-2.7 4-140 lH2 full",  [1.5, 6.0], src_dir, data_dir, 4, [[135, 145]], [90, 170], 32))
@@ -387,3 +386,5 @@ class Config(object):
       [(float(z)+z_afc, 200., "pipe_"+str(z)) for z in range(-1800, 1801, 100)]+\
       [(+209.6+z_afc, 160., "afc_209.6")],
     )
+
+

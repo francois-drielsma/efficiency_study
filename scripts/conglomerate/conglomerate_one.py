@@ -42,19 +42,26 @@ class ConglomerateOne(object):
 
     def get_hist_list(self, canvas):
         hist_list = []
-        other_types = [type(ROOT.TGraph()), type(ROOT.TFrame())]
+        hist_names = self.options["histogram_names"]
+        if hist_names == None:
+            hist_names = []
+        other_types = [type(ROOT.TGraph()), type(ROOT.TFrame()),
+                       type(ROOT.TLegend()), type(ROOT.TGraphErrors())] #, type(ROOT.TMultiGraph())]
         pad = self.get_pad(canvas)
         for an_object in pad.GetListOfPrimitives():
             name = str(an_object.GetName()).replace(" ", "_")
-            for hist_name in self.options["histogram_names"]:
+            print "ROOT object name", name, "type", type(an_object)
+            for hist_name in hist_names:
                 hist_name = hist_name.replace(" ", "_")
                 if hist_name in name:
                     if type(an_object) in other_types:
                         continue
+                    if type(an_object) == type(ROOT.TMultiGraph()):
+                        an_object = an_object.GetHistogram()
                     hist_list.append(an_object)
                     an_object.SetName(an_object.GetName()+self.uid())
                     break # we can only add each object once
-        if len(hist_list) == 0:
+        if len(hist_list) == 0 and hist_names:
             print "Did not find a histogram from list", self.options["histogram_names"]
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
@@ -64,7 +71,7 @@ class ConglomerateOne(object):
     def get_graph_list(self, canvas):
         graph_list = []
         pad = self.get_pad(canvas)
-        graph_types = [type(ROOT.TGraph()), type(ROOT.TGraphAsymmErrors())]
+        graph_types = [type(ROOT.TGraph()), type(ROOT.TGraphAsymmErrors()), type(ROOT.TGraphErrors())]
         graph_name_list = copy.deepcopy(self.options["graph_names"])
         graph_name_list = [name.replace(" ", "_").lower() for name in graph_name_list]
         canvas_objects = [an_object for an_object in pad.GetListOfPrimitives()]
@@ -72,13 +79,18 @@ class ConglomerateOne(object):
             for an_object in canvas_objects:
                 name = str(an_object.GetName()).replace(" ", "_").lower()
                 if graph_name in name:
-                    if type(an_object) not in graph_types:
+                    if type(an_object) == type(ROOT.TMultiGraph()):
+                        graph_list.append(an_object)
+                        for item in an_object.GetListOfGraphs():
+                            graph_list.append(item)
+                        continue
+                    elif type(an_object) not in graph_types:
                         print name, "matches", graph_name, "but type", type(an_object), "not a graph - skipping"
                         continue
                     graph_list.append(an_object)
                     canvas_objects.remove(an_object)
                     break # we can only add each object once
-        if len(graph_name_list) != len(graph_list):
+        if len(graph_name_list) > len(graph_list):
             print "Did not find graphs", graph_name_list, "from:"
             for an_object in pad.GetListOfPrimitives():
                 print an_object.GetName()
@@ -92,6 +104,7 @@ class ConglomerateOne(object):
         for key in a_list:
             old_canvas = key.ReadObj()
             target_name = self.options["canvas_name"].replace(" ", "_")
+            target_name = target_name.replace("*", "").replace("?", "")
             canvas_name = (old_canvas.GetName()).replace(" ", "_")
             if target_name in canvas_name:
                 return old_canvas
@@ -237,9 +250,11 @@ class ConglomerateOne(object):
     def normalise_graph(self, canvas, hist_list, graph_list):
         if not self.options["normalise_graph"]:
             return
-        max_y = self.graph_max_y(graph_list[0])
-        for graph in graph_list[1:]:
-            max_y = max(self.graph_max_y(graph), max_y)
+        tgt_name = self.options["normalise_graph"]
+        for graph in graph_list:
+              if type(tgt_name) == type("") and tgt_name in graph.GetName():
+                  break
+        max_y = self.graph_max_y(graph)
         for graph in graph_list:
             ey_low = graph.GetEYlow()
             ey_high = graph.GetEYhigh()
@@ -321,41 +336,50 @@ class ConglomerateOne(object):
 
     def redraw(self, canvas, hist_list, graph_list):
         redraw = self.options["redraw"]
-        draw_option = ["" for hist in hist_list]
-        draw_order = [i for i, hist in enumerate(hist_list)]
-        if redraw:
-            print "Will redraw", redraw["x_range"], redraw["y_range"]
-            if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
-                print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
-                print json.dumps(redraw, indent=2)
-                raise RuntimeError("Failed to find all histograms for redraw")
-            for i, hist in enumerate(hist_list):
-                if type(hist) == type(ROOT.TGraph()):
-                    continue
-                if i >= len(redraw["line_color"]):
-                    continue # ignore
-                hist.SetLineColor(redraw["line_color"][i])
-                if redraw["transparency"] != None:
-                    hist.SetFillColorAlpha(redraw["fill_color"][i], redraw["transparency"][i])
-                else:
-                    hist.SetFillColor(redraw["fill_color"][i])
-                hist.SetLineWidth(1)
+        if not redraw:
+            return
+        #### hist
+        print "Will redraw", redraw["x_range"], redraw["y_range"]
+        if len(hist_list) != len(redraw["line_color"]) and not redraw["ignore_more_histograms"]:
+            print "Failed to find all the histograms for redraw(...); found", len(hist_list), "expected", len(redraw["line_color"])
+            print json.dumps(redraw, indent=2)
+            raise RuntimeError("Failed to find all histograms for redraw")
+        for i, hist in enumerate(hist_list):
+            if type(hist) == type(ROOT.TGraph()) or  type(hist) == type(ROOT.TMultiGraph()):
+                continue
+            if i >= len(redraw["line_color"]):
+                continue # ignore
+            hist.SetLineColor(redraw["line_color"][i])
+            if redraw["transparency"] != None:
+                print "Doing transparency"
+                hist.SetFillColorAlpha(redraw["fill_color"][i], redraw["transparency"][i])
+            else:
+                hist.SetFillColor(redraw["fill_color"][i])
+            hist.SetLineWidth(1)
+            if redraw["marker_style"] != None:
                 hist.SetMarkerStyle(redraw["marker_style"][i])
-                for axis in hist.GetXaxis(), hist.GetYaxis():
-                    axis.SetNdivisions(5, 5, 0)
-                    axis.SetLabelSize(self.label_size)
-                hist.SetName(hist.GetName()+"_"+self.uid())
-            draw_option = redraw["draw_option"]
-            draw_order = redraw["draw_order"]
-            # nb if redraw range is wider than original, can draw overflow and underflow bins
-            if redraw["x_range"] != None:
-                hist.GetXaxis().SetRangeUser(redraw["x_range"][0], redraw["x_range"][1])
-            if redraw["y_range"] != None:
-                hist.GetYaxis().SetRangeUser(redraw["y_range"][0], redraw["y_range"][1])
+            marker_color = 1
+            if "marker_color" in redraw:
+                marker_color = redraw["marker_color"][i]
+            hist.SetMarkerColor(marker_color)
+            for axis in hist.GetXaxis(), hist.GetYaxis():
+                axis.SetNdivisions(5, 5, 0)
+                axis.SetLabelSize(self.label_size)
+            hist.SetName(hist.GetName()+"_"+self.uid())
+        draw_option = redraw["draw_option"]
+        draw_order = redraw["draw_order"]
+        # nb if redraw range is wider than original, can draw overflow and underflow bins
+        if redraw["x_range"] != None:
+            hist.GetXaxis().SetRangeUser(redraw["x_range"][0], redraw["x_range"][1])
+        if redraw["y_range"] != None:
+            hist.GetYaxis().SetRangeUser(redraw["y_range"][0], redraw["y_range"][1])
         same = ""
         for i in draw_order:
             hist_list[i].Draw(same+draw_option[i])
             same = "SAME "
+
+        #### graph
+
         if "graph" in redraw:
             graph_draw = redraw["graph"]
         else:
@@ -367,11 +391,18 @@ class ConglomerateOne(object):
                 "draw_order":None,
                 "fill_color":None,
                 "fill_style":None,
+                "line_color":None,
+                "line_width":None,
             }
         if graph_draw["draw_order"] == None:
             graph_draw["draw_order"] = range(len(graph_list))
         for i in graph_draw["draw_order"]:
             graph = graph_list[i]
+            if type(graph) == type(ROOT.TMultiGraph()):
+                if redraw["y_range"] != None:
+                    graph.SetMinimum(redraw["y_range"][0])
+                    graph.SetMaximum(redraw["y_range"][1])
+                continue
             graph.SetName(graph.GetName()+"_"+self.uid())
             if graph_draw["marker_style"] != None:
                 graph.SetMarkerStyle(graph_draw["marker_style"][i])
@@ -379,6 +410,10 @@ class ConglomerateOne(object):
                 graph.SetMarkerColor(graph_draw["marker_color"][i])
             if graph_draw["fill_style"] != None:
                 graph.SetFillStyle(graph_draw["fill_style"][i])
+            if "line_color" in graph_draw and graph_draw["line_color"] != None:
+                graph.SetLineColor(graph_draw["line_color"][i])
+            if "line_width" in graph_draw and graph_draw["line_width"] != None:
+                graph.SetLineWidth(graph_draw["line_width"][i])
             if graph_draw["fill_color"] != None:
                 if graph_draw["transparency"] != None:
                     graph.SetFillColorAlpha(graph_draw["fill_color"][i],
@@ -462,10 +497,14 @@ class ConglomerateOne(object):
         if self.options["write_plots"]["file_name"]:
             name = str(self.options["write_plots"]["file_name"])
         else:
-            name = str(canvas.GetName())
+            name = str(self.options["canvas_name"])
         print name, self.options["write_plots"]
         name = name.replace(" ", "_")
+        name = name.replace("*", "")
+        name = name.replace("?", "")
         name = name.replace(".",  "_")
+        if self.options["unique_id"] == None:
+            self.options["unique_id"] = name
         name = os.path.join(plot_dir, name)
         for fmt in formats:
             canvas.Print(name+"."+fmt)
@@ -517,8 +556,6 @@ class ConglomerateOne(object):
             old_canvas = self.get_canvas(file_name)
             self.hist_list += self.get_hist_list(old_canvas)
             self.graph_list += self.get_graph_list(old_canvas)
-        if len(self.hist_list) == 0:
-            print "Error - failed to find plots for", self.options["file_name"]
         print "Found", len(self.hist_list), "histograms"
         for hist in self.hist_list:
             print "   ", hist.GetName()

@@ -248,6 +248,10 @@ class MCPlotter(AnalysisBase):
 
     axis_labels = {"x":"x(meas) - x(true) [mm]", "y":"y(meas) - y(true) [mm]", "z":"z(meas) - z(true) [mm]", "t":"t(meas) - t(true) [ns]",
                    "px":"p_{x}(meas) - p_{x}(true) [MeV/c]", "py":"p_{y}(meas) - p_{y}(true) [MeV/c]", "pz":"p_{z}(meas) - p_{z}(true) [MeV/c]"}
+
+    cmp_axis_labels = {"x":"x [mm]", "y":"y [mm]", "z":"z [mm]", "t":"t [ns]",
+                   "px":"p_{x} [MeV/c]", "py":"p_{y} [MeV/c]", "pz":"p_{z} [MeV/c]"}
+
     def plot_detector_residuals(self, suffix):
         self.axis_min_max = {}
         for var in self.residual_dict.keys():
@@ -285,7 +289,7 @@ class MCPlotter(AnalysisBase):
             cut = "downstream_cut"
             offset_i = self.config.tof1_offset
             offset_j = self.config.tof2_offset
-        residuals = []
+        residuals, mc, det = [], [], []
         for event in self.data_loader.events:
             if event[cut]:
                 continue
@@ -303,20 +307,23 @@ class MCPlotter(AnalysisBase):
                 if t_i != None and t_j != None:
                     mc_tof = (t_j + offset_j) - (t_i + offset_i)
                     residuals.append(reco_tof - mc_tof)
+                    mc.append(mc_tof)
+                    det.append(reco_tof)
                     break
-        return {"t":residuals}
-
+        return {"t":residuals}, {"t":mc}, {"t":det}
 
     def get_data_detector_residuals(self, det_name, virt_name):
         if det_name in ["tof01", "tof12"]:
             return self.get_tofij_residual(det_name)
-
         if det_name in ["tku_tp", "tkd_tp"]:
             residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
         elif det_name in ["tof0", "tof1", "tof2"]:
             residual_dict = {"x":[], "y":[], "z":[]}
         elif "global" in det_name:
             residual_dict = {"x":[], "y":[], "z":[], "px":[], "py":[], "pz":[]}
+        mc_dict = copy.deepcopy(residual_dict)
+        det_dict = copy.deepcopy(residual_dict)
+            
         if det_name in ["tku_tp", "tof0", "tof1"] or "global_through" in det_name:
             cut = "upstream_cut"
         else:
@@ -333,10 +340,12 @@ class MCPlotter(AnalysisBase):
                 else:
                     continue
                 if vhit != None and thit != None:
-                    for residual in residual_dict.keys():
-                        residual_dict[residual].append(thit[residual] - vhit[residual])
+                    for key in residual_dict.keys():
+                        residual_dict[key].append(thit[key] - vhit[key])
+                        mc_dict[key].append(vhit[key])
+                        det_dict[key].append(thit[key])
                     break # next event please
-        return residual_dict
+        return residual_dict, mc_dict, det_dict
 
     def efficiency_plot(self):
         efficiency = Efficiency(self.amp.reco_mc_data_ds,
@@ -349,12 +358,25 @@ class MCPlotter(AnalysisBase):
     def process_data_detector_residuals(self):
         for detector, virtual_station_list in self.mc_stations.iteritems():
             virtual_station = virtual_station_list[0]
-            residual_dict = self.get_data_detector_residuals(detector, virtual_station)
+            residual_dict, mc_dict, det_dict = \
+                     self.get_data_detector_residuals(detector, virtual_station)
             for var in sorted(residual_dict.keys()):
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]
                 hist = self.plots[canvas_name]["histograms"][var]
                 for item in data:
+                    hist.Fill(item)
+
+                canvas_name = "mc_compare_"+detector+"_"+var
+
+                mc_data = mc_dict[var]
+                hist = self.plots[canvas_name]["histograms"]["mc_"+var]
+                for item in mc_data:
+                    hist.Fill(item)
+
+                det_data = det_dict[var]
+                hist = self.plots[canvas_name]["histograms"]["det_"+var]
+                for item in det_data:
                     hist.Fill(item)
 
     def get_x_min_max(self, var):
@@ -370,15 +392,28 @@ class MCPlotter(AnalysisBase):
         }
         return keys[var]
 
+    def get_x_min_max_compare(self, var):
+        #utilities.utilities.fractional_axis_range(data, 0.95)
+        keys = {
+            "x":(-150., 150.),
+            "y":(-150., 150.),
+            "z":(-10., 10.),
+            "px":(-100., 100.),
+            "py":(-100., 100.),
+            "pz":(-100., 100.),
+            "t":(-10., 10.),
+        }
+        return keys[var]
+
     def birth_data_detector_residuals(self):
         dummy_canvas = xboa.common.make_root_canvas("dummy")
         for detector, virtual_station_list in self.mc_stations.iteritems():
             #print "Birth residuals", detector, virtual_station_list
             virtual_station = virtual_station_list[0]
-            residual_dict = self.get_data_detector_residuals(detector, virtual_station)
-            #print "    keys", residual_dict.keys()
-            #print "    length", [len(value) for value in residual_dict.values()]
+            residual_dict, mc_dict, det_dict = \
+                     self.get_data_detector_residuals(detector, virtual_station)
             for var in sorted(residual_dict.keys()):
+                # residual distributions
                 canvas_name = "mc_residual_"+detector+"_"+var
                 data = residual_dict[var]
                 xmin, xmax = self.get_x_min_max(var)
@@ -388,6 +423,24 @@ class MCPlotter(AnalysisBase):
                 dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
                 hist = self.make_root_histogram(canvas_name, var, data, self.axis_labels[var], 100, [], '', 0, [], xmin, xmax)
                 hist.Draw()
+
+                # superimpose mc over recon mc
+                canvas_name = "mc_compare_"+detector+"_"+var
+                xmin, xmax = self.get_x_min_max_compare(var)
+                if len(data) == 0:
+                    data = [xmax+(xmax-xmin)*100.]
+                dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
+
+                mc_data = mc_dict[var]
+                hist = self.make_root_histogram(canvas_name, "mc_"+var, mc_data, self.cmp_axis_labels[var], 100, [], '', 0, [], xmin, xmax)
+                hist.SetFillColor(ROOT.kOrange-2)
+                hist.Draw()
+
+                det_data = det_dict[var]
+                hist = self.make_root_histogram(canvas_name, "det_"+var, det_data, self.cmp_axis_labels[var], 100, [], '', 0, [], xmin, xmax)
+                hist.SetMarkerStyle(20)
+                hist.Draw("P E1 PLC SAME")
+                dummy_canvas.cd() # make sure we don't accidentally overwrite "current" canvas
 
     def death_data_detector_residuals(self):
         for name in self.plots:

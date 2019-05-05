@@ -116,18 +116,22 @@ class PlotAmplitudeAnalysis(object):
         upstream_graph = self.get_asymm_error_graph(us_data["corrected_cdf"],
                                                     us_data["cdf_stats_errors"],
                                                     style=24, color=self.us_color,
-                                                    name = "Upstream CDF stats")
+                                                    name = "Upstream CDF stats",
+                                                    centred = False)
         downstream_graph = self.get_asymm_error_graph(ds_data["corrected_cdf"],
                                                       ds_data["cdf_stats_errors"],
                                                     style=26, color=self.ds_color,
-                                                    name = "Downstream CDF stats")
+                                                    name = "Downstream CDF stats",
+                                                    centred = False)
         upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_cdf"],
-                                                    us_data["cdf_sys_errors"],
+                                                    us_data["cdf_sum_errors"],
                                                     fill=self.us_color,
-                                                    name = "Upstream CDF sys")
+                                                    name = "Upstream CDF sys",
+                                                    centred = False)
         downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_cdf"],
-                                                      ds_data["cdf_sys_errors"],
-                                                    fill=self.ds_color, name = "Downstream CDF sys")
+                                                      ds_data["cdf_sum_errors"],
+                                                    fill=self.ds_color, name = "Downstream CDF sys",
+                                                    centred = False)
         graph_list = [upstream_graph, downstream_graph, upstream_graph_sys, downstream_graph_sys]
         draw_list = ["p", "p", "2", "2"]
 
@@ -150,14 +154,16 @@ class PlotAmplitudeAnalysis(object):
 
         cdf_graph_stats = self.get_asymm_error_graph(data["corrected_cdf"],
                                                data["cdf_stats_errors"],
-                                               style=20, name = "CDF Ratio stats")
+                                               style=20, name = "CDF Ratio stats",
+                                                    centred = False)
         cdf_graph_sys = self.get_asymm_error_graph(data["corrected_cdf"],
-                                               data["cdf_sys_errors"], fill=ROOT.kGray, 
-                                               name = "CDF Ratio sys")
+                                               data["cdf_sum_errors"], fill=ROOT.kGray, 
+                                               name = "CDF Ratio sys",
+                                                    centred = False)
         print "CDF"
         print data["corrected_cdf"]
         print data["cdf_stats_errors"]
-        print data["cdf_sys_errors"]
+        print data["cdf_sum_errors"]
         graph_list = [cdf_graph_stats, cdf_graph_sys]
         draw_list = ["p", "2"]
         
@@ -182,7 +188,7 @@ class PlotAmplitudeAnalysis(object):
                                                data["pdf_stats_errors"],
                                                style=20, name = "PDF Ratio stats")
         pdf_graph_sys = self.get_asymm_error_graph(data["corrected_pdf"],
-                                               data["pdf_sys_errors"], fill=ROOT.kGray,
+                                               data["pdf_sum_errors"], fill=ROOT.kGray,
                                                name = "PDF Ratio sys")
         graph_list = [pdf_graph_stats, pdf_graph_sys]
         draw_list = ["p", "2"]
@@ -195,7 +201,7 @@ class PlotAmplitudeAnalysis(object):
         print "PDF"
         print data["corrected_pdf"]
         print data["pdf_stats_errors"]
-        print data["pdf_sys_errors"]
+        print data["pdf_sum_errors"]
 
         canvas.Update()
         for a_format in ["eps", "pdf", "root", "png"]:
@@ -222,7 +228,7 @@ class PlotAmplitudeAnalysis(object):
                                                     style=20, color=self.us_color,
                                                     name = "Upstream stats")
         upstream_graph_sys = self.get_asymm_error_graph(us_data["corrected_pdf"],
-                                                    us_data["pdf_sys_errors"],
+                                                    us_data["pdf_sum_errors"],
                                                     fill=self.us_color,
                                                     name = "Upstream sys")
         downstream_graph_stats = self.get_asymm_error_graph(ds_data["corrected_pdf"],
@@ -230,11 +236,11 @@ class PlotAmplitudeAnalysis(object):
                                                     style=22, color=self.ds_color,
                                                     name = "Downstream stats")
         downstream_graph_sys = self.get_asymm_error_graph(ds_data["corrected_pdf"],
-                                                      ds_data["pdf_sys_errors"],
+                                                      ds_data["pdf_sum_errors"],
                                                     fill=self.ds_color,
                                                     name = "Downstream sys")
-        print "Plotting us sys", us_data["pdf_sys_errors"]
-        print "Plotting ds sys", ds_data["pdf_sys_errors"]
+        print "Plotting us sys", us_data["pdf_sum_errors"]
+        print "Plotting ds sys", ds_data["pdf_sum_errors"]
         graph_list = [upstream_graph_sys, downstream_graph_sys, upstream_graph_stats, downstream_graph_stats, scraped_graph, raw_upstream_graph, raw_downstream_graph]
         draw_list = ["2", "2", "p", "p", "p", "p", "p"]
         hist = self.get_hist(graph_list, self.get_suffix_label(suffix)+" Amplitude [mm]", "Number")
@@ -348,14 +354,18 @@ class PlotAmplitudeAnalysis(object):
         dummy, graph = utilities.chi2_distribution.chi2_graph(emittance, max_bin, 100, 0., 100.)
         return graph
 
-    def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, fill=None, name="Graph"):
+    def get_asymm_error_graph(self, points, errors=None, norm=1., style=None, color=None, fill=None, name="Graph", centred = True):
         graph = ROOT.TGraphAsymmErrors(len(points)-1)
         for i, low_edge in enumerate(self.amp.bin_edge_list[:-1]):
             high_edge = self.amp.bin_edge_list[i+1]
-            centre = (low_edge+high_edge)/2.
+            if centred:
+                centre = (low_edge+high_edge)/2.
+            else:
+                centre = high_edge
             graph.SetPoint(i, centre, points[i]/norm)
             if errors != None:
-                graph.SetPointError(i, centre-low_edge, high_edge-centre, errors[i]/norm, errors[i]/norm)
+                ex = centre-low_edge, high_edge-centre
+                graph.SetPointError(i, 0., 0., errors[i]/norm, errors[i]/norm)
         if style != None:
             graph.SetMarkerStyle(style)
         if color != None:

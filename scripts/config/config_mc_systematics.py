@@ -26,11 +26,11 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
     max_p = max([max(a_bin) for a_bin in p_bins])
     cov_us = Bunch.build_penn_ellipse(
                         1., xboa.common.pdg_pid_to_mass[13],
-                        250., 0., (min_p+max_p)/2., 0., 3.e-3, 1. 
+                        250., 0., (min_p+max_p)/2., 0., 3.e-3, 1.
             ).tolist()
     cov_ds = Bunch.build_penn_ellipse(
                         1., xboa.common.pdg_pid_to_mass[13],
-                        250., 0., (min_p+max_p)/2., 0., 2.e-3, 1. 
+                        250., 0., (min_p+max_p)/2., 0., 2.e-3, 1.
             ).tolist()
     return {
             "plot_dir":plot_dir, # makedirs and then put plots in this directory. Removes any old plots there!!!
@@ -38,16 +38,16 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "tof1_n_sp":1, # number of space points required in TOF1
             "tof12_cut_low":32., # TOF12 cut lower bound
             "tof12_cut_high":39., # TOF12 cut upper bound
-            "delta_tof01_lower":-1., # Delta TOF01 cut lower bound 
-            "delta_tof01_upper":1.5, # Delta TOF01 cut upper bound 
-            "delta_tof12_lower":-5., # Delta TOF01 cut lower bound 
-            "delta_tof12_upper":5., # Delta TOF01 cut upper bound 
+            "delta_tof01_lower":-1., # Delta TOF01 cut lower bound
+            "delta_tof01_upper":1.5, # Delta TOF01 cut upper bound
+            "delta_tof12_lower":-5., # Delta TOF01 cut lower bound
+            "delta_tof12_upper":5., # Delta TOF01 cut upper bound
             "tof01_cut_low":tof01_min_max[0], # TOF01 cut lower bound
             "tof01_cut_high":tof01_min_max[1], # TOF01 cut upper bound
-            "tof01_tramline_lower":2., # p_tof01 - p_tku
-            "tof01_tramline_upper":42., # p_tof01 - p_tku
+            "tof01_tramline_lower":-15.+70, # p_tof01 - p_tku
+            "tof01_tramline_upper":+15.+70, # p_tof01 - p_tku
             "p_bins":p_bins, # set of momentum bins; for now really it is just a lower and upper bound
-            "p_bins_alt":[[125, 155]], # alternative momentum cut
+            "p_bins_alt":[[100, 180]], # alternative momentum cut
             "p_tot_ds_low":tkd_cut[0], # downstream momentum cut lower bound
             "p_tot_ds_high":tkd_cut[1], # downstream momentum cut upper bound
             "reco_files":rogers_mc_file_names(datasets), # list of strings to be handed to glob
@@ -55,8 +55,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "color":4, # not used
             "pid":-13, # assume pid of tracks following TOF cut
             "pvalue_threshold":0.02, # minimum allowed pvalue for pvalue cut
-            "tku_chi2_threshold":4.0, # maximum allowed chi2/dof for chi2 cut
-            "tkd_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
+            "tku_chi2_threshold":8.0, # maximum allowed chi2/dof for chi2 cut
+            "tkd_chi2_threshold":4.0, # BUGGGGGGGGG # maximum allowed chi2/dof for chi2 cut
             "amplitude_corrections":None,
             "amplitude_systematics":{},
             "field_uncertainty":0.02,
@@ -75,7 +75,8 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "cov_fixed_ds":None, #cov_ds,
             "amplitude_algorithm":"binned",
 
-            "fractional_emittance_corrections":None,
+            "fractional_emittance_mc":True,
+            "fractional_emittance_corrections":False,
             "fractional_emittance_systematics":{},
             "fractional_emittance_corrections_draw":True,
             "fractional_emittance_systematics_draw":True,
@@ -90,19 +91,18 @@ def get_analysis(datasets, name, tof01_min_max, data_dir, p_bins, tkd_cut, do_gl
             "density_sections":False,           # True if density sections are to be printed
 
             "do_magnet_alignment":False,
-            "do_efficiency":True,
-            "do_fractional_emittance":True,
+            "do_efficiency":False, #True,
+            "do_fractional_emittance":False, #True,
             "do_amplitude":True,
-            "do_density":True,
+            "do_density":False, #True,
             "do_extrapolation":False,
-            "do_globals":do_globals,
-            "do_mc":True,
-            "do_plots":True,
+            "do_globals":False, #do_globals,
+            "do_mc":False, #True,
+            "do_plots":False, #True,
             "do_cuts_plots":True,
             "do_tof01_weighting":False,
             "do_optics":False,
             "do_data_recorder":False,
-
         }
 
 class Config(object):
@@ -161,7 +161,7 @@ class Config(object):
     }
     data_recorder_cuts = copy.deepcopy(upstream_cuts)
     downstream_cuts = copy.deepcopy(upstream_cuts)
-    downstream_cuts["p_tot_ds"] = False
+    downstream_cuts["p_tot_ds"] = True
     downstream_cuts["tof2_sp"] = False
     downstream_cuts["pvalue_ds"] = False
     downstream_cuts["chi2_ds"] = True
@@ -179,8 +179,8 @@ class Config(object):
     mc_true_ds_cuts = copy.deepcopy(mc_true_us_cuts)
     mc_true_ds_cuts["mc_stations_ds"] = True
     mc_true_ds_cuts["mc_scifi_fiducial_ds"] = True
-    mc_true_ds_cuts["mc_p_ds"] = False
-    cut_report = [[], [], [], []]
+    mc_true_ds_cuts["mc_p_ds"] = True
+    cut_report = [[], [], [], [], [], []]
 
     cut_report[0]  = ["hline", "all events", "hline",]
     cut_report[0] += ["scifi_tracks_us", "chi2_us", "scifi_fiducial_us", "hline",]
@@ -196,14 +196,20 @@ class Config(object):
     cut_report[2] += ["hline", "mc_true_us_cut", "hline"]
 
     cut_report[3] = ["hline", "mc_true_us_cut", "hline",]
-    cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds"]
+    cut_report[3] += ["mc_stations_ds", "mc_scifi_fiducial_ds"]
     cut_report[3] += ["hline", "mc_true_ds_cut", "hline"]
 
-    data_dir = "output/2017-02-7-Systematics-v3"
+    cut_report[4] = ["hline", "mc_true_ds_cut", "hline",]
+    cut_report[4] += ["scifi_tracks_ds", "chi2_ds", "scifi_fiducial_ds", "p_tot_ds",]
+
+    cut_report[5] = ["hline", "downstream_cut", "hline",]
+    cut_report[5] += ["mc_stations_ds", "mc_scifi_fiducial_ds", "mc_p_ds",]
+
+    data_dir = "output/2017-02-7-Systematics-test"
     analyses = []
 
 
-    files = "*"
+    files = "000?"
     lih_systematics_list = [
       "mc_base", "mc_lih_plus"
     ]
@@ -213,19 +219,19 @@ class Config(object):
       "mc_ssd_match_plus",
     ]
     empty_systematics_list = [
-      "tku_base",
+      "tku_base", "tku_full-p",
       "tku_pos_plus", "tku_rot_plus", "tku_density_plus",
-      "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
+      "tku_scale_SSUC_neg", "tku_scale_SSUC_plus", "tku_scale_SSUE1_plus", "tku_scale_SSUE2_plus",
       "tkd_pos_plus", "tkd_rot_plus", "tkd_density_plus",
-      "tkd_scale_SSDC_plus", "tkd_scale_SSDE1_plus", "tkd_scale_SSDE2_plus",
+      "tkd_scale_SSDC_neg", "tkd_scale_SSDC_plus", "tkd_scale_SSDE1_plus", "tkd_scale_SSDE2_plus",
     ]
     cuts = {}
     suffix = None
     vers = "v8"
     run_list = [
+        ["10", "10052", [1.5, 4.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["4",  "10064", [1.5, 6.0], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["6",  "10051", [1.5, 5.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
-        ["10", "10052", [1.5, 4.5], vers, "lH2 empty", suffix, cuts, files, empty_systematics_list],
         ["4",  "9962", [1.5, 6.0], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
         ["6",  "9966", [1.5, 5.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
         ["10", "9970", [1.5, 4.5], vers, "lH2 full", suffix, cuts, files, lh2_systematics_list],
@@ -272,7 +278,7 @@ class Config(object):
             if suffix != None:
                 name += "_"+suffix
             my_analysis = get_analysis(run+"_systematics_"+vers+"/"+sys+"/"+files,
-                            "Simulated 2017-2.7 "+emit+"-140 "+absorber+" Systematics "+name, 
+                            "Simulated 2017-2.7 "+emit+"-140 "+absorber+" Systematics "+name,
                             tof, data_dir, [[135, 145]], [90, 170], False)
             for cut, value in cuts.iteritems():
                 my_analysis[cut] = value
@@ -300,13 +306,14 @@ class Config(object):
     maus_verbose_level = 5
 
     fractional_emittance_bins = [0., 5., 10., 15., 20., 30., 50.]
-    fractional_emittance_fraction = 0.09        # Fraction at which to evaluate the quantiles
-    fractional_emittance_uncertainty = 0        # 0: theoretical, 1: bootstrapped
+    fractional_emittance_fraction = 0.09
+    fractional_emittance_uncertainty = 0
 
-    density_nthreads = 2        # Number of threads used by the density estimator
-    density_knn_rotate = True   # Use the metric of the covariance matrix
-    density_uncertainty = 0     # 0: theoretical, 1: bootstrapped
-    density_npoints = 1000      # Number of points in the density profiles
+    density_nthreads = 1
+    density_knn_rotate = True # rotate to eigenvector system
+    density_uncertainty = False # assume Gaussian for errors; True - use subsampling for errors
+    density_npoints = 100
+    density_graph_scaling = 1e9
 
     magnet_alignment = {
         "n_events":10,
@@ -425,5 +432,3 @@ class Config(object):
       [(float(z)+z_afc, 200., "pipe_"+str(z)) for z in range(-1800, 1801, 100)]+\
       [(+209.6+z_afc, 160., "afc_209.6")],
     )
-
-

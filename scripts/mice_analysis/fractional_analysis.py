@@ -9,6 +9,11 @@ from mice_analysis.amplitude.amplitude_data_binned import AmplitudeDataBinned
 from mice_analysis.fractional_emittance.amplitude_quantile import AmplitudeQuantile
 from mice_analysis.analysis_base import AnalysisBase
 
+#BUG?
+#I dont understand how the corrections are supposed to work. It looks like config
+#fractional_emittance_corrections holds both boolean flag to calculate corrections
+#and string file name for location from which to load corrections; which is it?
+
 class FractionalAnalysis(AnalysisBase):
 
     def __init__(self, config, config_anal, data_loader):
@@ -38,8 +43,8 @@ class FractionalAnalysis(AnalysisBase):
             self.data[typ] = {}
             self.amp_dict[typ] = {}
 
-        # Calculate corrections if required
-        self.calculate_corrections = self.config_anal["fractional_emittance_corrections"] == None
+	    # Calculate corrections if required
+        self.calculate_corrections = self.config_anal["fractional_emittance_mc"]
 
         # Initialize the systematics graphs if necessary
         if self.config_anal["fractional_emittance_systematics_draw"]:
@@ -127,7 +132,10 @@ class FractionalAnalysis(AnalysisBase):
                     break
 
             file_name = self.a_dir+"/amp_data_"+name+"_"
-            self.data["reco"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass, False)
+            min_bin = self.config.amplitude_min_bin
+            min_events= self.config.amplitude_min_events
+            self.data["reco"][name] = AmplitudeDataBinned(file_name, self.bin_edges, mass,
+                                                          False, min_bin, min_events)
             self.data["reco"][name].clear()
 
         print "Set up", len(self.data["reco"]), "reco planes"
@@ -157,12 +165,12 @@ class FractionalAnalysis(AnalysisBase):
     def append_data(self):
         """
         Add data to the amplitude calculation (done at death time)
-        
-        If amplitude_mc is false, we take 'tku' data from upstream_cut sample 
+
+        If amplitude_mc is false, we take 'tku' data from upstream_cut sample
         and 'tkd' data from downstream_cut sample
-        
+
         If amplitude_mc is true, then we build an additional samples
-        1. all_mc is for MC truth of all events that should have been included 
+        1. all_mc is for MC truth of all events that should have been included
            in the sample (some of which might have been missed by recon; some in
            recon sample maybe should have been excluded)
         We use "mc_true_us_cut"/"mc_true_ds_cut" for the all_mc sample
@@ -272,7 +280,7 @@ class FractionalAnalysis(AnalysisBase):
           systematic errors
         """
         # Set the upstream statistical uncertainty to 0, if it is not an
-        # MC data set, as it corresponds to the measurement to which to compare 
+        # MC data set, as it corresponds to the measurement to which to compare
         # the downstream measurement.
         data = self.feps_data[typ]
         if not self.config_anal["amplitude_mc"] and typ == "reco":
@@ -424,8 +432,8 @@ class FractionalAnalysis(AnalysisBase):
 
     def draw_systematics(self):
         """
-        Draws the systematic errors. The uncertainty on each level corresponds to the 
-        residuals between the reference reconstruction set and the data sets that 
+        Draws the systematic errors. The uncertainty on each level corresponds to the
+        residuals between the reference reconstruction set and the data sets that
         are shifted from the reference set
         """
         # Draw graphs that represent the deviations from the baseline
@@ -496,39 +504,34 @@ class FractionalAnalysis(AnalysisBase):
         # Initialize the canvas and the TMultiGraph
         canvas_name = 'fractional_emittance'
         canvas = self.get_plot(canvas_name)["pad"]
-        mg = ROOT.TMultiGraph("mg_feps", ";z [m];#epsilon_{%d}  [mm]" % int(1e2*self.fraction))
-
-        # Initialize the graphs
-        graphs, graphs_tot = {}, {}
-        markers = {"all_mc":24, "reco":20}
-        colors = {"all_mc":4, "reco":1}
-        draw_options= {"all_mc":"ple3", "reco":"p"}
-        for typ in self.data_types:
-            # Get the quantiles
-            quantiles = self.feps_data[typ]["quantiles"]
-
-            # Add a graph that contains only statistical uncertainties
-            point_list = [(datum['z_pos'], datum['corrected'], datum['stat_error']) \
-                                                for datum in quantiles.itervalues()]
-            graphs[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
-            graphs[typ].SetLineWidth(2)
-            mg.Add(graphs[typ], draw_options[typ])
-
-            # Add a graph that contains the full uncertainties (quadratic sum of stat. and syst.)
-            point_list = [(datum['z_pos'], datum['corrected'],\
-                                (datum['stat_error']**2+datum['syst_error']**2)**0.5)\
-                                for datum in quantiles.itervalues()]
-            graphs_tot[typ] = self.make_graph(point_list, colors[typ], markers[typ], typ)
-            mg.Add(graphs_tot[typ], draw_options[typ])
-
+	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#varepsilon_{%d}  [mm]" % int(1e2*self.fraction))
         # Initialize a legend
         leg = ROOT.TLegend(.6, .65, .8, .85)
-        leg.AddEntry(graphs["all_mc"], graphs["all_mc"].GetName(), "plf")
-        leg.AddEntry(graphs["reco"], graphs["reco"].GetName(), "p")
 
-        # Draw
-        mg.Draw("A")
-        leg.Draw("SAME")
+	# Initialize the reco graph
+	quantiles = self.feps_data["amplitude_quantiles"]
+        reco_predicate = lambda key: key == "tku" or key == "tkd"
+        name = "reco"
+        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+                                for key, datum in quantiles.iteritems() if reco_predicate(key)]
+        print "Reco keys      ", quantiles.keys()
+        print "Reco point list", point_list
+        reco_graph = self.make_graph(point_list, 1, 20, name)
+	mg.Add(reco_graph, "p")
+        leg.AddEntry(reco_graph, reco_graph.GetName(), "p")
+
+	# Initialize the MC truth graph
+        name = "all_mc"
+        point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
+                                for key, datum in quantiles.iteritems() if not reco_predicate(key)]
+        if len(point_list):
+            mc_graph = self.make_graph(point_list, 4, 24, name)
+            mg.Add(mc_graph, "ple3")
+            leg.AddEntry(mc_graph, mc_graph.GetName(), "plf")
+
+	# Draw
+	mg.Draw("A")
+	leg.Draw("SAME")
         for fmt in ["pdf", "png", "root"]:
             canvas.Print(self.plot_dir+"/fractional_emittance."+fmt)
 
@@ -613,14 +616,14 @@ class FractionalAnalysis(AnalysisBase):
             labels[loc] = ROOT.TLatex(graph.GetX()[i], graph.GetY()[i], loc)
             labels[loc].SetTextSize(0.025)
             labels[loc].SetTextAngle(90)
-        
+
         graph.Draw("APL")
         for loc in quantiles.keys():
             labels[loc].Draw("SAME")
 
         for fmt in ["root", "png", "pdf"]:
             canvas.Print(self.plot_dir+"/corrections/"+title+"."+fmt)
-        
+
 
     def load_errors(self):
         """
@@ -654,6 +657,7 @@ class FractionalAnalysis(AnalysisBase):
                 if loc not in self.feps_data[typ]:
                     self.feps_data[typ][loc] = {}
                 for key in ["detector_systematics", "performance_systematics"]:
+                    print typ, loc, key, systematics[typ].keys()
                     err_src_dict = systematics[typ][loc][key]
                     self.feps_data[typ][loc][key] = [
                         self.load_one_error(err_src, scale) \
@@ -663,9 +667,11 @@ class FractionalAnalysis(AnalysisBase):
 
     def load_corrections(self, file_name):
         """
-        Load the frational emittance corrections to be applied during this 
+        Load the frational emittance corrections to be applied during this
         fractional emittance analysis. Loads the correction factors
         """
+        if file_name == None:
+            return
         fin = open(file_name)
         feps_str = fin.read()
         src_feps = json.loads(feps_str)

@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import time
+import utilities
 import utilities.run # check that the path is correct
 
 def run_analysis(jobs, cards_list, logs):
@@ -25,20 +26,32 @@ def run_analysis(jobs, cards_list, logs):
     analysis_pool.prefix = cards_list
     analysis_pool.run_many()
 
+def main_reco_prod_analysis():
+    job_list = [2, 6, 10]
+    cards_list = ["scripts/config/config_prod_reco_test.py",]
+    logs = 'logs/reco-prod-logs'
+    run_analysis(job_list, cards_list, logs)
+
+def main_mc_prod_analysis():
+    job_list = range(12,13)
+    cards_list = ["scripts/config/config_mc.py",]
+    logs = 'logs/mc-prod-logs'
+    run_analysis(job_list, cards_list, logs)
+
 def main_mc_analysis():
-    job_list = range(16)
+    job_list = range(12)
     cards_list = ["scripts/config/config_mc.py",]
     logs = 'logs/mc-logs'
     run_analysis(job_list, cards_list, logs)
 
 def main_reco_analysis():
-    job_list = range(16)
+    job_list = range(12)
     cards_list = ["scripts/config/config_reco.py",]
     logs = 'logs/reco-logs'
     run_analysis(job_list, cards_list, logs)
         
 def main_systematics_analysis():
-    job_list = range(140)
+    job_list = range(1, 2)
     cards_list = ["scripts/config/config_mc_systematics.py",] #
     logs = 'logs/systematics-logs'
     run_analysis(job_list, cards_list, logs)
@@ -54,7 +67,7 @@ def main():
     for item in sys.argv:
         print item,
     print
-    if len(sys.argv) < 2 or sys.argv[1] not in ["reco", "sys", "mc"]:
+    if len(sys.argv) < 2 or sys.argv[1] not in ["reco", "sys", "mc", "mc_prod", "reco_prod_test"]:
         print """Usage:
     python run_many_analyses.py <option>
 where option is one of 'reco' 'sys' 'mc'
@@ -66,6 +79,10 @@ where option is one of 'reco' 'sys' 'mc'
         main_systematics_analysis()
     elif sys.argv[1] == "mc":
         main_mc_analysis()
+    elif sys.argv[1] == "mc_prod":
+        main_mc_prod_analysis()
+    elif sys.argv[1] == "reco_prod_test":
+        main_reco_prod_analysis()
     return
 
 if __name__ == "__main__":

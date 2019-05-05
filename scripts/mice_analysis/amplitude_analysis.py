@@ -40,15 +40,17 @@ class AmplitudeAnalysis(AnalysisBase):
         self.clear_amplitude_data()
         self.bin_edge_list = [float(i) for i in range(0, 101, config.amplitude_bin_width)]
         self.a_dir = tempfile.mkdtemp()
+        self.min_bin = config.amplitude_min_bin
+        self.min_events = config.amplitude_min_events
         file_name = self.a_dir+"/amp_data_"
         mu_mass = common.pdg_pid_to_mass[13]
         AmplitudeData = self.get_amplitude_algorithm()
-        self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
-        self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
-        self.reco_data_us = AmplitudeData(file_name+"recon_us", self.bin_edge_list, mu_mass, self.cov_fixed_us)
-        self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
-        self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
-        self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds)
+        self.all_mc_data_us = AmplitudeData(file_name+"mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us, self.min_bin, self.min_events)
+        self.reco_mc_data_us = AmplitudeData(file_name+"reco_mc_us", self.bin_edge_list, mu_mass, self.cov_fixed_us, self.min_bin, self.min_events)
+        self.reco_data_us = AmplitudeData(file_name+"recon_us", self.bin_edge_list, mu_mass, self.cov_fixed_us, self.min_bin, self.min_events)
+        self.all_mc_data_ds = AmplitudeData(file_name+"mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds, self.min_bin, self.min_events)
+        self.reco_mc_data_ds = AmplitudeData(file_name+"reco_mc_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds, self.min_bin, self.min_events)
+        self.reco_data_ds = AmplitudeData(file_name+"recon_ds", self.bin_edge_list, mu_mass, self.cov_fixed_ds, self.min_bin, self.min_events)
         self.plotter = PlotAmplitudeAnalysis(self)
         self.calculate_corrections = self.config_anal["amplitude_corrections"] == None
 
@@ -154,13 +156,13 @@ class AmplitudeAnalysis(AnalysisBase):
         print "Amplitude", suffix
         print "  starting delta_amplitude_calc    ", datetime.datetime.now()
         data = self.amplitudes[suffix]
-        print "  Upstream amplitude calculation...  ", datetime.datetime.now()
+        print "\nUpstream amplitude calculation...  ", datetime.datetime.now()
         fractional_amplitude_dict_0 = data_0.fractional_amplitude()
         print "  n_events", len(fractional_amplitude_dict_0)
-        print "  Downstream amplitude calculation...", datetime.datetime.now()
+        print "\nDownstream amplitude calculation...", datetime.datetime.now()
         fractional_amplitude_dict_1 = data_1.fractional_amplitude()
         print "  n_events", len(fractional_amplitude_dict_1)
-        print "  ... done                           ", datetime.datetime.now()
+        print "... done                           ", datetime.datetime.now()
 
         data["amplitude_dict_upstream"] = fractional_amplitude_dict_0
         data["amplitude_dict_downstream"] = fractional_amplitude_dict_1
@@ -388,7 +390,7 @@ class AmplitudeAnalysis(AnalysisBase):
                     matrix_str += str(row).rjust(width) # maybe it was a vector
         return matrix_str
 
-    def stats_errors(self, migration_matrix, suffix):
+    def pdf_stats_errors(self, migration_matrix, suffix):
         # migration_matrix M_ij is number of events having 
         # upstream bin i AND downstream bin j
         # statistical error on number in bin M_ij is binomially distributed
@@ -459,13 +461,15 @@ class AmplitudeAnalysis(AnalysisBase):
         """
         data = self.amplitudes[suffix]
         bins = range(len(data[us_ds]["pdf"]))
-        sys_error_list = [0 for i in bins]
+        sys_error_pdf_list = [0 for i in bins]
+        sys_error_cdf_list = [0 for i in bins]
         if data["detector_reference"] == None:
-            return [0. for i in bins]
+            return [0. for i in bins], [0. for i in bins]
 
         print "\nReconstruction systematic errors", us_ds
         migrations = data["detector_reference"]
         ref_pdf_list = self.do_migrations(suffix, us_ds, migrations)
+        ref_cdf_list = self.get_cdf(ref_pdf_list)
 
         print 'ref pdf: ', [format(p, '6.4g') for p in ref_pdf_list]
 
@@ -474,15 +478,23 @@ class AmplitudeAnalysis(AnalysisBase):
             scale = migrations["scale"]
             source = migrations["source"]
             sys_pdf_list = self.do_migrations(suffix, us_ds, migrations)
+            sys_cdf_list = self.get_cdf(sys_pdf_list)
             print "sys pdf: ", [format(p, '6.4g') for p in sys_pdf_list]
-            print "  ", i, str(scale).ljust(6), "  err:",
+            print "  ", i, str(scale).ljust(6), "  pdf_err:",
             for j in bins:
-                err = (sys_pdf_list[j] - ref_pdf_list[j])*scale
-                print format(err, '6.2e'),
-                sys_error_list[j] = (sys_error_list[j]**2+err**2)**0.5
+                pdf_err = (sys_pdf_list[j] - ref_pdf_list[j])*scale
+                print format(pdf_err, '6.2e'),
+                sys_error_pdf_list[j] = (sys_error_pdf_list[j]**2+pdf_err**2)**0.5
+            print "sys cdf: ", [format(c, '6.4g') for c in sys_cdf_list]
+            print "  ", i, str(scale).ljust(6), "  cdf_err:",
+            for j in bins:
+                cdf_err = (sys_cdf_list[j] - ref_cdf_list[j])*scale
+                print format(cdf_err, '6.2e'),
+                sys_error_cdf_list[j] = (sys_error_cdf_list[j]**2+cdf_err**2)**0.5
             print
-        print "\nsum: ", [format(err, '6.2e') for err in sys_error_list]
-        return sys_error_list
+        print "\npdf sum: ", [format(pdf_err, '6.2e') for pdf_err in sys_error_pdf_list]
+        print "\ncdf sum: ", [format(cdf_err, '6.2e') for cdf_err in sys_error_cdf_list]
+        return sys_error_pdf_list, sys_error_cdf_list
 
     def calculate_performance_systematics(self, suffix, us_ds):
         """
@@ -501,7 +513,7 @@ class AmplitudeAnalysis(AnalysisBase):
         tku_ref = data["all_upstream"]["pdf"]
         bins = range(len(tku_ref))
         if data["performance_reference"] == None:
-            return [0. for i in bins]
+            return [0. for i in bins], [0. for i in bins]
         print "\nPerformance systematic errors", suffix
         migrations = data["performance_reference"]
         ref_matrix = migrations[suffix]["migration_matrix"]
@@ -547,11 +559,17 @@ class AmplitudeAnalysis(AnalysisBase):
         print "\nFinally reference migration matrix\n   ",
         print self.matrix_str(ref_matrix)
 
-        sys_error_list = [0. for i in bins]
+        sys_error_pdf_list = [0. for i in bins]
         for i in bins:
             for j in bins:
-                sys_error_list[j] += err_matrix[i][j] * tku_ref[i]
-        return sys_error_list
+                sys_error_pdf_list[j] += err_matrix[i][j] * tku_ref[i]
+        sys_error_cdf_list = self.get_cdf(sys_error_pdf_list)
+        return sys_error_pdf_list, sys_error_cdf_list
+
+    def rms(self, list_1, list_2):
+        bins = range(len(list_1))
+        sum_sq = [(list_1[i]**2+list_2[i]**2)**0.5 for i in bins]
+        return sum_sq
 
     def corrections_and_uncertainties(self, suffix):
         """
@@ -569,51 +587,55 @@ class AmplitudeAnalysis(AnalysisBase):
         migration_matrix = data["migration_matrix"]
         data["all_upstream"]["pdf_stats_errors"] = [0. for bin in raw_pdf_list_tku]
         data["all_downstream"]["pdf_stats_errors"] = \
-                                     self.stats_errors(migration_matrix, suffix)
+                                     self.pdf_stats_errors(migration_matrix, suffix)
+        bins = range(len(raw_pdf_list_tku))
         for us_ds in ["all_upstream", "all_downstream"]:
             # apply basic migrations
             print "Doing error correction for", suffix, us_ds
             migrations = self.amplitudes
             pdf_list = self.do_migrations(suffix, us_ds, migrations)
             data[us_ds]["corrected_pdf"] = pdf_list
+            data[us_ds]["corrected_cdf"] = self.get_cdf(pdf_list)
             print "Finding systematic errors for", suffix, us_ds
-            reco_sys_list = self.calculate_detector_systematics(suffix, us_ds)
-            perf_sys_list = self.calculate_performance_systematics(suffix, us_ds)
-            sys_error_list = [(reco_sys_list[i]**2+perf_sys_list[i]**2)**0.5 \
-                                                  for i in range(len(pdf_list))]
-            data[us_ds]["pdf_sys_errors"] = sys_error_list
+            reco_sys_pdf_list, reco_sys_cdf_list = \
+                             self.calculate_detector_systematics(suffix, us_ds)
+            perf_sys_pdf_list, perf_sys_cdf_list = \
+                             self.calculate_performance_systematics(suffix, us_ds)
+            sys_error_pdf_list = self.rms(reco_sys_pdf_list, perf_sys_pdf_list)
+            sys_error_cdf_list = self.rms(reco_sys_cdf_list, perf_sys_cdf_list)
+            sum_error_pdf_list = self.rms(sys_error_pdf_list, data[us_ds]["pdf_stats_errors"])
+            data[us_ds]["pdf_sys_errors"] = sys_error_pdf_list
+            data[us_ds]["pdf_sum_errors"] = sum_error_pdf_list
+            data[us_ds]["cdf_sys_errors"] = sys_error_cdf_list
             print "    sys errors:   ", data[us_ds]["pdf_sys_errors"] 
             print "    stats errors: ", data[us_ds]["pdf_stats_errors"]
             print "    pdf:          ", pdf_list
         self.amplitudes[suffix] = data
 
+    def get_cdf(self, pdf_list):
+        bins = range(len(pdf_list))
+        cdf_list = [sum(pdf_list[:i+1]) for i in bins]
+        return cdf_list
+
     def cdf_data(self, suffix):
         """
-        Calculated Cumulative Density Function and associated uncertainties
-        * cdf is done by adding bins
+        Calculated Cumulative Density Function statistical uncertainties
         * cdf errors are done by adding in quadrature errors of preceding bins
           so for pdf errors e^p_i the cdf error
               e^c_i = sum_{j=0}^{j=i}(e^p_j**2)**0.5
         """
         data = self.amplitudes[suffix]
         for key in ["all_upstream", "all_downstream"]:
-            pdf_list = data[key]["corrected_pdf"]
             stats_err_list = data[key]["pdf_stats_errors"]
-            sys_err_list = data[key]["pdf_sys_errors"]
-            bins = range(len(pdf_list))
-
-            cdf_list = [sum(pdf_list[:i+1]) for i in bins]
+            bins = range(len(stats_err_list))
             cdf_list_stats_errs = [0. for i in bins]
-            cdf_list_sys_errs = [0. for i in bins]
             for i in bins:
                 stats_err_sq = [err**2 for err in stats_err_list[:i+1]]
-                sys_err_sq = [err**2 for err in sys_err_list[:i+1]]
                 cdf_list_stats_errs[i] = sum(stats_err_sq)**0.5
-                cdf_list_sys_errs[i] = sum(sys_err_sq)**0.5
 
-            data[key]["corrected_cdf"] = cdf_list
             data[key]["cdf_stats_errors"] = cdf_list_stats_errs
-            data[key]["cdf_sys_errors"] = cdf_list_sys_errs
+            data[key]["cdf_sum_errors"] = self.rms(cdf_list_stats_errs,
+                                                   data[key]["cdf_sys_errors"])
 
     def ratio_data(self, suffix):
         """
@@ -625,8 +647,10 @@ class AmplitudeAnalysis(AnalysisBase):
         """
         data = self.amplitudes[suffix]
         data["ratio"] = {}
-        for key, stats_err_key, sys_err_key in [("corrected_pdf", "pdf_stats_errors", "pdf_sys_errors",),
-                                                ("corrected_cdf", "cdf_stats_errors", "cdf_sys_errors",)]:
+        for f_key  in ["pdf", "cdf"]:
+            #("corrected_pdf", "pdf_stats_errors", "pdf_sys_errors",), ("corrected_cdf", "cdf_stats_errors", "cdf_sys_errors",)]:
+            key = "corrected_"+f_key
+
             pdf_list_tku = data["all_upstream"][key]
             pdf_list_tkd = data["all_downstream"][key]
             bins = range(len(pdf_list_tku))
@@ -637,7 +661,8 @@ class AmplitudeAnalysis(AnalysisBase):
                     ratio_pdf[i] = pdf_list_tkd[i]/pdf_list_tku[i]
             data["ratio"][key] = ratio_pdf
 
-            for err_key in stats_err_key, sys_err_key:
+            for err_key in "_stats_errors", "_sys_errors", "_sum_errors":
+                err_key = f_key+err_key
                 err_list_tku = [0. for i in bins]
                 err_list_tkd = [0. for i in bins]
                 data["ratio"][err_key] = [0. for i in bins]

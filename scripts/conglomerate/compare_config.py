@@ -61,18 +61,7 @@ class CompareConfig(object):
                 "log_y":False,
                 "hist_title":"",
                 "replace_hist":False,
-                "redraw":{
-                    "draw_option":["P E1 PLC", ""],
-                    "fill_color":[1, ROOT.kOrange-2],
-                    "transparency":None,
-                    "line_color":[1, 1],
-                    "marker_style":[20, 20],
-                    "draw_order":[1, 0],
-                    "x_range":None,
-                    "y_range":None,
-                    "graph_draw_option":["P", "P"],
-                    "ignore_more_histograms":False,
-                },
+                "redraw":False,
                 "canvas_fill_color":None,
                 "extra_lines":False,
                 "extra_labels":False,
@@ -91,6 +80,7 @@ class CompareConfig(object):
                     "x":None,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -151,6 +141,7 @@ class CompareConfig(object):
                     "x":axis_title,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -206,6 +197,7 @@ class CompareConfig(object):
                     "x":axis_title,
                     "y":None,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -252,6 +244,7 @@ class CompareConfig(object):
                     "x":x_axis_title,
                     "y":y_axis_title,
                 },
+                "unique_id":None,
             }
         self.recursive_modify_dict(my_config, modifiers)
         return my_config
@@ -348,6 +341,8 @@ class CompareConfig(object):
                     "x":x_axis_title,
                     "y":y_axis_title,
                 },
+                "unique_id":None,
             }
+
         self.recursive_modify_dict(my_config, modifiers)
         return my_config

@@ -1,8 +1,8 @@
 import shutil
 import os
 
-source = "/home/astg/scarf148/work/amplitude/output/2017-02-7-v4"
-target = "/home/astg/scarf148/work/systematics_mc/beams"
+source = "/home/astg/scarf148/work/2016-11-18_emittance-analysis/amplitude/output/2017-02-7-v5"
+target = "/home/astg/scarf148/work/systematics_mc/beams/full-p-dist"
 analysis_path = "data_recorder/"
 file_name = "tku_5.json"
 analysis_to_run = {
@@ -10,10 +10,6 @@ analysis_to_run = {
     "plots_2017-2.7_10-140_lH2_full":9970,
     "plots_2017-2.7_10-140_LiH":10486,
     "plots_2017-2.7_10-140_None":10447,
-    "plots_2017-2.7_3-140_lH2_empty":10069,
-    "plots_2017-2.7_3-140_lH2_full":9971,
-    "plots_2017-2.7_3-140_LiH":10483,
-    "plots_2017-2.7_3-140_None":10444,
     "plots_2017-2.7_4-140_lH2_empty":10064,
     "plots_2017-2.7_4-140_lH2_full":9962,
     "plots_2017-2.7_4-140_LiH":10484,
@@ -23,6 +19,12 @@ analysis_to_run = {
     "plots_2017-2.7_6-140_LiH":10485,
     "plots_2017-2.7_6-140_None":10446,
 }
+    #"plots_2017-2.7_3-140_lH2_empty":10069,
+    #"plots_2017-2.7_3-140_lH2_full":9971,
+    #"plots_2017-2.7_3-140_LiH":10483,
+    #"plots_2017-2.7_3-140_None":10444,
+
+
 
 def main():
     for analysis_name, run_number in analysis_to_run.iteritems():

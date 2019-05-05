@@ -6,6 +6,7 @@ import itertools
 import math
 import time
 import resource
+import json
 
 import ROOT
 
@@ -13,7 +14,7 @@ from xboa.hit import Hit
 import xboa.common
 
 class AmplitudeDataBinned(object):
-    def __init__(self, file_name, bin_edges, mass, cov_fixed):
+    def __init__(self, file_name, bin_edges, mass, cov_fixed, min_bin, min_events):
         """
         Initialise the AmplitudeData class for the basic amplitude calculation
         * File name is the name of the (temporary) file to which the amplitude data is written
@@ -25,7 +26,8 @@ class AmplitudeDataBinned(object):
         array thingy). We have several memmaps for each bin:
         * run_array stores the run number of each event in the bin
         * spill_array stores the spill number of each event in the bin
-        * event_array stores the event number of each event in the bin
+        * event_array stor
+        es the event number of each event in the bin
         * ps_matrix stores the 4D phase space vector of each event in the bin
         Each one is stored in a memmap file, based on "file_name"+suffix
         During the amplitude calculation, for events whose amplitude we have
@@ -39,10 +41,11 @@ class AmplitudeDataBinned(object):
         """
         self.file_name = file_name
         self.bins = bin_edges
-        self.min_events = 1000 # minimum number of events in the cov calculation
-        self.min_bin = 4 # minimum bin to apply amplitude iterative procedure
+        self.min_events = min_events # minimum number of events in the cov calculation
+        self.min_bin = min_bin # minimum bin to apply amplitude iterative procedure
         self.n_bins = len(self.bins) # we have an overflow bin
         self.n_samples = 2
+        self.max_amplitude = 0.
         for i in range(self.n_bins-1):
             if self.bins[i+1] - self.bins[i] < 1e-6:
                 print "Found bins:", self.bins
@@ -231,16 +234,6 @@ class AmplitudeDataBinned(object):
         emittance = numpy.linalg.det(self.cov)**0.25/self.mass
         return emittance
 
-    def queue_for_amplitude(self, runs, spills, events, psvs):
-        new_list = [None]*spills.shape[0]
-        emittance = self.get_emittance()
-        for i in range(spills.shape[0]):
-            psv = [ui - self.mean[i] for i, ui in enumerate(psvs[i])]
-            psv_t = numpy.transpose(psv)
-            amplitude = emittance*numpy.dot(numpy.dot(psv_t, self.cov_inv), psv)
-            new_list[i] = ((runs[i], spills[i], events[i]), amplitude)
-        self.amplitude_list += new_list
-
     def apply_rebins(self, source_bin, rebins, cut_bin, sample):
         """
         Rebin data. If data is moved from inside cut_bin to outside cut_bin, 
@@ -285,6 +278,7 @@ class AmplitudeDataBinned(object):
         for cut_bin in range(self.n_bins):
             rebins = self.get_rebins(cut_bin, test_sample, True)
             self.apply_rebins(cut_bin, rebins, self.n_bins+1, test_sample)
+        self.get_max_amplitude(ref_sample, self.n_bins)
         self.save_state(ref_sample)
         print "Fractional_amplitudes for ref/test sample", ref_sample, "/", test_sample
         print "Contained emittance", self.get_emittance(), "and", self.n_cov_events, "events, cov matrix"
@@ -292,7 +286,7 @@ class AmplitudeDataBinned(object):
         print "Initially"
         print "    Test bins:", self.n_events[test_sample]
         print "    Ref bins:", self.n_events[ref_sample]
-        print "===  Bin Emit N_cov Time  ==="
+        print "===  Bin Emit N_cov Max_amp Time  ==="
         for cut_bin in reversed(range(self.min_bin, self.n_bins)):
             now = time.time()
             run_array, spill_array, event_array, ps_matrix, amp_array = self.get_data(cut_bin, ref_sample, 'r')
@@ -312,8 +306,12 @@ class AmplitudeDataBinned(object):
             for a_bin in range(cut_bin):
                 rebins = self.get_rebins(a_bin, test_sample, True)
                 self.apply_rebins(a_bin, rebins, a_bin, test_sample)
+            self.get_max_amplitude(test_sample, cut_bin)
             self.save_state(ref_sample)
-            print "   ", cut_bin, round(self.get_emittance(), 3), self.n_cov_events, round(time.time()-now)
+            print "   ", cut_bin, format(self.get_emittance(), "6.4g"),
+            print format(self.n_cov_events, "6.6g"),
+            print format(self.max_amplitude, "6.4g"),
+            print round(time.time()-now)
             now = time.time()
         print "Finally"
         print "    Test bins:", self.n_events[test_sample]
@@ -330,6 +328,20 @@ class AmplitudeDataBinned(object):
         data_dict = dict(data)
         return data_dict
 
+    def get_max_amplitude(self, sample, cut_bin):
+        if cut_bin >= len(self.bins):
+            self.max_amplitude = max(self.bins)
+        else:
+            self.max_amplitude = self.bins[cut_bin]
+        for i in reversed(range(1, cut_bin)):
+            amp_array = self.amp_array[sample][cut_bin-1]
+            if len(amp_array):
+                a_max = max(amp_array)
+                if a_max > 1e-9:
+                    self.max_amplitude = a_max
+                    break
+        return self.max_amplitude
+
     def save_state(self, sample):
         """
         Record internal state for plotting/diagnostics etc
@@ -339,21 +351,24 @@ class AmplitudeDataBinned(object):
           - mean
           - cov
           - number of events surviving in the reference sample
+          - maximum amplitude in the sample
         """
         my_state = {
-            "emittance":copy.deepcopy(self.emittance),
-            "mean":copy.deepcopy(self.mean),
-            "cov":copy.deepcopy(self.cov),
+            "emittance":copy.deepcopy(float(self.emittance)),
+            "mean":copy.deepcopy(self.mean.tolist()),
+            "cov":copy.deepcopy(self.cov.tolist()),
             "n_events":self.n_cov_events,
+            "max_amplitude":copy.deepcopy(float(self.max_amplitude)),
         }
         self.state_list[sample].append(my_state)
+        fout = open(self.file_name+".json", "w")
+        print >> fout, json.dumps(self.state_list, indent=2)
 
     def get_n_events(self):
         n_events = 0
         for bins in self.n_events:
             n_events += sum([a_bin for a_bin in bins])
         return n_events
-            
 
 def delete_elements(source_map, elements):
     if len(elements) == 0:
