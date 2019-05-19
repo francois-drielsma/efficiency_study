@@ -255,25 +255,24 @@ class DensityAnalysis(AnalysisBase):
 
         self.density_data[typ] = data
 
-    def do_corrections(self, ref_source, typ, loc, source, use_capped = True):
+    def do_corrections(self, ref_source, typ, loc, source):
         """
         Applies the corrections to the requested density profile
         Only applies response correction to the reconstructed sample
         * typ specifies the type of data (all_mc, reco_mc, reco)
         * loc specifies the location of the tracker (us, ds)
         * source specifies the source of the corrections to be used
-        * Use capped corrections if use_capped is True
         """
         levels = np.array(ref_source[typ][loc]["levels"])
         corr_key = "level_ratio"
-        if use_capped:
+        if self.config_anal["density_use_capped"]:
             corr_key = "level_ratio_capped"
         if typ == "reco":
             response = np.array(source["response"][loc][corr_key])
-            levels = levels*response
+            levels = (1.+levels)*response-1.
         if typ == "reco" or typ == "reco_mc":
             inefficiency = np.array(source["inefficiency"][loc][corr_key])
-            levels = levels*inefficiency
+            levels = (1.+levels)*inefficiency-1.
 
         return levels.tolist()
 
@@ -549,6 +548,7 @@ class DensityAnalysis(AnalysisBase):
         gratio = ROOT.TGraphErrors(self.npoints)
         gratio_full = ROOT.TGraphErrors(self.npoints)
         gratio_multi.SetTitle(";Fraction #alpha;#rho_{#alpha}^{d} /#rho_{#alpha}^{u}")
+        print "Making the ratio plot for", typ
         for i in range(self.npoints):
             us, ds = graphs["us"].GetY()[i], graphs["ds"].GetY()[i]
             use, dse = graphs["us"].GetEY()[i], graphs["ds"].GetEY()[i]
@@ -558,6 +558,7 @@ class DensityAnalysis(AnalysisBase):
             gratio.GetY()[i] = ratio
             gratio.GetEY()[i] = dse/us
 
+            use, dse = graphs_full["us"].GetEY()[i], graphs_full["ds"].GetEY()[i]
             gratio_full.GetX()[i] = gratio.GetX()[i]
             gratio_full.GetEX()[i] = gratio.GetEX()[i]
             gratio_full.GetY()[i] = ratio
@@ -565,6 +566,7 @@ class DensityAnalysis(AnalysisBase):
             us_rel_err = dse/us
             ds_rel_err = ratio*use/us
             gratio_full.GetEY()[i] = (us_rel_err**2 + ds_rel_err**2)**0.5
+            print i, ratio, us_rel_err, ds_rel_err, gratio_full.GetEY()[i]
 
         self.plots[name+"_"+typ]["graphs"]["ratio"] = gratio
         self.plots[name+"_"+typ]["graphs"]["ratio_full"] = gratio_full
@@ -604,22 +606,16 @@ class DensityAnalysis(AnalysisBase):
             inefficiency, response = [], []
             for i in range(len(all_mc_levels)):
                 # Inherent detector inefficiency
-                if reco_mc_levels[i] == 0:
-                    inefficiency.append(1.)
-                else:
-                    inefficiency.append(float(all_mc_levels[i])/reco_mc_levels[i])
+                inefficiency.append(float(1.+all_mc_levels[i])/(1.+reco_mc_levels[i]))
 
                 # Detector response function
-                if reco_levels[i] == 0:
-                    response.append(1.)
-                else:
-                    response.append(float(reco_mc_levels[i])/reco_levels[i])
+                response.append(float(1.+reco_mc_levels[i])/(1.+reco_levels[i]))
 
             # Produce a capped version of the corrections
             cutoff = self.config_anal["density_corrections_cutoff"]
             cutoff_index = int(cutoff*(self.npoints+1.))
-            ineff_cap = all_mc_levels[cutoff_index]/reco_mc_levels[cutoff_index]
-            resp_cap = reco_mc_levels[cutoff_index]/reco_levels[cutoff_index]
+            ineff_cap = inefficiency[cutoff_index]
+            resp_cap = response[cutoff_index]
 
             inefficiency_capped = copy.deepcopy(inefficiency)
             response_capped = copy.deepcopy(response)
@@ -642,13 +638,23 @@ class DensityAnalysis(AnalysisBase):
         Draw the correction factors used
         """
         for loc in self.locations:
-            inefficiency = self.density_data["inefficiency"][loc]["level_ratio"]
+            levels = np.array(self.density_data["reco"][loc]["levels"])
+
             response = self.density_data["response"][loc]["level_ratio"]
+            levels_corr = (1.+levels)*response-1.
+            response = [levels_corr[i]/levels[i] if levels[i] > 0. else 1. for i in range(len(levels))]
+            inefficiency = self.density_data["inefficiency"][loc]["level_ratio"]
+            levels_corr_2 = (1.+levels_corr)*inefficiency-1.
+            inefficiency = [levels_corr_2[i]/levels_corr[i] if levels[i] > 0. else 1. for i in range(len(levels))]
             plotter = DensityPlotter(self.plot_dir, loc)
             plotter.plot_corrections(inefficiency, response)
 
-            inefficiency = self.density_data["inefficiency"][loc]["level_ratio_capped"]
             response = self.density_data["response"][loc]["level_ratio_capped"]
+            levels_corr = (1.+levels)*response-1.
+            response = [levels_corr[i]/levels[i] if levels[i] > 0. else 1. for i in range(len(levels))]
+            inefficiency = self.density_data["inefficiency"][loc]["level_ratio_capped"]
+            levels_corr_2 = (1.+levels_corr)*inefficiency-1.
+            inefficiency = [levels_corr_2[i]/levels_corr[i] if levels[i] > 0. else 1. for i in range(len(levels))]
             plotter = DensityPlotter(self.plot_dir, "capped_"+loc)
             plotter.plot_corrections(inefficiency, response)
 
