@@ -43,7 +43,7 @@ class FractionalAnalysis(AnalysisBase):
             self.data[typ] = {}
             self.amp_dict[typ] = {}
 
-	    # Calculate corrections if required
+        # Calculate corrections if required
         self.calculate_corrections = self.config_anal["fractional_emittance_mc"]
 
         # Initialize the systematics graphs if necessary
@@ -504,12 +504,12 @@ class FractionalAnalysis(AnalysisBase):
         # Initialize the canvas and the TMultiGraph
         canvas_name = 'fractional_emittance'
         canvas = self.get_plot(canvas_name)["pad"]
-	mg = ROOT.TMultiGraph("mg_feps", ";z [m];#varepsilon_{%d}  [mm]" % int(1e2*self.fraction))
+        mg = ROOT.TMultiGraph("mg_feps", ";z [m];#varepsilon_{%d}  [mm]" % int(1e2*self.fraction))
         # Initialize a legend
         leg = ROOT.TLegend(.6, .65, .8, .85)
 
-	# Initialize the reco graph
-	quantiles = self.feps_data["amplitude_quantiles"]
+        # Initialize the reco graph
+        quantiles = self.feps_data["amplitude_quantiles"]
         reco_predicate = lambda key: key == "tku" or key == "tkd"
         name = "reco"
         point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
@@ -517,10 +517,10 @@ class FractionalAnalysis(AnalysisBase):
         print "Reco keys      ", quantiles.keys()
         print "Reco point list", point_list
         reco_graph = self.make_graph(point_list, 1, 20, name)
-	mg.Add(reco_graph, "p")
+        mg.Add(reco_graph, "p")
         leg.AddEntry(reco_graph, reco_graph.GetName(), "p")
 
-	# Initialize the MC truth graph
+        # Initialize the MC truth graph
         name = "all_mc"
         point_list = [(datum['z_pos'], datum['value'], datum['stat_error']) \
                                 for key, datum in quantiles.iteritems() if not reco_predicate(key)]
@@ -529,9 +529,9 @@ class FractionalAnalysis(AnalysisBase):
             mg.Add(mc_graph, "ple3")
             leg.AddEntry(mc_graph, mc_graph.GetName(), "plf")
 
-	# Draw
-	mg.Draw("A")
-	leg.Draw("SAME")
+        # Draw
+        mg.Draw("A")
+        leg.Draw("SAME")
         for fmt in ["pdf", "png", "root"]:
             canvas.Print(self.plot_dir+"/fractional_emittance."+fmt)
 
