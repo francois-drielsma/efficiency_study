@@ -484,9 +484,7 @@ class DensityAnalysis(AnalysisBase):
             all_err = self.density_data[typ][loc]["levels_stat_errors"][i]*scale_factor
             print "stt:", format(all_err, "4.2g"), "sys:",
             if include_syst and value > 0.:
-                syst_err = self.density_data[typ][loc]["levels_syst_errors"][i]
-                if normalised:
-                    syst_err *= scale_factor/self.config.density_graph_scaling
+                syst_err = self.density_data[typ][loc]["levels_syst_errors"][i]*scale_factor
                 if abs(syst_err) < 1e-6 and abs(syst_err) > 1e-12:
                     print """
                   Warning - I did something hacky; I ran the systematics calculation
